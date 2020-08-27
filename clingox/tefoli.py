@@ -3,14 +3,16 @@ This module defines a single Theory class for using a C theory with
 clingo's python library.
 """
 
+import sys
 import ctypes
-from typing import Optional, Union, Iterator, Tuple, Callable
+from typing import Optional, Union, Iterator, Tuple, Callable, IO
 from ctypes import c_bool, c_void_p, c_int, c_double, c_uint, c_uint64, c_size_t, c_char_p, Structure
 from ctypes import POINTER, byref, CFUNCTYPE, cdll
 from ctypes.util import find_library
 
 from clingo import _error_message, _error_code, _Symbol # type: ignore
 from clingo import Control, ApplicationOptions, Model, StatisticsMap, Symbol
+from clingo import parse_program
 from clingo.ast import AST
 
 
@@ -378,3 +380,28 @@ class Theory:
             if code == 3:
                 raise MemoryError(msg)
             raise RuntimeError("unknow error")
+
+
+def _parse(stream: IO[str], theory: Theory, add: Callable[[AST], None]):
+    parse_program(stream.read(), lambda stm: theory.rewrite_statement(stm, add))
+
+
+def parse_files(files: Iterator[str], theory: Theory, add: Callable[[AST], None]):
+    """
+    Helper function to ease parsing of files.
+
+    This function calls the rewrite method of the theory on each parsed
+    statement and then passes them to the callback.
+    """
+    parsed = False
+
+    for name in files:
+        parsed = True
+        if name == "-":
+            _parse(sys.stdin, theory, add)
+        else:
+            with open(name) as file_:
+                _parse(file_, theory, add)
+
+    if not parsed:
+        _parse(sys.stdin, theory, add)
