@@ -6,9 +6,9 @@ its functionality.
 
 import sys
 from typing import Callable
-from clingo import (clingo_main,
+from clingo import (clingo_main, parse_files,
                     Application, ApplicationOptions, Control, Model, StatisticsMap)
-from clingox.tefoli import Theory, parse_files
+from clingox.tefoli import Theory
 
 
 class DLApp(Application):
@@ -68,7 +68,7 @@ class DLApp(Application):
         self.__theory.register(ctl)
 
         with ctl.builder() as bld:
-            parse_files(files, self.__theory, bld.add)
+            parse_files(files, lambda stm: self.__theory.rewrite_statement(stm, bld.add))
 
         ctl.ground([("base", [])])
         self.__theory.prepare(ctl)
