@@ -72,7 +72,7 @@ class TermEvaluator:
 
     def __call__(self, term: TheoryTerm):
         '''
-        Evalue the given term.
+        Evaluate the given term.
         '''
         # tuples
         if term.type == TheoryTermType.Tuple:
