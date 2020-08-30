@@ -22,7 +22,7 @@ jobs:
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
-        activate-environment: clingcon
+        activate-environment: clingox
         channels: potassco/label/dev,conda-forge
 
     - name: install prerequisites
