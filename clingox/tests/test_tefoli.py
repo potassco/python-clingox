@@ -2,7 +2,7 @@
 Tests tefoli by loading the clingo-dl and clingcon libraries.
 
 This module requires that the OS can load the required libaries. This can be
-achieved by either installing clingo-dl and clingcon in default location or
+achieved by either installing clingo-dl and clingcon in a default location or
 setting environment variables.
 """
 
