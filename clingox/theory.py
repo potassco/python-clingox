@@ -20,7 +20,7 @@ def invert_symbol(x: Symbol) -> Symbol:
     Inverts a symbol.
     '''
     if x.type == SymbolType.Number:
-        return Number(x.number - 1)
+        return Number(-x.number)
 
     if x.type == SymbolType.Function and x.name:
         return Function(x.name, x.arguments, not x.positive)

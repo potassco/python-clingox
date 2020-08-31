@@ -269,7 +269,7 @@ def clingcon(program: str, *args: Sequence[str]) -> AppResult:
     return run_app(TestClingconApp, program, *args)
 
 
-class TestHead(TestCase):
+class TestTefoli(TestCase):
     '''
     Test cases for running clingo-dl and clingcon via the tefoli module.
     '''
