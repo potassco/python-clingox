@@ -18,6 +18,7 @@ def eval_term(s: str) -> str:
     t {{
     +  : 3, unary;
     -  : 3, unary;
+    ?  : 3, binary, left;
     ** : 2, binary, right;
     *  : 1, binary, left;
     /  : 1, binary, left;
@@ -71,3 +72,4 @@ class TestTheory(TestCase):
         Test failed term evaluation.
         '''
         self.assertRaises(TypeError, eval_term, "-(1,2)")
+        self.assertRaises(AttributeError, eval_term, "1?2")

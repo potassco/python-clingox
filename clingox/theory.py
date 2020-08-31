@@ -2,8 +2,6 @@
 This module provides functions to work with clingo's theories.
 '''
 
-# TODO: an option to raise an error for unknown theory operators would be nice.
-
 from clingo import Symbol, Function, Tuple_, Number, SymbolType, TheoryTerm, TheoryTermType
 
 
@@ -29,6 +27,12 @@ def invert_symbol(x: Symbol) -> Symbol:
 
     raise TypeError('cannot invert symbol')
 
+def is_operator(x: str):
+    '''
+    Return true if the given string is an operator.
+    '''
+    return x and x[0] in "/!<=>+-*\\?&@|:;~^."
+
 class TermEvaluator:
     '''
     Evaluates the operators in a theory term in the same fashion as clingo
@@ -52,12 +56,15 @@ class TermEvaluator:
             return Number(require_number(x) ** require_number(y))
         if f == "\\":
             if y == Number(0):
-                raise RuntimeError("division by zero")
+                raise ZeroDivisionError("division by zero")
             return Number(require_number(x) % require_number(y))
         if f == "/":
             if y == Number(0):
-                raise RuntimeError("division by zero")
+                raise ZeroDivisionError("division by zero")
             return Number(require_number(x) // require_number(y))
+
+        if is_operator(f):
+            raise AttributeError('unexpected operator')
 
         return Function(f, [x, y])
 
@@ -69,6 +76,8 @@ class TermEvaluator:
             return Number(require_number(x))
         if f == "-":
             return invert_symbol(x)
+        if is_operator(f):
+            raise AttributeError('unexpected operator')
 
         return Function(f, [x])
 
