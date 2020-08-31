@@ -56,13 +56,20 @@ class Visitor:
                 getattr(self, attr)(x, *args, **kwargs)
             else:
                 self.visit_children(x, *args, **kwargs)
-        if isinstance(x, list):
+        elif isinstance(x, list):
             self.visit_list(x, *args, **kwargs)
-        if isinstance(x, tuple):
+        elif isinstance(x, tuple):
             self.visit_tuple(x, *args, **kwargs)
-        if x is None:
+        elif x is None:
             self.visit_none(x, *args, **kwargs)
-        raise TypeError("unexpected type: {}".format(x))
+        else:
+            raise TypeError("unexpected type: {}".format(x))
+
+    def __call__(self, x: Optional[AST], *args: Sequence[Any], **kwargs):
+        '''
+        Alternative to call visit.
+        '''
+        return self.visit(x, *args, **kwargs)
 
 
 class Transformer:
