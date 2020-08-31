@@ -2,6 +2,8 @@
 This module provides functions to work with clingo's theories.
 '''
 
+# TODO: an option to raise an error for unknown theory operators would be nice.
+
 from clingo import Symbol, Function, Tuple_, Number, SymbolType, TheoryTerm, TheoryTermType
 
 
