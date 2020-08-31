@@ -3,16 +3,14 @@ This module defines a single Theory class for using a C theory with
 clingo's python library.
 """
 
-import sys
 import ctypes
-from typing import Optional, Union, Iterator, Tuple, Callable, IO
-from ctypes import c_bool, c_void_p, c_int, c_double, c_uint, c_uint64, c_size_t, c_char_p, Structure
-from ctypes import POINTER, byref, CFUNCTYPE, cdll
+from typing import Optional, Union, Iterator, Tuple, Callable
+from ctypes import (c_bool, c_void_p, c_int, c_double, c_uint, c_uint64, c_size_t, c_char_p, Structure,
+                    POINTER, byref, CFUNCTYPE, cdll)
 from ctypes.util import find_library
 
-from clingo import _error_message, _error_code, _Symbol # type: ignore
-from clingo import Control, ApplicationOptions, Model, StatisticsMap, Symbol
-from clingo import parse_program
+from clingo import (_error_message, _error_code, _Symbol, # type: ignore
+                    Control, ApplicationOptions, Model, StatisticsMap, Symbol)
 from clingo.ast import AST
 
 
