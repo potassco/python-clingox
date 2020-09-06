@@ -11,10 +11,10 @@ import sys
 from tempfile import NamedTemporaryFile
 from multiprocessing import Process, Queue
 from unittest import TestCase
-from typing import Callable, Sequence, List, Tuple
+from typing import Callable, Iterable, List, Sequence, Tuple
 
 from clingo import (clingo_main, parse_files,
-                    Application, ApplicationOptions, Control, Model, StatisticsMap, SymbolType)
+                    Application, ApplicationOptions, Control, Model, StatisticsMap, Symbol, SymbolType)
 from ..tefoli import Theory
 
 
@@ -44,10 +44,10 @@ class ClingoDL(Application):
         self._theory.validate_options()
         return True
 
-    def _hidden(self, symbol):
+    def _hidden(self, symbol: Symbol) -> bool:
         return symbol.type == SymbolType.Function and symbol.name.startswith("__")
 
-    def print_model(self, model: Model, printer: Callable[[], None]):
+    def print_model(self, model: Model, printer: Callable[[], None]) -> None:
         """
         Print the assignment in nice text format along with the model.
         """
@@ -66,7 +66,7 @@ class ClingoDL(Application):
 
         sys.stdout.flush()
 
-    def main(self, ctl: Control, files):
+    def main(self, ctl: Control, files: Iterable[str]) -> None:
         """
         Main function repsonsible for registering the theory, loading and
         parsing files, grounding, and solving.
@@ -81,13 +81,13 @@ class ClingoDL(Application):
 
         ctl.solve(on_model=self._on_model, on_statistics=self._on_statistics)
 
-    def _on_model(self, model: Model):
+    def _on_model(self, model: Model) -> None:
         """
         Callback to report models to theory and add additional output.
         """
         self._theory.on_model(model)
 
-    def _on_statistics(self, step: StatisticsMap, accu: StatisticsMap):
+    def _on_statistics(self, step: StatisticsMap, accu: StatisticsMap) -> None:
         """
         Callback to gather statistics of theory.
         """
@@ -104,23 +104,23 @@ class ClingconApp(Application):
         self.version = "1.0"
         self._theory = Theory("clingcon", "clingcon")
 
-    def register_options(self, options):
+    def register_options(self, options: ApplicationOptions) -> None:
         """
         Register options with theory.
         """
         self._theory.register_options(options)
 
-    def validate_options(self):
+    def validate_options(self) -> bool:
         """
         Check options in theory.
         """
         self._theory.validate_options()
         return True
 
-    def _hidden(self, symbol):
+    def _hidden(self, symbol: Symbol) -> bool:
         return symbol.type == SymbolType.Function and symbol.name.startswith("__")
 
-    def print_model(self, model, default_printer):
+    def print_model(self, model: Model, printer: Callable[[], None]) -> None:
         """
         Print the assignment in nice text format along with the model.
         """
@@ -140,7 +140,7 @@ class ClingconApp(Application):
             if symbol.match("__csp", 2):
                 assignment.append("{}={}".format(*symbol.arguments))
             if symbol.match("__csp_cost", 1):
-                cost = symbol.arguments[0].string()
+                cost = symbol.arguments[0].string
         sys.stdout.write(" ".join(assignment))
         sys.stdout.write('\n')
 
@@ -150,8 +150,7 @@ class ClingconApp(Application):
 
         sys.stdout.flush()
 
-
-    def main(self, ctl, files):
+    def main(self, ctl: Control, files: Iterable[str]) -> None:
         """
         Main function repsonsible for registering the theory, loading and
         parsing files, grounding, and solving.
@@ -166,13 +165,13 @@ class ClingconApp(Application):
 
         ctl.solve(on_model=self._on_model, on_statistics=self._on_statistics)
 
-    def _on_model(self, model):
+    def _on_model(self, model: Model) -> None:
         """
         Callback to report models to theory and add additional output.
         """
         self._theory.on_model(model)
 
-    def _on_statistics(self, step, accu):
+    def _on_statistics(self, step: StatisticsMap, accu: StatisticsMap) -> None:
         self._theory.on_statistics(step, accu)
 
 
@@ -186,13 +185,12 @@ class TestClingoDL(ClingoDL):
         ClingoDL.__init__(self)
         self.__queue = queue
 
-    def _on_model(self, model: Model):
+    def _on_model(self, model: Model) -> None:
         ClingoDL._on_model(self, model)
 
         symbols = [f'{symbol}' for symbol in model.symbols(shown=True)]
         assignments = [f'{name}={value}' for name, value in sorted(self._theory.assignment(model.thread_id))]
         self.__queue.put((symbols, assignments))
-
 
 class TestClingconApp(ClingconApp):
     """
@@ -204,7 +202,7 @@ class TestClingconApp(ClingconApp):
         ClingconApp.__init__(self)
         self.__queue = queue
 
-    def _on_model(self, model: Model):
+    def _on_model(self, model: Model) -> None:
         ClingconApp._on_model(self, model)
 
         symbols = [f'{symbol}' for symbol in model.symbols(shown=True)]
@@ -212,7 +210,7 @@ class TestClingconApp(ClingconApp):
         self.__queue.put((symbols, assignments))
 
 
-def _run_process(app: Callable[[Queue], Application], program: str, queue: Queue, args: Sequence[str]):
+def _run_process(app: Callable[[Queue], Application], program: str, queue: Queue, args: Sequence[str]) -> None:
     '''
     Run clingo application with given program and intercept results.
     '''
@@ -225,6 +223,7 @@ def _run_process(app: Callable[[Queue], Application], program: str, queue: Queue
         # class to communicate results.
         ret = clingo_main(app(queue), (name, '--outf=3') + tuple(args))
         queue.put(int(ret))
+        queue.close()
     finally:
         os.unlink(name)
 
@@ -250,6 +249,8 @@ def run_app(app: Callable[[Queue], Application], program: str, *args: Sequence[s
             break
         seq.append(ret)
     p.join()
+    q.close()
+    p.close()
 
     seq.sort()
     return status, seq

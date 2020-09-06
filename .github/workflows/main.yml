@@ -34,8 +34,8 @@ jobs:
       run: |
         conda info
         conda list
-        python --version
+        python -VV
 
     - name: test
       shell: pwsh
-      run: python -m unittest discover
+      run: python -m unittest discover -v
