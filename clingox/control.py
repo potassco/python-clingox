@@ -29,17 +29,18 @@ class Literal:
         return repr(self.sign) + repr(self.atom)
 
     @classmethod
-    def from_int(cls, literal, atom_to_symbol: Dict[int, Symbol], symbols: Set[Symbol]) -> 'Literal':
-        if abs(literal) in atom_to_symbol:
-            lit = atom_to_symbol[abs(literal)]
+    def from_int(cls, literal, atom_to_symbol: Dict[int, Symbol]) -> 'Literal':
+        i = abs(literal)
+        if i in atom_to_symbol:
+            atom = atom_to_symbol[i]
         else:
-            i = abs(literal)
             while True:
-                lit = Function('x_' + str(i))
-                if lit not in symbols:
+                atom = Function('x_' + str(i))
+                if atom not in atom_to_symbol.values():
+                    atom_to_symbol.update({i: atom})
                     break
                 i += 1
-        return cls(lit, literal >= 0)
+        return cls(atom, literal >= 0)
 
 
 class ClingoObject(object):
@@ -175,13 +176,13 @@ class PrettyRule(PrettyClingoOject):
         raise Exception("Incomparable type")
 
     @classmethod
-    def from_rule(cls, rule: ClingoRule, atom_to_symbol, symbols) -> 'PrettyRule':
-        return cls._from_rule(rule.choice, rule.head, rule.body, atom_to_symbol, symbols)
+    def from_rule(cls, rule: ClingoRule, atom_to_symbol) -> 'PrettyRule':
+        return cls._from_rule(rule.choice, rule.head, rule.body, atom_to_symbol)
 
     @classmethod
-    def _from_rule(cls, choice: bool, head, body, atom_to_symbol, symbols) -> 'PrettyRule':
-        head = [Literal.from_int(literal, atom_to_symbol, symbols) for literal in head]
-        body = [Literal.from_int(literal, atom_to_symbol, symbols) for literal in body]
+    def _from_rule(cls, choice: bool, head, body, atom_to_symbol) -> 'PrettyRule':
+        head = [Literal.from_int(literal, atom_to_symbol) for literal in head]
+        body = [Literal.from_int(literal, atom_to_symbol) for literal in body]
         return cls(choice, head, body)
 
 
@@ -205,8 +206,8 @@ class PrettyProjection(PrettyClingoOject):
         raise Exception("Incomparable type")
 
     @classmethod
-    def from_projection(cls, projection: ClingoProject, atom_to_symbol, symbols) -> 'PrettyProjection':
-        return cls(Literal.from_int(atom, atom_to_symbol, symbols) for atom in projection.atoms)
+    def from_projection(cls, projection: ClingoProject, atom_to_symbol) -> 'PrettyProjection':
+        return cls(Literal.from_int(atom, atom_to_symbol) for atom in projection.atoms)
 
 
 class PrettyExternal(PrettyClingoOject):
@@ -219,8 +220,8 @@ class PrettyExternal(PrettyClingoOject):
         return '#external ' + repr(self.atom) + ' [' + ('True' if self.value else 'False') + '].'
 
     @classmethod
-    def from_external(self, external: ClingoExternal, atom_to_symbol, symbols) -> 'PrettyExternal':
-        return PrettyExternal(Literal.from_int(external.atom, atom_to_symbol, symbols), external.value)
+    def from_external(self, external: ClingoExternal, atom_to_symbol) -> 'PrettyExternal':
+        return PrettyExternal(Literal.from_int(external.atom, atom_to_symbol), external.value)
 
 class PrettyGroundProgram():
 
@@ -280,7 +281,7 @@ class PrettyGroundProgram():
                 self._add(obj2)
 
     def add_rule(self, rule: ClingoRule) -> PrettyRule:
-        pretty_rule = PrettyRule.from_rule(rule, self.atom_to_symbol, self. symbols)
+        pretty_rule = PrettyRule.from_rule(rule, self.atom_to_symbol)
         self.__add_rule(pretty_rule)
         return pretty_rule
 
@@ -300,11 +301,11 @@ class PrettyGroundProgram():
             self.add_rule(rule)
 
     def add_projection(self, projection: ClingoProject) -> None:
-        pretty_projection = PrettyProjection.from_projection(projection, self.atom_to_symbol, self. symbols)
+        pretty_projection = PrettyProjection.from_projection(projection, self.atom_to_symbol)
         self.projections.append(pretty_projection)
 
-    def add_external(self, external: 'ClingoExternal') -> None:
-        pretty_external = PrettyExternal.from_external(external, self.atom_to_symbol, self. symbols)
+    def add_external(self, external: ClingoExternal) -> None:
+        pretty_external = PrettyExternal.from_external(external, self.atom_to_symbol)
         self.externals.append(pretty_external)
 
     def add_project(self, atoms: List[int]) -> None:
