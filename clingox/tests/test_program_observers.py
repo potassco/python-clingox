@@ -1,7 +1,12 @@
-from clingo import Function, TruthValue
-import clingo
-from clingox.program_observers import External, Minimize, Program, Project, Rule, WeightRule, ProgramObserver
 import unittest
+
+import clingo
+from clingo import Function, TruthValue
+
+from clingox.program_observers import (External, Minimize, Program,
+                                       ProgramObserver, Project, Rule,
+                                       WeightRule)
+
 
 class Test(unittest.TestCase):
 
@@ -125,5 +130,3 @@ class Test(unittest.TestCase):
         """)
         ctr.ground([("base", [])])
         print("\n" + str(prg))
-
-        

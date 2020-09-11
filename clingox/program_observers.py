@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from functools import singledispatch
 from itertools import chain
 
-from clingo import HeuristicType, Symbol, Function, Observer, TruthValue
+from clingo import HeuristicType, Symbol, Observer, TruthValue
 
 
 @singledispatch
@@ -46,7 +46,7 @@ def _(arg, output_atoms):
         ret += "}"
     if arg.body or (not arg.head and not arg.choice):
         ret += " :- "
-         
+
     if isinstance(arg, WeightRule):
         body = ", ".join(str(x[1]) + ":" + pretty_str(x[0], output_atoms) for x in arg.body)
         ret += str(arg.lower_bound) + "{" + body + "}"
@@ -114,7 +114,7 @@ class Program:
     externals: List[Rule] = field(default_factory=list)
 
     def __repr__(self):
-        return f"""Program(output_atoms={repr(self.output_atoms)}, 
+        return f"""Program(output_atoms={repr(self.output_atoms)},
                            rules={repr(self.rules)}, 
                            minimizes={repr(self.minimizes)},
                            projects={repr(self.projects)},
@@ -133,7 +133,7 @@ class Program:
             sorted(self.externals)
             ))
         return ret
-            
+
 class ProgramObserver(Observer):
     def __init__(self, program):
         self._program = program
@@ -143,7 +143,7 @@ class ProgramObserver(Observer):
             self._program.output_atoms[atom] = symbol
         else:
             self._program.facts.append(symbol)
-        
+
 
     def rule(self, choice: bool, head: Sequence[int], body: Sequence[int]) -> None:
         # categorization of rules can be handled here
@@ -161,5 +161,3 @@ class ProgramObserver(Observer):
 
     def minimize(self, priority: int, literals: Sequence[Tuple[int,int]]) -> None:
         self._program.minimizes.append(Minimize(priority, list(literals)))
-
-
