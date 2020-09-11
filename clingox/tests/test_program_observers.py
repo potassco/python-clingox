@@ -124,6 +124,6 @@ class Test(unittest.TestCase):
         #external a. % value=True
         """)
         ctr.ground([("base", [])])
-        print(">>>" + str(prg) + ">>>")
+        print(str(prg))
 
         
