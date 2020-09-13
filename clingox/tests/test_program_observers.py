@@ -164,8 +164,7 @@ class TestObserver(TestCase):
             #external a. % value=True
             """)
         ctl.ground([("base", [])])
-        prg.rules = sorted(prg.rules)
-        prg.projects = sorted(prg.projects)
+        prg.sort()
         self.assertEqual(prg, Program(
             output_atoms={3: c, 2: a},
             shows=[],

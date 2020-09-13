@@ -245,6 +245,21 @@ class Program: # pylint: disable=too-many-instance-attributes
             return ["#project x: #false."]
         return (pretty_str(project, self.output_atoms) for project in sorted(self.projects))
 
+    def sort(self):
+        '''
+        Sort the statements in the program inplace.
+        '''
+        self.shows.sort()
+        self.facts.sort()
+        self.rules.sort()
+        self.weight_rules.sort()
+        self.heuristics.sort()
+        self.edges.sort()
+        self.minimizes.sort()
+        self.externals.sort()
+        self.projects.sort()
+        self.assumptions.sort()
+
     def __str__(self):
         return "\n".join(chain(
             self._pretty_sorted(self.shows),
