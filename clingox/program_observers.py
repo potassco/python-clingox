@@ -6,7 +6,7 @@ printing the ground representation, and adding ground program to control
 objects via the backend.
 '''
 
-from typing import Any, List, Mapping, MutableMapping, NamedTuple, Sequence, Tuple, Union
+from typing import Any, Iterable, List, Mapping, MutableMapping, NamedTuple, Optional, Sequence, Tuple, Union
 from dataclasses import dataclass, field
 from functools import singledispatch
 from itertools import chain
@@ -24,6 +24,7 @@ def pretty_str(arg: Any, output_atoms: OutputTable): # pylint: disable=unused-ar
     '''
     Pretty print program constructs.
     '''
+    print(type(arg))
     assert False, "unexpected type"
 
 
@@ -128,15 +129,14 @@ class Project(NamedTuple):
     '''
     Ground representation of project statements.
     '''
-    atoms: Sequence[Atom]
+    atom: Atom
 
 @pretty_str.register(Project)
 def _pretty_str_project(arg: Project, output_atoms: OutputTable):
     '''
     Pretty print a project statement.
     '''
-    atoms = ', '.join(pretty_str(atom, output_atoms) for atom in arg.atoms)
-    return f'#project{" " if atoms else ""}{atoms}.'
+    return f'#project {pretty_str(arg.atom, output_atoms)}.'
 
 
 class External(NamedTuple):
@@ -207,21 +207,6 @@ def _pretty_str_edge(arg: Edge, output_atoms: OutputTable):
     return f'#edge ({arg.u},{arg.v}){": " if body else ""}{body}.'
 
 
-class Assume(NamedTuple):
-    '''
-    Ground representation of an assume statement.
-    '''
-    literals: Sequence[Literal]
-
-@pretty_str.register(Assume)
-def _pretty_str_assume(arg: Assume, output_atoms: OutputTable):
-    '''
-    Pretty print a assume statement.
-    '''
-    body = ', '.join(pretty_str(lit, output_atoms) for lit in arg.literals)
-    return f'#assume{" " if body else ""}{body}.'
-
-
 @dataclass
 class Program: # pylint: disable=too-many-instance-attributes
     '''
@@ -239,21 +224,39 @@ class Program: # pylint: disable=too-many-instance-attributes
     edges: List[Edge] = field(default_factory=list)
     minimizes: List[Minimize] = field(default_factory=list)
     externals: List[External] = field(default_factory=list)
-    projects: List[Project] = field(default_factory=list)
-    assumes: List[Assume] = field(default_factory=list)
+    projects: Optional[List[Project]] = None
+    assumptions: List[Literal] = field(default_factory=list)
+
+    def _pretty_sorted(self, arg: Any) -> Iterable[str]:
+        return (pretty_str(x, self.output_atoms) for x in sorted(arg))
+
+    def _pretty_assumptions(self) -> Iterable[str]:
+        if not self.assumptions:
+            return []
+        assumptions = (pretty_str(lit, self.output_atoms) for lit in sorted(self.assumptions))
+        return [f'% assumptions: {", ".join(assumptions)}']
+
+    def _pretty_projects(self) -> Iterable[str]:
+        if self.projects is None:
+            return []
+        # This is to inform that there is an empty projection statement.
+        # It might be worth to allow writing just #project.
+        if not self.projects:
+            return ["#project x: #false."]
+        return (pretty_str(project, self.output_atoms) for project in sorted(self.projects))
 
     def __str__(self):
-        return "\n".join(pretty_str(stm, self.output_atoms) for stm in chain(
-            sorted(self.shows),
-            sorted(self.facts),
-            sorted(self.rules),
-            sorted(self.weight_rules),
-            sorted(self.heuristics),
-            sorted(self.edges),
-            sorted(self.minimizes),
-            sorted(self.externals),
-            sorted(self.projects),
-            sorted(self.assumes)))
+        return "\n".join(chain(
+            self._pretty_sorted(self.shows),
+            self._pretty_sorted(self.facts),
+            self._pretty_sorted(self.rules),
+            self._pretty_sorted(self.weight_rules),
+            self._pretty_sorted(self.heuristics),
+            self._pretty_sorted(self.edges),
+            self._pretty_sorted(self.minimizes),
+            self._pretty_sorted(self.externals),
+            self._pretty_projects(),
+            self._pretty_assumptions()))
 
 
 class ProgramObserver(Observer):
@@ -272,7 +275,7 @@ class ProgramObserver(Observer):
         '''
         Resets the assumptions.
         '''
-        self._program.assumes.clear()
+        self._program.assumptions.clear()
 
     def output_atom(self, symbol: Symbol, atom: int) -> None:
         '''
@@ -305,13 +308,21 @@ class ProgramObserver(Observer):
         '''
         Add a project statement to the ground representation.
         '''
-        self._program.projects.append(Project(atoms))
+        if self._program.projects is None:
+            self._program.projects = []
+        self._program.projects.extend(Project(atom) for atom in atoms)
 
     def external(self, atom: int, value: TruthValue) -> None:
         '''
         Add an external statement to the ground representation.
         '''
         self._program.externals.append(External(atom, value))
+
+    def assume(self, literals: Sequence[int]) -> None:
+        '''
+        Extend the program with the given assumptions.
+        '''
+        self._program.assumptions.extend(literals)
 
     def minimize(self, priority: int, literals: Sequence[Tuple[int, int]]) -> None:
         '''

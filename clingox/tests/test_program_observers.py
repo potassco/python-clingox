@@ -14,10 +14,7 @@ class TestObserver(TestCase):
 
     TODO:
     - there is too much copy and paste below
-    - test cases are missing for other statements
-    - a ground program should be parseble by clingo
-      - assume statements should be printed as a comment
-      - the project statement needs to be printed differently
+    - test cases are missing for some statements
     '''
     def test_normal_rule(self):
         '''
@@ -96,8 +93,8 @@ class TestObserver(TestCase):
         obs.project([1, 2])
         self.assertEqual(prg, Program(
             output_atoms={1: a, 2: b, 3: c},
-            projects=[Project(atoms=[1, 2])]))
-        self.assertEqual(str(prg), "#project a, b.")
+            projects=[Project(atom=1), Project(atom=2)]))
+        self.assertEqual(str(prg), "#project a.\n#project b.")
 
     def test_add_empty_project(self):
         '''
@@ -110,8 +107,8 @@ class TestObserver(TestCase):
         obs.output_atom(b, 2)
         obs.output_atom(c, 3)
         obs.project([])
-        self.assertEqual(prg, Program(output_atoms={1: a, 2: b, 3: c}, projects=[Project(atoms=[])]))
-        self.assertEqual(str(prg), "#project.")
+        self.assertEqual(prg, Program(output_atoms={1: a, 2: b, 3: c}, projects=[]))
+        self.assertEqual(str(prg), "#project x: #false.")
 
     def test_add_external(self):
         '''
@@ -178,4 +175,4 @@ class TestObserver(TestCase):
                    Rule(choice=True, head=[3], body=[])],
             minimizes=[Minimize(priority=10, literals=[(3, 5), (2, 7)])],
             externals=[External(atom=2, value=TruthValue.False_)],
-            projects=[Project(atoms=[1]), Project(atoms=[2])]))
+            projects=[Project(atom=1), Project(atom=2)]))
