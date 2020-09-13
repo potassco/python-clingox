@@ -10,7 +10,6 @@ from typing import Any, List, Mapping, MutableMapping, NamedTuple, Sequence, Tup
 from dataclasses import dataclass, field
 from functools import singledispatch
 from itertools import chain
-from textwrap import dedent
 
 from clingo import HeuristicType, Symbol, Observer, TruthValue
 
@@ -242,20 +241,6 @@ class Program: # pylint: disable=too-many-instance-attributes
     externals: List[External] = field(default_factory=list)
     projects: List[Project] = field(default_factory=list)
     assumes: List[Assume] = field(default_factory=list)
-
-    def __repr__(self):
-        return dedent(f'''\
-            Program(output_atoms={repr(self.output_atoms)},
-                    shows={repr(self.shows)},
-                    facts={repr(self.facts)},
-                    rules={repr(self.rules)},
-                    weight_rules={repr(self.rules)},
-                    heuristics={repr(self.heuristics)},
-                    edges={repr(self.edges)},
-                    minimizes={repr(self.minimizes)},
-                    externals={repr(self.externals)},
-                    projects={repr(self.projects)},
-                    assumes={repr(self.assumes)})''')
 
     def __str__(self):
         return "\n".join(pretty_str(stm, self.output_atoms) for stm in chain(
