@@ -6,11 +6,12 @@ printing the ground representation, and adding ground program to control
 objects via the backend.
 '''
 
-from typing import (Callable, Iterable, List, Mapping, MutableMapping, NamedTuple, Optional, Sequence, Tuple,
-                    TypeVar)
+from typing import (Callable, Iterable, List, Mapping, MutableMapping, MutableSequence, NamedTuple, Optional, Sequence,
+                    Tuple, TypeVar)
 from dataclasses import dataclass, field
 from functools import singledispatch
 from itertools import chain
+from copy import copy
 
 from clingo import Backend, HeuristicType, Observer, Symbol, TruthValue
 
@@ -100,18 +101,22 @@ def _remap_wseq(literals: Sequence[Tuple[Literal, Weight]], mapping: LiteralMap)
     '''
     return [(mapping(lit), weight) for lit, weight in literals]
 
-def _remap_stms(stms: Iterable[Statement], mapping: LiteralMap) -> Iterable[Statement]:
+def _remap_stms(stms: MutableSequence[Statement], mapping: LiteralMap):
     '''
-    Remap the given statements returning a list with the result.
+    Remap the given statements.
     '''
-    return (remap(stm, mapping) for stm in stms)
+    for i, stm in enumerate(stms):
+        stms[i] = remap(stm, mapping)
 
-def _add_stms_to_backend(stms: Iterable[Statement], backend: Backend):
+def _add_stms_to_backend(stms: Iterable[Statement], backend: Backend, mapping: Optional[LiteralMap]):
     '''
     Remap the given statements returning a list with the result.
     '''
     for stm in stms:
-        add_to_backend(stm, backend)
+        if mapping:
+            add_to_backend(remap(stm, mapping), backend)
+        else:
+            add_to_backend(stm, backend)
 
 # ------------------------------------------------------------------------------
 
@@ -426,27 +431,33 @@ class Program: # pylint: disable=too-many-instance-attributes
     projects: Optional[List[Project]] = None
     assumptions: List[Literal] = field(default_factory=list)
 
-    def _pretty_sorted(self, arg: Iterable[Statement]) -> Iterable[str]:
-        return (pretty_str(x, self.output_atoms) for x in sorted(arg))
+    def _pretty_stms(self, arg: Iterable[Statement], sort: bool) -> Iterable[str]:
+        if sort:
+            arg = sorted(arg)
+        return (pretty_str(x, self.output_atoms) for x in arg)
 
-    def _pretty_assumptions(self) -> Iterable[str]:
+    def _pretty_assumptions(self, sort: bool) -> Iterable[str]:
         if not self.assumptions:
             return []
-        assumptions = (_pretty_str_lit(lit, self.output_atoms) for lit in sorted(self.assumptions))
+        arg = sorted(self.assumptions) if sort else self.assumptions
+        assumptions = (_pretty_str_lit(lit, self.output_atoms) for lit in arg)
         return [f'% assumptions: {", ".join(assumptions)}']
 
-    def _pretty_projects(self) -> Iterable[str]:
+    def _pretty_projects(self, sort: bool) -> Iterable[str]:
         if self.projects is None:
             return []
         # This is to inform that there is an empty projection statement.
         # It might be worth to allow writing just #project.
         if not self.projects:
             return ["#project x: #false."]
-        return (pretty_str(project, self.output_atoms) for project in sorted(self.projects))
+        arg = sorted(self.projects) if sort else self.projects
+        return (pretty_str(project, self.output_atoms) for project in arg)
 
     def sort(self) -> 'Program':
         '''
         Sort the statements in the program inplace.
+
+        Returns a reference to self.
 
         Note: It might also be nice to sort statement bodies and conditions.
         '''
@@ -468,53 +479,78 @@ class Program: # pylint: disable=too-many-instance-attributes
         '''
         Remap the literals in the program inplace.
 
+        Returns a reference to self.
+
         Note: It might also be nice to sort statement bodies and conditions.
         '''
-        self.shows = list(_remap_stms(self.shows, mapping))
-        self.facts = list(_remap_stms(self.facts, mapping))
-        self.rules = list(_remap_stms(self.rules, mapping))
-        self.weight_rules = list(_remap_stms(self.weight_rules, mapping))
-        self.heuristics = list(_remap_stms(self.heuristics, mapping))
-        self.edges = list(_remap_stms(self.edges, mapping))
-        self.minimizes = list(_remap_stms(self.minimizes, mapping))
-        self.externals = list(_remap_stms(self.externals, mapping))
+        _remap_stms(self.shows, mapping)
+        _remap_stms(self.facts, mapping)
+        _remap_stms(self.rules, mapping)
+        _remap_stms(self.weight_rules, mapping)
+        _remap_stms(self.heuristics, mapping)
+        _remap_stms(self.edges, mapping)
+        _remap_stms(self.minimizes, mapping)
+        _remap_stms(self.externals, mapping)
         if self.projects is not None:
-            self.projects = list(_remap_stms(self.projects, mapping))
-        self.assumptions = [mapping(lit) for lit in self.assumptions]
+            _remap_stms(self.projects, mapping)
+        for i, lit in enumerate(self.assumptions):
+            self.assumptions[i] = mapping(lit)
         self.output_atoms = {mapping(lit): sym for lit, sym in self.output_atoms.items()}
 
         return self
 
-    def add_to_backend(self, backend: Backend) -> 'Program':
+    def add_to_backend(self, backend: Backend, mapping: Optional[LiteralMap] = None) -> 'Program':
         '''
-        Add the program to the given backend.
+        Add the program to the given backend with an optional mapping.
+
+        Returns a reference to self.
         '''
-        _add_stms_to_backend(self.shows, backend)
-        _add_stms_to_backend(self.facts, backend)
-        _add_stms_to_backend(self.rules, backend)
-        _add_stms_to_backend(self.weight_rules, backend)
-        _add_stms_to_backend(self.heuristics, backend)
-        _add_stms_to_backend(self.edges, backend)
-        _add_stms_to_backend(self.minimizes, backend)
-        _add_stms_to_backend(self.externals, backend)
+
+        _add_stms_to_backend(self.shows, backend, mapping)
+        _add_stms_to_backend(self.facts, backend, mapping)
+        _add_stms_to_backend(self.rules, backend, mapping)
+        _add_stms_to_backend(self.weight_rules, backend, mapping)
+        _add_stms_to_backend(self.heuristics, backend, mapping)
+        _add_stms_to_backend(self.edges, backend, mapping)
+        _add_stms_to_backend(self.minimizes, backend, mapping)
+        _add_stms_to_backend(self.externals, backend, mapping)
         if self.projects is not None:
-            _add_stms_to_backend(self.projects, backend)
-        backend.add_assume(self.assumptions)
+            _add_stms_to_backend(self.projects, backend, mapping)
+
+        backend.add_assume(mapping(lit) if mapping else lit
+                           for lit in self.assumptions)
 
         return self
 
-    def __str__(self) -> str:
+    def pretty_str(self, sort: bool = True) -> str:
+        '''
+        Return a readable string represenation of the program.
+        '''
         return "\n".join(chain(
-            self._pretty_sorted(self.shows),
-            self._pretty_sorted(self.facts),
-            self._pretty_sorted(self.rules),
-            self._pretty_sorted(self.weight_rules),
-            self._pretty_sorted(self.heuristics),
-            self._pretty_sorted(self.edges),
-            self._pretty_sorted(self.minimizes),
-            self._pretty_sorted(self.externals),
-            self._pretty_projects(),
-            self._pretty_assumptions()))
+            self._pretty_stms(self.shows, sort),
+            self._pretty_stms(self.facts, sort),
+            self._pretty_stms(self.rules, sort),
+            self._pretty_stms(self.weight_rules, sort),
+            self._pretty_stms(self.heuristics, sort),
+            self._pretty_stms(self.edges, sort),
+            self._pretty_stms(self.minimizes, sort),
+            self._pretty_stms(self.externals, sort),
+            self._pretty_projects(sort),
+            self._pretty_assumptions(sort)))
+
+    def copy(self) -> 'Program':
+        '''
+        Return a shallow copy of the program.
+
+        This copies all mutable state.
+        '''
+        return copy(self)
+
+    def __str__(self) -> str:
+        '''
+        Return a readable string represenation of the program.
+        '''
+        return self.pretty_str()
 
 # ------------------------------------------------------------------------------
 
