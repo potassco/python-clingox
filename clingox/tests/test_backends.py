@@ -25,10 +25,9 @@ class TestSymbolicBackend(TestCase):
 
 
     def test_add_rule(self):
-        with self.ctl.backend() as backend:
-            sym_backend = SymbolicBackend(backend)
+        with SymbolicBackend(self.ctl.backend()) as backend:
             a = Function("a", [Function("c1")])
             b = Function("b", [Function("c2")])
             c = Function("c", [Function("c3")])
-            sym_backend.add_rule([a], [b], [c])
+            backend.add_rule([a], [b], [c])
         self.assertEqual(str(self.prg), "a(c1) :- b(c2), not c(c3).")
