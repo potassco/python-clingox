@@ -7,8 +7,8 @@ from unittest import TestCase
 
 from clingo import Control, Function, HeuristicType, TruthValue
 
-from clingox.program_observers import (Edge, External, Fact, Heuristic, Minimize, Program, ProgramObserver, Project,
-                                       Rule, Show, WeightRule)
+from clingox.program import (Edge, External, Fact, Heuristic, Minimize, Program, ProgramObserver, Project,
+                             Rule, Show, WeightRule)
 
 
 class TestObserver(TestCase):
