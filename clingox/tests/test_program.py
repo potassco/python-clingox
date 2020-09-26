@@ -1,20 +1,22 @@
 '''
 Test cases for the ground program and observer.
+
+TODO: test remapping
 '''
 from unittest import TestCase
 
-from clingo import Control, Function, TruthValue
+from clingo import Control, Function, HeuristicType, TruthValue
 
-from clingox.program_observers import (External, Fact, Minimize, Program, ProgramObserver, Project, Rule, WeightRule)
+from clingox.program_observers import (Edge, External, Fact, Heuristic, Minimize, Program, ProgramObserver, Project,
+                                       Rule, Show, WeightRule)
 
 
 class TestObserver(TestCase):
     '''
     Tests for the program observer.
-
-    TODO:
-    - test cases are missing for some statements
     '''
+    prg: Program
+    obs: ProgramObserver
 
     def __init__(self, *args, **kwargs):
         TestCase.__init__(self, *args, **kwargs)
@@ -44,89 +46,134 @@ class TestObserver(TestCase):
         '''
         Test simple rules.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.rule(False, [1], [2, -3])
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             rules=[Rule(choice=False, head=[1], body=[2, -3])]))
-        self.assertEqual(str(self.prg), "a :- b, not c.")
+        self.assertEqual(str(self.prg), 'a :- b, not c.')
 
     def test_add_choice_rule(self):
         '''
         Test choice rules.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.rule(True, [1], [2, -3])
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             rules=[Rule(choice=True, head=[1], body=[2, -3])]))
-        self.assertEqual(str(self.prg), "{a} :- b, not c.")
+        self.assertEqual(str(self.prg), '{a} :- b, not c.')
 
     def test_add_weight_rule(self):
         '''
         Test weight rules.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.weight_rule(True, [1], 10, [(2, 7), (-3, 5)])
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             weight_rules=[WeightRule(choice=True, head=[1], lower_bound=10, body=[(2, 7), (-3, 5)])]))
-        self.assertEqual(str(self.prg), "{a} :- 10{7,0: b, 5,1: not c}.")
+        self.assertEqual(str(self.prg), '{a} :- 10{7,0: b, 5,1: not c}.')
 
     def test_add_weight_choice_rule(self):
         '''
         Test weight rules that are also choice rules.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.weight_rule(True, [1], 10, [(2, 7), (-3, 5)])
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             weight_rules=[WeightRule(choice=True, head=[1], lower_bound=10, body=[(2, 7), (-3, 5)])]))
-        self.assertEqual(str(self.prg), "{a} :- 10{7,0: b, 5,1: not c}.")
+        self.assertEqual(str(self.prg), '{a} :- 10{7,0: b, 5,1: not c}.')
 
     def test_add_project(self):
         '''
         Test project statements.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.project([1, 2])
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             projects=[Project(atom=1), Project(atom=2)]))
-        self.assertEqual(str(self.prg), "#project a.\n#project b.")
+        self.assertEqual(str(self.prg), '#project a.\n#project b.')
 
     def test_add_empty_project(self):
         '''
         Test empty projection statement.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.project([])
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             projects=[]))
-        self.assertEqual(str(self.prg), "#project x: #false.")
+        self.assertEqual(str(self.prg), '#project x: #false.')
 
     def test_add_external(self):
         '''
         Test external statement.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.external(1, TruthValue.True_)
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             externals=[External(atom=1, value=TruthValue.True_)]))
-        self.assertEqual(str(self.prg), "#external a. [True]")
+        self.assertEqual(str(self.prg), '#external a. [True]')
 
     def test_add_minimize(self):
         '''
         Test minimize statement.
         '''
-        out = self.add_atoms("a", "b", "c")
+        out = self.add_atoms('a', 'b', 'c')
         self.obs.minimize(10, [(1, 7), (3, 5)])
         self.assertEqual(self.prg, Program(
             output_atoms=out,
             minimizes=[Minimize(priority=10, literals=[(1, 7), (3, 5)])]))
-        self.assertEqual(str(self.prg), "#minimize{7@10,0: a; 5@10,1: c}.")
+        self.assertEqual(str(self.prg), '#minimize{7@10,0: a; 5@10,1: c}.')
+
+    def test_add_edge(self):
+        '''
+        Test edge statement.
+        '''
+        out = self.add_atoms('a', 'b', 'c')
+        self.obs.acyc_edge(1, 2, [1])
+        self.assertEqual(self.prg, Program(
+            output_atoms=out,
+            edges=[Edge(1, 2, [1])]))
+        self.assertEqual(str(self.prg), '#edge (1,2): a.')
+
+    def test_add_heuristic(self):
+        '''
+        Test heuristic statement.
+        '''
+        out = self.add_atoms('a', 'b', 'c')
+        self.obs.heuristic(1, HeuristicType.Level, 2, 3, [2])
+        self.assertEqual(self.prg, Program(
+            output_atoms=out,
+            heuristics=[Heuristic(1, HeuristicType.Level, 2, 3, [2])]))
+        self.assertEqual(str(self.prg), '#heuristic a: b. [2@3, Level]')
+
+    def test_add_assume(self):
+        '''
+        Test assumptions.
+        '''
+        out = self.add_atoms('a', 'b', 'c')
+        self.obs.assume([1, 3])
+        self.assertEqual(self.prg, Program(
+            output_atoms=out,
+            assumptions=[1, 3]))
+        self.assertEqual(str(self.prg), '% assumptions: a, c')
+
+    def test_add_show(self):
+        '''
+        Test show statement.
+        '''
+        t = Function('t')
+        out = self.add_atoms('a', 'b', 'c')
+        self.obs.output_term(t, [1])
+        self.assertEqual(self.prg, Program(
+            output_atoms=out,
+            shows=[Show(t, [1])]))
+        self.assertEqual(str(self.prg), '#show t: a.')
 
     def test_control(self):
         '''
@@ -134,7 +181,7 @@ class TestObserver(TestCase):
         '''
         ctl = Control()
         ctl.register_observer(self.obs)
-        ctl.add("base", [], """\
+        ctl.add('base', [], '''\
             b.
             {c}.
             a :- b, not c.
@@ -142,10 +189,10 @@ class TestObserver(TestCase):
             #project a.
             #project b.
             #external a.
-            """)
-        ctl.ground([("base", [])])
+            ''')
+        ctl.ground([('base', [])])
 
-        a, b, c = (Function(s) for s in ("a", "b", "c"))
+        a, b, c = (Function(s) for s in ('a', 'b', 'c'))
         la, lb, lc = (ctl.symbolic_atoms[sym].literal for sym in (a, b, c))
 
         self.prg.sort()
