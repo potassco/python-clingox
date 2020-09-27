@@ -19,7 +19,7 @@ Atom = int
 Literal = int
 Weight = int
 OutputTable = Mapping[Atom, Symbol]
-LiteralMap = Callable[[Literal], Literal]
+AtomMap = Callable[[Atom], Atom]
 Statement = TypeVar('Statement', 'Fact', 'Show', 'Rule', 'WeightRule', 'Heuristic', 'Edge', 'Minimize', 'External',
                     'Project')
 
@@ -31,7 +31,7 @@ def pretty_str(arg: Statement, output_atoms: OutputTable) -> str: # pylint: disa
     assert False, 'unexpected type'
 
 @singledispatch
-def remap(arg: Statement, mapping: Mapping) -> Statement: # pylint: disable=unused-argument
+def remap(arg: Statement, mapping: AtomMap) -> Statement: # pylint: disable=unused-argument
     '''
     Add statements or programs to the backend using the provided mapping to map
     literals.
@@ -88,26 +88,29 @@ def _pretty_str_truth_value(arg: TruthValue):
         return 'True'
     return 'Free'
 
-def _remap_seq(literals: Sequence[Literal], mapping: LiteralMap):
+def _remap_lit(literal: Literal, mapping: AtomMap) -> Atom:
+    return -mapping(-literal) if literal < 0 else mapping(literal)
+
+def _remap_seq(literals: Sequence[Literal], mapping: AtomMap):
     '''
     Apply the mapping to a sequence of literals or atoms.
     '''
-    return [mapping(lit) for lit in literals]
+    return [_remap_lit(lit, mapping) for lit in literals]
 
-def _remap_wseq(literals: Sequence[Tuple[Literal, Weight]], mapping: LiteralMap):
+def _remap_wseq(literals: Sequence[Tuple[Literal, Weight]], mapping: AtomMap):
     '''
     Apply the mapping to a sequence of weighted literals or atoms.
     '''
-    return [(mapping(lit), weight) for lit, weight in literals]
+    return [(_remap_lit(lit, mapping), weight) for lit, weight in literals]
 
-def _remap_stms(stms: MutableSequence[Statement], mapping: LiteralMap):
+def _remap_stms(stms: MutableSequence[Statement], mapping: AtomMap):
     '''
     Remap the given statements.
     '''
     for i, stm in enumerate(stms):
         stms[i] = remap(stm, mapping)
 
-def _add_stms_to_backend(stms: Iterable[Statement], backend: Backend, mapping: Optional[LiteralMap]):
+def _add_stms_to_backend(stms: Iterable[Statement], backend: Backend, mapping: Optional[AtomMap]):
     '''
     Remap the given statements returning a list with the result.
     '''
@@ -133,7 +136,7 @@ def _pretty_str_fact(arg: Fact, output_atoms: OutputTable) -> str: # pylint: dis
     return f'{arg.symbol}'
 
 @remap.register
-def _remap_fact(arg: Fact, mapping: LiteralMap) -> Fact: # pylint: disable=unused-argument
+def _remap_fact(arg: Fact, mapping: AtomMap) -> Fact: # pylint: disable=unused-argument
     '''
     Remap a fact statement.
     '''
@@ -166,7 +169,7 @@ def _pretty_str_show(arg: Show, output_atoms: OutputTable) -> str:
     return f'#show {arg.symbol}{": " if body else ""}{body}.'
 
 @remap.register
-def _remap_show(arg: Show, mapping: LiteralMap) -> Show:
+def _remap_show(arg: Show, mapping: AtomMap) -> Show:
     '''
     Remap a show statetment.
     '''
@@ -202,7 +205,7 @@ def _pretty_str_rule(arg: Rule, output_atoms: OutputTable) -> str:
     return f'{head}{body}.'
 
 @remap.register
-def _remap_rule(arg: Rule, mapping: LiteralMap) -> Rule:
+def _remap_rule(arg: Rule, mapping: AtomMap) -> Rule:
     '''
     Remap literals in a rule.
     '''
@@ -238,7 +241,7 @@ def _pretty_str_weight_rule(arg: WeightRule, output_atoms: OutputTable) -> str:
     return f'{head}{arg.lower_bound}{{{body}}}.'
 
 @remap.register
-def _remap_weight_rule(arg: WeightRule, mapping: LiteralMap) -> WeightRule:
+def _remap_weight_rule(arg: WeightRule, mapping: AtomMap) -> WeightRule:
     '''
     Remap literals in a weight rule.
     '''
@@ -267,7 +270,7 @@ def _pretty_str_project(arg: Project, output_atoms: OutputTable) -> str:
     return f'#project {_pretty_str_lit(arg.atom, output_atoms)}.'
 
 @remap.register
-def _remap_project(arg: Project, mapping: LiteralMap):
+def _remap_project(arg: Project, mapping: AtomMap):
     '''
     Remap project statement.
     '''
@@ -297,7 +300,7 @@ def _pretty_print_external(arg: External, output_atoms: OutputTable) -> str:
     return f'#external {_pretty_str_lit(arg.atom, output_atoms)}. [{_pretty_str_truth_value(arg.value)}]'
 
 @remap.register
-def _remap_external(arg: External, mapping: LiteralMap) -> External:
+def _remap_external(arg: External, mapping: AtomMap) -> External:
     '''
     Remap the external.
     '''
@@ -329,7 +332,7 @@ def _pretty_print_minimize(arg, output_atoms) -> str:
     return f'#minimize{{{body}}}.'
 
 @remap.register
-def _remap_minimize(arg: Minimize, mapping: LiteralMap) -> Minimize:
+def _remap_minimize(arg: Minimize, mapping: AtomMap) -> Minimize:
     '''
     Remap the literals in the minimize statement.
     '''
@@ -364,7 +367,7 @@ def _pretty_str_heuristic(arg: Heuristic, output_atoms: OutputTable) -> str:
     return f'#heuristic {head}{": " if body else ""}{body}. [{arg.bias}@{arg.priority}, {arg.type_}]'
 
 @remap.register
-def _remap_heuristic(arg: Heuristic, mapping: LiteralMap) -> Heuristic:
+def _remap_heuristic(arg: Heuristic, mapping: AtomMap) -> Heuristic:
     '''
     Remap the heuristic statement.
     '''
@@ -396,7 +399,7 @@ def _pretty_str_edge(arg: Edge, output_atoms: OutputTable) -> str:
     return f'#edge ({arg.u},{arg.v}){": " if body else ""}{body}.'
 
 @remap.register
-def _remap_edge(arg: Edge, mapping: LiteralMap) -> Edge:
+def _remap_edge(arg: Edge, mapping: AtomMap) -> Edge:
     '''
     Remap an edge statement.
     '''
@@ -475,7 +478,7 @@ class Program: # pylint: disable=too-many-instance-attributes
 
         return self
 
-    def remap(self, mapping: LiteralMap) -> 'Program':
+    def remap(self, mapping: AtomMap) -> 'Program':
         '''
         Remap the literals in the program inplace.
 
@@ -494,12 +497,12 @@ class Program: # pylint: disable=too-many-instance-attributes
         if self.projects is not None:
             _remap_stms(self.projects, mapping)
         for i, lit in enumerate(self.assumptions):
-            self.assumptions[i] = mapping(lit)
+            self.assumptions[i] = _remap_lit(lit, mapping)
         self.output_atoms = {mapping(lit): sym for lit, sym in self.output_atoms.items()}
 
         return self
 
-    def add_to_backend(self, backend: Backend, mapping: Optional[LiteralMap] = None) -> 'Program':
+    def add_to_backend(self, backend: Backend, mapping: Optional[AtomMap] = None) -> 'Program':
         '''
         Add the program to the given backend with an optional mapping.
 
@@ -515,9 +518,12 @@ class Program: # pylint: disable=too-many-instance-attributes
         _add_stms_to_backend(self.minimizes, backend, mapping)
         _add_stms_to_backend(self.externals, backend, mapping)
         if self.projects is not None:
-            _add_stms_to_backend(self.projects, backend, mapping)
+            if self.projects:
+                _add_stms_to_backend(self.projects, backend, mapping)
+            else:
+                backend.add_project([])
 
-        backend.add_assume(mapping(lit) if mapping else lit
+        backend.add_assume(_remap_lit(lit, mapping) if mapping else lit
                            for lit in self.assumptions)
 
         return self
@@ -577,19 +583,17 @@ class Remapping:
             for fact in facts:
                 backend.add_rule([backend.add_atom(fact.symbol)])
 
-    def __call__(self, lit: Literal) -> Literal:
+    def __call__(self, atom: Atom) -> Atom:
         '''
         Map the given literal to the corresponding literal in the backend.
 
         If the literal was not mapped during initialization, a new literal is
         associated with it.
         '''
-        atom = abs(lit)
         if atom not in self._map:
             self._map[atom] = self._backend.add_atom()
 
-        ret = self._map[atom]
-        return -ret if lit < 0 else -ret
+        return self._map[atom]
 
 # ------------------------------------------------------------------------------
 
