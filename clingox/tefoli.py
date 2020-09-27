@@ -18,7 +18,7 @@ ValueType = Union[int, float, Symbol]
 
 
 class _c_value(ctypes.Union):
-    # pylint: disable=bad-whitespace,bad-continuation,invalid-name
+    # pylint: disable=W,C,R
     _fields_ = [ ("integer", c_int)
                , ("double", c_double)
                , ("symbol", c_uint64)
@@ -26,7 +26,7 @@ class _c_value(ctypes.Union):
 
 
 class _c_variant(Structure):
-    # pylint: disable=bad-whitespace,bad-continuation,invalid-name
+    # pylint: disable=W,C,R
     _fields_ = [ ("type", c_int)
                , ("value", _c_value)
                ]
@@ -368,6 +368,7 @@ class Theory:
         return ret
 
     def __handle_error(self, success, func, arguments):
+        # pylint: disable=unused-argument
         if not success:
             msg = _error_message()
             code = _error_code()
