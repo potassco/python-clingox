@@ -202,7 +202,7 @@ class SymbolicBackend():
         -------
         None
         '''
-        literals = chain(self._add_symbols_weights(pos_literals), self._add_symbols_weights(neg_literals))
+        literals = chain(self._add_symbols_weights(pos_literals), self._add_negated_symbols_weights(neg_literals))
         return self.backend.add_minimize(priority, literals)
 
     def add_project(self, symbols: Iterable[Symbol]) -> None:
@@ -222,7 +222,7 @@ class SymbolicBackend():
         return self.backend.add_project(atoms)
 
     # TODO: can the head also have negative literals?
-    def add_rule(self, head: Iterable[Symbol] = (), pos_body: Iterable[Symbol] = (), neg_body: Iterable[Symbol] = (), choice: bool = False) -> None:
+    def add_rule(self, head: Iterable[Symbol] = (), pos_body: Iterable[Symbol] = (), neg_body: Iterable[Symbol] = (), *, choice: bool = False) -> None:
         '''
         Add a disjuntive or choice rule to the underline backend.
 
@@ -248,10 +248,9 @@ class SymbolicBackend():
         '''
         head_ = (self._add_symbols(head))
         body = chain(self._add_symbols(pos_body), self._add_negated_symbols(neg_body))
-        body = list(body)
         return self.backend.add_rule(head_, body, choice)
 
-    def add_weight_rule(self, head: Iterable[int], lower: int, pos_body: Iterable[Tuple[Symbol, int]], neg_body: Iterable[Tuple[Symbol, int]], choice: bool=False) -> None:
+    def add_weight_rule(self, head: Iterable[Symbol], lower: int, pos_body: Iterable[Tuple[Symbol, int]], neg_body: Iterable[Tuple[Symbol, int]], *, choice: bool = False) -> None:
         '''
         Add a disjuntive or choice rule with one weight constraint with a lower bound
         in the body to the underline backend.
