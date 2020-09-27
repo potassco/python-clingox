@@ -276,7 +276,7 @@ class SymbolicBackend():
         None
         '''
         head_ = (self._add_symbols(head))
-        body = chain(self._add_symbols_weights(pos_body), self._add_symbols_weights(neg_body))
+        body = chain(self._add_symbols_weights(pos_body), self._add_negated_symbols_weights(neg_body))
         return self.backend.add_weight_rule(head_, lower, body, choice)
 
     def _add_symbols(self, symbols: Iterable[Symbol]) -> Iterable[int]:
@@ -338,7 +338,7 @@ class SymbolicBackend():
         '''
         return ((self.backend.add_atom(symbol), w) for (symbol, w) in weighted_symbols)
 
-    def _add_symbols_weights(self, weighted_symbols: Iterable[Tuple[Symbol, int]]):
+    def _add_negated_symbols_weights(self, weighted_symbols: Iterable[Tuple[Symbol, int]]):
         '''
         Return a pair composing of an negated literal and its associated weith for each pair in `weighted_symbols`.
         The first component is a fresh negated literal or the negation of the atom associated with the symbol in the weighted_symbol.
