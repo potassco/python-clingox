@@ -506,6 +506,10 @@ class Program: # pylint: disable=too-many-instance-attributes
         '''
         Add the program to the given backend with an optional mapping.
 
+        Note that the output table cannot be added to the backend for technical
+        reasons. This has to be taken care of by the user. See for example the
+        `Remapping` class, which provides functionality for this.
+
         Returns a reference to self.
         '''
 
