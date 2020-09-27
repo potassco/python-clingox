@@ -28,14 +28,32 @@ class SymbolicBackend():
     to a program:
 
         >>> import clingo
-        >>> import clingox.backends.SymbolicBackend
+        >>> from clingox.backends import SymbolicBackend
         >>> ctl = clingo.Control()
         >>> a = clingo.Function("a")
         >>> b = clingo.Function("b")
         >>> c = clingo.Function("c")
-        >>> with SymbolicBackend(ctl.backend()) as backend:
-                backend.add_rule([a], [b], [c])
-                backend.add_rule([b])
+        >>> with SymbolicBackend(ctl.backend()) as symbolic_backend:
+                symbolic_backend.add_rule([a], [b], [c])
+                symbolic_backend.add_rule([b])
+        >>> ctl.solve(on_model=lambda m: print("Answer: {}".format(m)))
+        Answer: a b
+        SAT
+
+    The `SymbolicBackend` can also be used in combination with the `Backend` that it wraps.
+    In this case, it is the `Backend` the one that must be used with Python's `with` statement.
+
+        >>> import clingo
+        >>> from clingox.backends import SymbolicBackend
+        >>> ctl = clingo.Control()
+        >>> a = clingo.Function("a")
+        >>> b = clingo.Function("b")
+        >>> c = clingo.Function("c")
+        >>> with ctl.backend() as backend:
+                symbolic_backend = SymbolicBackend(backend)
+                symbolic_backend.add_rule([a], [b], [c])
+                atom_b = backend.add_atom(b)
+                backend.add_rule([atom_b])
         >>> ctl.solve(on_model=lambda m: print("Answer: {}".format(m)))
         Answer: a b
         SAT
@@ -230,6 +248,7 @@ class SymbolicBackend():
         '''
         head_ = (self._add_symbols(head))
         body = chain(self._add_symbols(pos_body), self._add_negated_symbols(neg_body))
+        body = list(body)
         return self.backend.add_rule(head_, body, choice)
 
     def add_weight_rule(self, head: Iterable[int], lower: int, pos_body: Iterable[Tuple[Symbol, int]], neg_body: Iterable[Tuple[Symbol, int]], choice: bool=False) -> None:

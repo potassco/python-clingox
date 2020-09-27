@@ -6,7 +6,7 @@ from unittest import TestCase
 
 from clingo import Control, Function, TruthValue
 
-from clingox.program_observers import (External, Fact, Minimize, Program, ProgramObserver, Project, Rule, WeightRule)
+from clingox.program import (External, Fact, Minimize, Program, ProgramObserver, Project, Rule, WeightRule)
 
 
 class TestSymbolicBackend(TestCase):
