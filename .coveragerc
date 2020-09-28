@@ -1,0 +1,3 @@
+[run]
+omit = 
+    clingox/tefoli.py
