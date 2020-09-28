@@ -1,32 +1,42 @@
 '''
-This module provides a backedn wrapper to work with symbols instead of integer literals.
+This module provides a backend wrapper to work with symbols instead of integer
+literals.
 '''
 from typing import Iterable, Tuple
 from itertools import chain
 from clingo import HeuristicType, Symbol, Backend, TruthValue
 
-# pylint: disable=line-too-long
+
+def _add_sign(lit: int, sign: bool):
+    '''
+    Invert the literal if sign is negative and otherwise leave it untouched.
+    '''
+    return lit if sign else -lit
 
 class SymbolicBackend():
     '''
-    Backend wrapper providing a interface to extend a logic program.
-    It mirrors the interface of clingo's Backend, but using Symbols rather than integers to represent literals.
+    Backend wrapper providing a interface to extend a logic program. It mirrors
+    the interface of clingo's Backend, but using Symbols rather than integers
+    to represent literals.
 
-    Implements: ContextManager[SymbolicBackend].
+    Implements: `ContextManager[SymbolicBackend]`.
 
     See Also
     --------
-    clingo.Backend and Control.backend()
+    clingo.Backend, clingo.Control.backend
 
     Notes
     --------
-    The `SymbolicBackend` is a context manager and must be used with Python's `with` statement.
+    The `SymbolicBackend` is a context manager and must be used with Python's
+    `with` statement.
 
     Examples
     --------
     The following example shows how to add the rules
+
         a :- b, not c.
         b.
+
     to a program:
 
         >>> import clingo
@@ -42,8 +52,9 @@ class SymbolicBackend():
         Answer: a b
         SAT
 
-    The `SymbolicBackend` can also be used in combination with the `Backend` that it wraps.
-    In this case, it is the `Backend` the one that must be used with Python's `with` statement.
+    The `SymbolicBackend` can also be used in combination with the `Backend`
+    that it wraps. In this case, it is the `Backend` that must be used with
+    Python's `with` statement:
 
         >>> import clingo
         >>> from clingox.backends import SymbolicBackend
@@ -89,10 +100,10 @@ class SymbolicBackend():
         '''
         return self.backend.__exit__(type_, value, traceback)
 
-    # TODO: are node_u and node_v literals? do they need to be Symbols?
-    def add_acyc_edge(self, node_u: int, node_v: int, pos_condition: Iterable[Symbol], neg_condition: Iterable[Symbol]) -> None:
+    def add_acyc_edge(self, node_u: int, node_v: int, pos_condition: Iterable[Symbol],
+                      neg_condition: Iterable[Symbol]) -> None:
         '''
-        Add an edge directive to the underline backend.
+        Add an edge directive to the underlying backend.
 
         Parameters
         ----------
@@ -101,32 +112,42 @@ class SymbolicBackend():
         node_v : int
             The end node represented as an unsigned integer.
         pos_condition : Iterable[Symbol]
-            List of program symbols forming positive part of the condition
+            List of program symbols forming positive part of the condition.
         neg_condition : Iterable[Symbol]
-            List of program symbols forming negated part of the condition
+            List of program symbols forming negated part of the condition.
+
         Returns
         -------
         None
         '''
-        condition = chain(self._add_symbols(pos_condition), self._add_negated_symbols(neg_condition))
-        return self.backend.add_acyc_edge(node_u, node_v, condition)
+        condition = chain(self._add_lits(pos_condition, True), self._add_lits(neg_condition, False))
+        self.backend.add_acyc_edge(node_u, node_v, condition)
 
-    # TODO: can this get negative literals?
-    def add_assume(self, literals: Iterable[Symbol]) -> None:
+    def add_assume(self, pos_atoms: Iterable[Symbol] = (), neg_atoms: Iterable[Symbol] = ()) -> None:
         '''
-        Add assumptions to the underline backend.
+        Add assumptions to the underlying backend.
 
-        :param literals: The list of symbols to assume true.
-        :returns: None
+        Parameters
+        ----------
+        pos_atoms : Iterable[Symbol]
+            Atoms to assume true.
+        neg_atoms : Iterable[Symbol]
+            Atoms to assume false.
+
+        Returns
+        -------
+        None
         '''
-        return self.backend.add_assume(self._add_symbols(literals))
+        self.backend.add_assume(chain(self._add_lits(pos_atoms, True), self._add_lits(neg_atoms, False)))
 
     def add_atom(self, symbol: Symbol) -> int:
         '''
-        Return a fresh program atom or the atom associated with the given symbol.
+        Return a fresh program atom or the atom associated with the given
+        symbol.
 
-        If the given symbol does not exist in the atom base, it is added first. Such
-        atoms will be used in subequents calls to ground for instantiation.
+        If the given symbol does not exist in the atom base, it is added first.
+        Such atoms will be used in subsequents calls to ground for
+        instantiation.
 
         Parameters
         ----------
@@ -140,14 +161,14 @@ class SymbolicBackend():
         '''
         return self.backend.add_atom(symbol)
 
-    def add_external(self, symbol: Symbol, value: TruthValue = TruthValue.False_) -> None:
+    def add_external(self, atom: Symbol, value: TruthValue = TruthValue.False_) -> None:
         '''
-        Mark a program atom as external optionally fixing its truth value.
+        Mark a program atom as external and set its truth value.
 
         Parameters
         ----------
         atom : Symbol
-            The program atom associated with symbol to mark as external.
+            The atom to mark as external.
         value : TruthValue=TruthValue.False_
             Optional truth value.
 
@@ -159,57 +180,62 @@ class SymbolicBackend():
         -----
         Can also be used to release an external atom using `TruthValue.Release`.
         '''
-        return self.backend.add_external(self.backend.add_atom(symbol), value)
+        return self.backend.add_external(self.backend.add_atom(atom), value)
 
-    def add_heuristic(self, symbol: Symbol, type_: HeuristicType, bias: int, priority: int, pos_condition: Iterable[Symbol], neg_condition: Iterable[Symbol]) -> None:
+    def add_heuristic(self, atom: Symbol, type_: HeuristicType, bias: int, priority: int,
+                      pos_condition: Iterable[Symbol], neg_condition: Iterable[Symbol]) -> None:
         '''
-        Add a heuristic directive to the underline backend.
+        Add a heuristic directive to the underlying backend.
 
         Parameters
         ----------
-        atom : int
+        atom : Symbol
             Program atom to heuristically modify.
-        type : HeuristicType
+        type_ : HeuristicType
             The type of modification.
         bias : int
             A signed integer.
         priority : int
             An unsigned integer.
         pos_condition : Iterable[Symbol]
-            List of program literals forming the positive part of the condition.
+            List of program literals forming the positive part of the
+            condition.
         neg_condition : Iterable[Symbol]
             List of program literals forming the negated part of the condition.
 
         Returns
         -------
         None
-    '''
-        atom = self.backend.add_atom(symbol)
-        condition = chain(self._add_symbols(pos_condition), self._add_negated_symbols(neg_condition))
-        return self.backend.add_heuristic(atom, type_, bias, priority, condition)
-
-    def add_minimize(self, priority: int, pos_literals: Iterable[Tuple[Symbol, int]], neg_literals: Iterable[Tuple[Symbol, int]]) -> None:
         '''
-        Add a minimize constraint to the underline backend.
+        condition = chain(self._add_lits(pos_condition, True), self._add_lits(neg_condition, False))
+        return self.backend.add_heuristic(self.backend.add_atom(atom), type_, bias, priority, condition)
+
+    def add_minimize(self, priority: int, pos_literals: Iterable[Tuple[Symbol, int]],
+                     neg_literals: Iterable[Tuple[Symbol, int]]) -> None:
+        '''
+        Add a minimize constraint to the underlying backend.
 
         Parameters
         ----------
         priority : int
             Integer for the priority.
         pos_literals : Iterable[Tuple[Symbol,int]]
-            List of pairs of program symbols and weights forming the positive part of the condition.
+            List of pairs of program symbols and weights forming the positive
+            part of the condition.
         neg_literals : Iterable[Tuple[Symbol,int]]
-            List of pairs of program symbols and weights forming the negated part of the condition.
+            List of pairs of program symbols and weights forming the negated
+            part of the condition.
+
         Returns
         -------
         None
         '''
-        literals = chain(self._add_symbols_weights(pos_literals), self._add_negated_symbols_weights(neg_literals))
+        literals = chain(self._add_wlits(pos_literals, True), self._add_wlits(neg_literals, False))
         return self.backend.add_minimize(priority, literals)
 
-    def add_project(self, symbols: Iterable[Symbol]) -> None:
+    def add_project(self, atoms: Iterable[Symbol]) -> None:
         '''
-        Add a project statement to the underline backend.
+        Add a project statement to the underlying backend.
 
         Parameters
         ----------
@@ -220,13 +246,12 @@ class SymbolicBackend():
         -------
         None
         '''
-        atoms = (self._add_symbols(symbols))
-        return self.backend.add_project(atoms)
+        return self.backend.add_project(self._add_lits(atoms, True))
 
-    # TODO: can the head also have negative literals?
-    def add_rule(self, head: Iterable[Symbol] = (), pos_body: Iterable[Symbol] = (), neg_body: Iterable[Symbol] = (), *, choice: bool = False) -> None:
+    def add_rule(self, head: Iterable[Symbol] = (), pos_body: Iterable[Symbol] = (), neg_body: Iterable[Symbol] = (),
+                 choice: bool = False) -> None:
         '''
-        Add a disjuntive or choice rule to the underline backend.
+        Add a disjuntive or choice rule to the underlying backend.
 
         Parameters
         ----------
@@ -248,14 +273,14 @@ class SymbolicBackend():
         Integrity constraints and normal rules can be added by using an empty or
         singleton head list, respectively.
         '''
-        head_ = (self._add_symbols(head))
-        body = chain(self._add_symbols(pos_body), self._add_negated_symbols(neg_body))
-        return self.backend.add_rule(head_, body, choice)
+        body = chain(self._add_lits(pos_body, True), self._add_lits(neg_body, False))
+        return self.backend.add_rule(self._add_lits(head, True), body, choice)
 
-    def add_weight_rule(self, head: Iterable[Symbol], lower: int, pos_body: Iterable[Tuple[Symbol, int]], neg_body: Iterable[Tuple[Symbol, int]], *, choice: bool = False) -> None:
+    def add_weight_rule(self, head: Iterable[Symbol], lower: int, pos_body: Iterable[Tuple[Symbol, int]],
+                        neg_body: Iterable[Tuple[Symbol, int]], choice: bool = False) -> None:
         '''
-        Add a disjuntive or choice rule with one weight constraint with a lower bound
-        in the body to the underline backend.
+        Add a disjunctive or choice rule with one weight constraint with a lower
+        bound in the body to the underlying backend.
 
         Parameters
         ----------
@@ -276,86 +301,18 @@ class SymbolicBackend():
         -------
         None
         '''
-        head_ = (self._add_symbols(head))
-        body = chain(self._add_symbols_weights(pos_body), self._add_negated_symbols_weights(neg_body))
-        return self.backend.add_weight_rule(head_, lower, body, choice)
+        body = chain(self._add_wlits(pos_body, True), self._add_wlits(neg_body, False))
+        return self.backend.add_weight_rule(self._add_lits(head, True), lower, body, choice)
 
-    def _add_symbols(self, symbols: Iterable[Symbol]) -> Iterable[int]:
+    def _add_lits(self, atoms: Iterable[Symbol], sign: bool) -> Iterable[int]:
         '''
-        Return a fresh program atom or the atom associated with each symbol in `symbols`.
-
-        If the given symbol does not exist in the atom base, it is added first. Such
-        atoms will be used in subequents calls to ground for instantiation.
-
-        Parameters
-        ----------
-        symbols : Iterable[Symbol]
-            The symbols associated with the atoms.
-
-        Returns
-        -------
-        Iterable[int]
-            The program atoms representing the atoms.
+        Map the given atoms to program literals with the given sign.
         '''
-        return (self.backend.add_atom(symbol) for symbol in symbols)
+        return (_add_sign(self.backend.add_atom(symbol), sign) for symbol in atoms)
 
-    def _add_negated_symbols(self, symbols: Iterable[Symbol]):
+    def _add_wlits(self, weighted_symbols: Iterable[Tuple[Symbol, int]], sign: bool):
         '''
-        Return a fresh program negated literal or the negation of the atom associated with each symbol in `symbols`.
-
-        If the given symbol does not exist in the atom base, it is added first. Such
-        atoms will be used in subequents calls to ground for instantiation.
-
-        Parameters
-        ----------
-        symbols : Iterable[Symbol]
-            The symbols associated with the atoms.
-
-        Returns
-        -------
-        Iterable[int]
-            The program literals representing the negated atoms.
+        Map the given weighted atoms to weighted program literals with the
+        given sign.
         '''
-        return (-x for x in self._add_symbols(symbols))
-
-    def _add_symbols_weights(self, weighted_symbols: Iterable[Tuple[Symbol, int]]) -> Iterable[Tuple[int, int]]:
-        '''
-        Return a pair composing of an atom and its associated weith for each pair in `weighted_symbols`.
-        The first component is a fresh program atom or the atom associated with a given symbol for each symbol in the weighted_symbol.
-        The second component is the associated weight unchanged.
-
-        If the given symbol does not exist in the atom base, it is added first. Such
-        atoms will be used in subequents calls to ground for instantiation.
-
-        Parameters
-        ----------
-        symbols : Iterable[Tuple[Symbol,int]]
-            The symbols associated with the atoms.
-
-        Returns
-        -------
-        Iterable[Tuple[int,int]]
-            The pairs representing the weighted atoms.
-        '''
-        return ((self.backend.add_atom(symbol), w) for (symbol, w) in weighted_symbols)
-
-    def _add_negated_symbols_weights(self, weighted_symbols: Iterable[Tuple[Symbol, int]]):
-        '''
-        Return a pair composing of an negated literal and its associated weith for each pair in `weighted_symbols`.
-        The first component is a fresh negated literal or the negation of the atom associated with the symbol in the weighted_symbol.
-        The second component is the associated weight unchanged.
-
-        If the given symbol does not exist in the atom base, it is added first. Such
-        atoms will be used in subequents calls to ground for instantiation.
-
-        Parameters
-        ----------
-        symbols : Iterable[Tuple[Symbol,int]]
-            The symbols associated with the atoms.
-
-        Returns
-        -------
-        Iterable[Tuple[int,int]]
-            The pairs representing the weighted atoms.
-        '''
-        return ((-x, w) for (x, w) in self._add_symbols_weights(weighted_symbols))
+        return ((_add_sign(self.backend.add_atom(x), sign), w) for (x, w) in weighted_symbols)
