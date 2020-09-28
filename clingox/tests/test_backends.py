@@ -5,8 +5,7 @@ from unittest import TestCase
 
 from clingo import Control, Function, HeuristicType, TruthValue
 from clingox.backends import SymbolicBackend
-from clingox.program import (External, Fact, Minimize, Program,
-                             ProgramObserver, Project, Rule, WeightRule)
+from clingox.program import Program, ProgramObserver
 
 
 class TestSymbolicBackend(TestCase):
@@ -43,13 +42,16 @@ class TestSymbolicBackend(TestCase):
         self.assertEqual(str(self.prg), "% assumptions: a(c1), b(c2), c(c3)")
 
     def test_add_atom(self):
+        '''
+        Test atom.
+        '''
         a = Function("a", [Function("c1")])
         b = Function("b", [Function("c2")])
         with self.ctl.backend() as backend:
             symbolic_backend = SymbolicBackend(self.ctl.backend())
             atom_a = symbolic_backend.add_atom(a)
             atom_b = symbolic_backend.add_atom(b)
-            backend.add_rule([atom_a], [ atom_b])
+            backend.add_rule([atom_a], [atom_b])
         self.assertEqual(str(self.prg), "a(c1) :- b(c2).")
 
     def test_add_external(self):
@@ -98,9 +100,6 @@ class TestSymbolicBackend(TestCase):
         '''
         Test project statements.
         '''
-        a = Function("a", [Function("c1")])
-        b = Function("b", [Function("c2")])
-        c = Function("c", [Function("c3")])
         with SymbolicBackend(self.ctl.backend()) as symbolic_backend:
             symbolic_backend.add_project([])
         self.assertEqual(str(self.prg), "#project x: #false.")
@@ -148,5 +147,3 @@ class TestSymbolicBackend(TestCase):
         with SymbolicBackend(self.ctl.backend()) as symbolic_backend:
             symbolic_backend.add_weight_rule([a], 3, [(b, 5)], [(c, 7)], choice=True)
         self.assertEqual(str(self.prg), "{a(c1)} :- 3{5,0: b(c2), 7,1: not c(c3)}.")
-
-

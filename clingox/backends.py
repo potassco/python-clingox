@@ -5,6 +5,8 @@ from typing import Iterable, Tuple
 from itertools import chain
 from clingo import HeuristicType, Symbol, Backend, TruthValue
 
+# pylint: disable=line-too-long
+
 class SymbolicBackend():
     '''
     Backend wrapper providing a interface to extend a logic program.
