@@ -34,16 +34,13 @@ class TestSymbolicBackend(TestCase):
     def test_add_assume(self):
         '''
         Test assumptions.
-
-        TODO: this test currently fails but probably has to be fixed in clingo
-        because assumptions are not observed properly.
         '''
         a = Function("a", [Function("c1")])
         b = Function("b", [Function("c2")])
         c = Function("c", [Function("c3")])
         with SymbolicBackend(self.ctl.backend()) as symbolic_backend:
             symbolic_backend.add_assume([a, b, c])
-        self.assertEqual(str(self.prg), "% assumptions: a(c1), b(c2), c(c3).")
+        self.assertEqual(str(self.prg), "% assumptions: a(c1), b(c2), c(c3)")
 
     def test_add_atom(self):
         a = Function("a", [Function("c1")])
