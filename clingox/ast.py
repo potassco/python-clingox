@@ -5,7 +5,7 @@ TODO:
 - unpooling as in clingcon
 '''
 
-from typing import Any, List, Sequence, Mapping, Optional, cast, Tuple, Union, Set
+from typing import Any, cast, Iterator, List, Mapping, Optional, Set, Tuple, TypeVar, Union
 from copy import copy
 
 from clingo.ast import AST, ASTType, TheoryFunction, TheoryAtomType, TheoryOperatorType
@@ -17,6 +17,8 @@ BINARY: bool = not UNARY
 LEFT: bool = True
 RIGHT: bool = not LEFT
 NONE: bool = RIGHT
+
+ASTChild = TypeVar('ASTChild', AST, List[AST])
 
 class Visitor:
     '''
@@ -30,28 +32,17 @@ class Visitor:
         Visit the children of an AST node.
         '''
         for key in x.child_keys:
-            self.visit(getattr(x, key), *args, **kwargs)
+            if (y := getattr(x, key)) is not None:
+                self.visit(y, *args, **kwargs)
 
     def visit_list(self, x: List[AST], *args: Any, **kwargs: Any):
         '''
-        Visit a list of AST nodes.
+        Visit a sequence of AST nodes.
         '''
         for y in x:
             self.visit(y, *args, **kwargs)
 
-    def visit_tuple(self, x: Sequence[AST], *args: Any, **kwargs: Any):
-        '''
-        Visit a tuple of AST nodes.
-        '''
-        for y in x:
-            self.visit(y, *args, **kwargs)
-
-    def visit_none(self, x: None, *args: Any, **kwargs: Any):
-        '''
-        Called when an optional child in an AST is absent.
-        '''
-
-    def visit(self, x: Optional[AST], *args: Any, **kwargs: Any):
+    def visit(self, x: ASTChild, *args: Any, **kwargs: Any):
         '''
         Generic visit method dispatching to specific member functions to visit
         child nodes.
@@ -64,14 +55,10 @@ class Visitor:
                 self.visit_children(x, *args, **kwargs)
         elif isinstance(x, list):
             self.visit_list(x, *args, **kwargs)
-        elif isinstance(x, tuple):
-            self.visit_tuple(x, *args, **kwargs)
-        elif x is None:
-            self.visit_none(x, *args, **kwargs)
         else:
             raise TypeError("unexpected type: {}".format(x))
 
-    def __call__(self, x: Optional[AST], *args: Any, **kwargs: Any):
+    def __call__(self, x: ASTChild, *args: Any, **kwargs: Any):
         '''
         Alternative to call visit.
         '''
@@ -83,58 +70,42 @@ class Transformer:
     This class is similar to the `Visitor` but allows for mutating the AST by
     returning modified AST nodes from the visit methods.
     '''
-    def visit_children(self, x: AST, *args: Any, **kwargs: Any):
+    def visit_children(self, x: AST, *args: Any, **kwargs: Any) -> AST:
         '''
         Visit the children of an AST node.
         '''
         copied = False
         for key in x.child_keys:
             y = getattr(x, key)
-            z = self.visit(y, *args, **kwargs)
-            if y is not z:
-                if not copied:
-                    copied = True
-                    x = copy(x)
-                setattr(x, key, z)
+            z = None if y is None else self.visit(y, *args, **kwargs)
+            if y is z:
+                continue
+            if not copied:
+                copied = True
+                x = copy(x)
+            setattr(x, key, z)
         return x
 
-    def _seq(self, i: int, z: AST, x: Sequence[AST], args: Sequence[Any], kwargs: Mapping[str, Any]):
+    def _seq(self, i: int, z: Optional[AST], x: List[AST], *args: Any, **kwargs: Any) -> Iterator[Optional[AST]]:
         for y in x[:i]:
             yield y
         yield z
         for y in x[i+1:]:
             yield self.visit(y, *args, **kwargs)
 
-    def visit_list(self, x: List[AST], *args: Any, **kwargs: Any):
+    def visit_list(self, x: List[AST], *args: Any, **kwargs: Any) -> List[AST]:
         '''
-        Visit a list of AST nodes.
+        Visit a sequence of AST nodes.
 
         If a transformer returns None, the element is removed from the list.
         '''
         for i, y in enumerate(x):
             z = self.visit(y, *args, **kwargs)
             if y is not z:
-                return list(w for w in self._seq(i, cast(AST, z), x, args, kwargs) if w is not None)
+                return list(w for w in self._seq(i, z, x, *args, **kwargs) if w is not None)
         return x
 
-    def visit_tuple(self, x: Sequence[AST], *args: Any, **kwargs: Any):
-        '''
-        Visit a tuple of AST nodes.
-        '''
-        for i, y in enumerate(x):
-            z = self.visit(y, *args, **kwargs)
-            if y is not z:
-                return tuple(self._seq(i, cast(AST, z), x, args, kwargs))
-        return x
-
-    def visit_none(self, x: None, *args: Any, **kwargs: Any):
-        '''
-        Called when an optional child in an AST is absent.
-        '''
-        # pylint: disable=no-self-use,unused-argument
-        return x
-
-    def visit(self, x: Optional[AST], *args: Any, **kwargs: Any) -> Optional[AST]:
+    def visit(self, x: ASTChild, *args: Any, **kwargs: Any) -> Optional[ASTChild]:
         '''
         Generic visit method dispatching to specific member functions to visit
         child nodes.
@@ -146,13 +117,9 @@ class Transformer:
             return self.visit_children(x, *args, **kwargs)
         if isinstance(x, list):
             return self.visit_list(x, *args, **kwargs)
-        if isinstance(x, tuple):
-            return self.visit_tuple(x, *args, **kwargs)
-        if x is None:
-            return self.visit_none(x, *args, **kwargs)
         raise TypeError("unexpected type: {}".format(x))
 
-    def __call__(self, x: Optional[AST], *args: Any, **kwargs: Any):
+    def __call__(self, x: ASTChild, *args: Any, **kwargs: Any) -> Optional[ASTChild]:
         '''
         Alternative to call visit.
         '''
@@ -316,7 +283,7 @@ class TheoryTermParser(Transformer):
         """
         Parse the given unparsed term.
         """
-        return self(self._parser.parse(x))
+        return cast(AST, self(self._parser.parse(x)))
 
 
 class TheoryParser(Transformer):

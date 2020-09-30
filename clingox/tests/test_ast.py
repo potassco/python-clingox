@@ -6,10 +6,10 @@ from unittest import TestCase
 from typing import List, Optional, cast
 
 from clingo import parse_program
-from clingo.ast import AST, ASTType
+from clingo.ast import AST, ASTType, Variable
 from .. import ast
 from ..ast import (Visitor, Transformer, TheoryTermParser, TheoryParser, TheoryAtomType,
-                   theory_parser_from_definition)
+                   str_location, theory_parser_from_definition)
 
 
 TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
@@ -84,9 +84,9 @@ def test_visit(s: str) -> str:
     prg: List[AST]
     prg = []
     parse_program(s, prg.append)
-    v = TestVisitor()
-    v.visit_list(prg)
-    return v.result
+    visitor = TestVisitor()
+    visitor(prg)
+    return visitor.result
 
 
 class TestTransformer(Transformer):
@@ -109,8 +109,7 @@ class TestTransformer(Transformer):
         '''
         Add suffix to variable.
         '''
-        x.name = x.name + suffix
-        return x
+        return Variable(x.location, x.name + suffix)
 
 def test_transform(s: str) -> str:
     '''
@@ -130,24 +129,15 @@ class Extractor(Visitor):
     '''
     # pylint: disable=invalid-name
     atom: Optional[AST]
-    rule: Optional[AST]
 
     def __init__(self):
         self.atom = None
-        self.rule = None
 
     def visit_TheoryAtom(self, x: AST):
         '''
         Extract theory atom.
         '''
         self.atom = x
-
-    def visit_Rule(self, x: AST):
-        '''
-        Extract last rule.
-        '''
-        self.rule = x
-        self.visit_children(x)
 
 def theory_atom(s: str) -> AST:
     """
@@ -157,13 +147,20 @@ def theory_atom(s: str) -> AST:
     parse_program(f"{s}.", v)
     return cast(AST, v.atom)
 
-def last_rule(s: str) -> AST:
+def last_stm(s: str) -> AST:
     """
     Convert string to rule.
     """
     v = Extractor()
-    parse_program(s, v)
-    return cast(AST, v.rule)
+    stm = None
+    def set(x):
+        nonlocal stm
+        stm = x
+        v(stm)
+
+    parse_program(s, set)
+
+    return cast(AST, stm)
 
 def parse_term(s: str) -> str:
     """
@@ -180,14 +177,14 @@ def parse_atom(s: str, parser: Optional[TheoryParser] = None) -> str:
 
     return str(parser(theory_atom(s)))
 
-def parse_rule(s: str, parser: Optional[TheoryParser] = None) -> str:
+def parse_stm(s: str, parser: Optional[TheoryParser] = None) -> str:
     """
     Parse the given theory atom using a simple parse table for testing.
     """
     if parser is None:
         parser = TheoryParser(TERM_TABLE, ATOM_TABLE)
 
-    return str(parser(last_rule(s)))
+    return str(parser(last_stm(s)))
 
 
 def parse_theory(s: str) -> TheoryParser:
@@ -208,17 +205,41 @@ class TestAST(TestCase):
     Tests for AST manipulation.
     '''
 
+    def test_loc(self):
+        '''
+        Test string representation of location.
+        '''
+        loc = { "begin": { "filename": "a",
+                           "line": 1,
+                           "column": 2 },
+                "end": { "filename": "a",
+                         "line": 1,
+                         "column": 2 } }
+        self.assertEqual(str_location(loc), "a:1:2")
+        loc['end']['column'] = 4
+        self.assertEqual(str_location(loc), "a:1:2-4")
+        loc['end']['line'] = 3
+        self.assertEqual(str_location(loc), "a:1:2-3:4")
+        loc['end']['filename'] = 'b'
+        self.assertEqual(str_location(loc), "a:1:2-b:3:4")
+
     def test_visit(self):
         '''
         Test the visitor.
         '''
         self.assertEqual(test_visit("a(X) :- p(X)."), "rlavlav")
+        self.assertEqual(test_visit("a(X) :- &p { }."), "rlavl")
+        self.assertRaises(TypeError, Visitor(), object())
 
     def test_transform(self):
         '''
         Test the transformer.
         '''
         self.assertEqual(test_transform("a(X) :- p(X)."), "a(X_x) :- p(X_x).")
+        self.assertEqual(test_transform("a(X) :- p(X), q; r; s."), "a(X_x) :- p(X_x); q; r; s.")
+        self.assertEqual(test_transform("a(X) :- p, q(X), r; s."), "a(X_x) :- p; q(X_x); r; s.")
+        self.assertEqual(test_transform("a(X) :- p, q, r(X); s."), "a(X_x) :- p; q; r(X_x); s.")
+        self.assertRaises(TypeError, Transformer(), object())
 
     def test_parse_term(self):
         '''
@@ -230,6 +251,7 @@ class TestAST(TestCase):
         self.assertEqual(parse_term("1**2**3"), "**(1,**(2,3))")
         self.assertEqual(parse_term("-1+2"), "+(-(1),2)")
         self.assertEqual(parse_term("f(1+2)+3"), "+(f(+(1,2)),3)")
+        self.assertRaises(RuntimeError, parse_term, "1++2")
 
     def test_parse_atom(self):
         '''
@@ -239,18 +261,21 @@ class TestAST(TestCase):
         self.assertEqual(parse_atom("&p {1+2+3}"), "&p { +(+(1,2),3) :  }")
         self.assertEqual(parse_atom("&q(1+2+3) { }"), "&q(((1+2)+3)) {  }")
         self.assertEqual(parse_atom("&r { } < 1+2+3"), "&r {  } < +(+(1,2),3)")
+        # for coverage
+        p = TheoryParser({'t': TheoryTermParser(TERM_TABLE["t"])}, ATOM_TABLE)
+        self.assertEqual(parse_atom("&p {1+2}", p), "&p { +(1,2) :  }")
 
     def test_parse_atom_occ(self):
         """
         Test parsing of different theory atom types.
         """
-        self.assertEqual(parse_rule("&p {1+2}."), "&p { +(1,2) :  }.")
-        self.assertRaises(RuntimeError, parse_rule, ":- &p {1+2}.")
-        self.assertRaises(RuntimeError, parse_rule, "&q(1+2+3) { }.")
-        self.assertEqual(parse_rule(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) {  }.")
-        self.assertEqual(parse_rule("&r { } < 1+2+3."), "&r {  } < +(+(1,2),3).")
-        self.assertRaises(RuntimeError, parse_rule, "&r { } < 1+2+3 :- x.")
-        self.assertRaises(RuntimeError, parse_rule, ":- &r { } < 1+2+3.")
+        self.assertEqual(parse_stm("&p {1+2}."), "&p { +(1,2) :  }.")
+        self.assertRaises(RuntimeError, parse_stm, ":- &p {1+2}.")
+        self.assertRaises(RuntimeError, parse_stm, "&q(1+2+3) { }.")
+        self.assertEqual(parse_stm(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) {  }.")
+        self.assertEqual(parse_stm("&r { } < 1+2+3."), "&r {  } < +(+(1,2),3).")
+        self.assertRaises(RuntimeError, parse_stm, "&r { } < 1+2+3 :- x.")
+        self.assertRaises(RuntimeError, parse_stm, ":- &r { } < 1+2+3.")
 
     def test_parse_theory(self):
         """
@@ -258,7 +283,7 @@ class TestAST(TestCase):
         """
         parser = parse_theory(TEST_THEORY)
         pa = lambda s: parse_atom(s, parser)
-        pr = lambda s: parse_rule(s, parser)
+        pr = lambda s: parse_stm(s, parser)
 
         self.assertEqual(parse_atom("&p {1+2}", pa), "&p { +(1,2) :  }")
         self.assertEqual(parse_atom("&p {1+2+3}", pa), "&p { +(+(1,2),3) :  }")
@@ -266,9 +291,18 @@ class TestAST(TestCase):
         self.assertEqual(parse_atom("&r { } < 1+2+3", pa), "&r {  } < +(+(1,2),3)")
 
         self.assertEqual(pr("&p {1+2}."), "&p { +(1,2) :  }.")
+        self.assertEqual(pr("#show x : &q(0) {1+2}."), "#show x : &q(0) { +(1,2) :  }.")
+        self.assertEqual(pr(":~ &q(0) {1+2}. [0]"), ":~ &q(0) { +(1,2) :  }. [0@0]")
+        self.assertEqual(pr("#edge (u, v) : &q(0) {1+2}."), "#edge (u,v) : &q(0) { +(1,2) :  }.")
+        self.assertEqual(pr("#heuristic a : &q(0) {1+2}. [sign,true]"),
+                         "#heuristic a : &q(0) { +(1,2) :  }. [sign@0,true]")
+        self.assertEqual(pr("#project a : &q(0) {1+2}."), "#project a : &q(0) { +(1,2) :  }.")
         self.assertRaises(RuntimeError, pr, ":- &p {1+2}.")
         self.assertRaises(RuntimeError, pr, "&q(1+2+3) { }.")
         self.assertEqual(pr(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) {  }.")
         self.assertEqual(pr("&r { } < 1+2+3."), "&r {  } < +(+(1,2),3).")
         self.assertRaises(RuntimeError, pr, "&r { } < 1+2+3 :- x.")
         self.assertRaises(RuntimeError, pr, ":- &r { } < 1+2+3.")
+        self.assertRaises(RuntimeError, pr, "&s(1+2+3) { }.")
+        self.assertRaises(RuntimeError, pr, "&p { } <= 3.")
+        self.assertRaises(RuntimeError, pr, "&r { } <= 3.")
