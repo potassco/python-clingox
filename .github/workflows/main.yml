@@ -27,7 +27,7 @@ jobs:
 
     - name: install prerequisites
       shell: pwsh
-      run: conda install clingo clingo-dl clingcon mypy pylint
+      run: conda install clingo clingo-dl clingcon mypy pylint coverage
 
     - name: info
       shell: pwsh
@@ -39,6 +39,7 @@ jobs:
     - name: test
       shell: pwsh
       run: |
-        python -m unittest discover -v
+        coverage run -m unittest discover -v
         mypy -p clingox
         pylint clingox
+        coverage report --fail-under=100

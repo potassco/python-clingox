@@ -18,6 +18,7 @@ def eval_term(s: str) -> str:
     t {{
     +  : 3, unary;
     -  : 3, unary;
+    ?  : 3, unary;
     ?  : 3, binary, left;
     ** : 2, binary, right;
     *  : 1, binary, left;
@@ -33,7 +34,7 @@ def eval_term(s: str) -> str:
     ctl.ground([("base", [])])
     for x in ctl.theory_atoms:
         return str(evaluate(x.elements[0].terms[0]))
-    raise RuntimeError('cannot happen')
+    assert False
 
 
 class TestTheory(TestCase):
@@ -57,6 +58,7 @@ class TestTheory(TestCase):
         Test evaluation of unary terms.
         '''
         self.assertEqual(eval_term("-1"), "-1")
+        self.assertEqual(eval_term("+1"), "1")
         self.assertEqual(eval_term("-f"), "-f")
         self.assertEqual(eval_term("-f(x)"), "-f(x)")
         self.assertEqual(eval_term("-(-f(x))"), "f(x)")
@@ -66,10 +68,16 @@ class TestTheory(TestCase):
         Test evaluation of nested terms
         '''
         self.assertEqual(eval_term("f(2+3*4,-g(-1))"), "f(14,-g(-1))")
+        self.assertEqual(eval_term("f(2+3*4,-g(-1),0)"), "f(14,-g(-1),0)")
 
     def test_error(self):
         '''
         Test failed term evaluation.
         '''
         self.assertRaises(TypeError, eval_term, "-(1,2)")
+        self.assertRaises(TypeError, eval_term, "+a")
+        self.assertRaises(RuntimeError, eval_term, "{1}")
+        self.assertRaises(AttributeError, eval_term, "?2")
         self.assertRaises(AttributeError, eval_term, "1?2")
+        self.assertRaises(ZeroDivisionError, eval_term, "1\\0")
+        self.assertRaises(ZeroDivisionError, eval_term, "1/0")
