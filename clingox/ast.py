@@ -32,7 +32,8 @@ class Visitor:
         Visit the children of an AST node.
         '''
         for key in x.child_keys:
-            if (y := getattr(x, key)) is not None:
+            y = getattr(x, key)
+            if y is not None:
                 self.visit(y, *args, **kwargs)
 
     def visit_list(self, x: List[AST], *args: Any, **kwargs: Any):
