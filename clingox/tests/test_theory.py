@@ -4,8 +4,8 @@ Simple tests for term evaluation.
 
 from unittest import TestCase
 
-from clingo import Control
-from ..theory import evaluate
+from clingo import Control, Function
+from ..theory import evaluate, require_number
 
 
 def eval_term(s: str) -> str:
@@ -18,6 +18,7 @@ def eval_term(s: str) -> str:
     t {{
     +  : 3, unary;
     -  : 3, unary;
+    ?  : 3, unary;
     ?  : 3, binary, left;
     ** : 2, binary, right;
     *  : 1, binary, left;
@@ -41,6 +42,12 @@ class TestTheory(TestCase):
     Tests for theory term evaluation.
     '''
 
+    def test_number(self):
+        '''
+        Test require_number function.
+        '''
+        self.assertRaises(TypeError, require_number, Function('a'))
+
     def test_binary(self):
         '''
         Test evaluation of binary terms.
@@ -57,6 +64,7 @@ class TestTheory(TestCase):
         Test evaluation of unary terms.
         '''
         self.assertEqual(eval_term("-1"), "-1")
+        self.assertEqual(eval_term("+1"), "1")
         self.assertEqual(eval_term("-f"), "-f")
         self.assertEqual(eval_term("-f(x)"), "-f(x)")
         self.assertEqual(eval_term("-(-f(x))"), "f(x)")
@@ -66,10 +74,15 @@ class TestTheory(TestCase):
         Test evaluation of nested terms
         '''
         self.assertEqual(eval_term("f(2+3*4,-g(-1))"), "f(14,-g(-1))")
+        self.assertEqual(eval_term("f(2+3*4,-g(-1),0)"), "f(14,-g(-1),0)")
 
     def test_error(self):
         '''
         Test failed term evaluation.
         '''
         self.assertRaises(TypeError, eval_term, "-(1,2)")
+        self.assertRaises(RuntimeError, eval_term, "{1}")
+        self.assertRaises(AttributeError, eval_term, "?2")
         self.assertRaises(AttributeError, eval_term, "1?2")
+        self.assertRaises(ZeroDivisionError, eval_term, "1\\0")
+        self.assertRaises(ZeroDivisionError, eval_term, "1/0")
