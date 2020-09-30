@@ -31,6 +31,7 @@ def _remap(prg: Program, mapping=None):
     else:
         chk.output_atoms = {mapping(lit): sym for lit, sym in prg.output_atoms.items()}
         chk.shows = [cast(Show, remap(x, mapping)) for x in prg.shows]
+    chk.facts = prg.facts
 
     ctl.register_observer(ProgramObserver(chk))
 
@@ -126,6 +127,47 @@ class TestProgram(TestCase):
                 rules=[Rule(choice=False, head=[11], body=[12, -13])]),
             'a :- b, not c.')
 
+
+    def test_aux_lit(self):
+        '''
+        Test printing of auxiliary literals.
+        '''
+        out, out10 = self._add_atoms('a', 'b', 'c')
+        self.obs.rule(False, [4], [1])
+        self.assertEqual(self.prg,
+            Program(
+                output_atoms=out,
+                rules=[Rule(choice=False, head=[4], body=[1])]))
+        self.assertEqual(str(self.prg), '__x4 :- a.')
+
+        prg10 = _remap(self.prg, _plus10)
+        self.assertEqual(prg10,
+            Program(
+                output_atoms=out10,
+                rules=[Rule(choice=False, head=[14], body=[11])]))
+        self.assertEqual(str(prg10), '__x14 :- a.')
+
+        ctl = Control()
+        with ctl.backend() as b:
+            b.add_atom()
+            rm_prg = self.prg.copy().remap(Remapping(b, self.prg.output_atoms, self.prg.facts))
+        self.assertEqual(str(rm_prg), '__x5 :- a.')
+
+    def test_facts(self):
+        '''
+        Test simple rules.
+        '''
+        out, out10 = self._add_atoms('a', 'b', 'c')
+        self.obs.output_atom(Function('d'), 0)
+        self._check(
+            Program(
+                output_atoms=out,
+                facts=[Fact(Function('d'))]),
+            Program(
+                output_atoms=out10,
+                facts=[Fact(Function('d'))]),
+            'd.')
+
     def test_add_choice_rule(self):
         '''
         Test choice rules.
@@ -207,14 +249,22 @@ class TestProgram(TestCase):
         '''
         out, out10 = self._add_atoms('a', 'b', 'c')
         self.obs.external(1, TruthValue.True_)
+        self.obs.external(2, TruthValue.Free)
+        self.obs.external(3, TruthValue.False_)
         self._check(
             Program(
                 output_atoms=out,
-                externals=[External(atom=1, value=TruthValue.True_)]),
+                externals=[External(atom=1, value=TruthValue.True_),
+                           External(atom=2, value=TruthValue.Free),
+                           External(atom=3, value=TruthValue.False_)]),
             Program(
                 output_atoms=out10,
-                externals=[External(atom=11, value=TruthValue.True_)]),
-            '#external a. [True]')
+                externals=[External(atom=11, value=TruthValue.True_),
+                           External(atom=12, value=TruthValue.Free),
+                           External(atom=13, value=TruthValue.False_)]),
+            '#external a. [True]\n'
+            '#external b. [Free]\n'
+            '#external c. [False]')
 
     def test_add_minimize(self):
         '''

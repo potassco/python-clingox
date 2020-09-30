@@ -133,7 +133,7 @@ def _pretty_str_fact(arg: Fact, output_atoms: OutputTable) -> str: # pylint: dis
     '''
     Pretty print a fact.
     '''
-    return f'{arg.symbol}'
+    return f'{arg.symbol}.'
 
 @remap.register
 def _remap_fact(arg: Fact, mapping: AtomMap) -> Fact: # pylint: disable=unused-argument
