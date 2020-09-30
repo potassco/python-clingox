@@ -33,7 +33,7 @@ def eval_term(s: str) -> str:
     ctl.ground([("base", [])])
     for x in ctl.theory_atoms:
         return str(evaluate(x.elements[0].terms[0]))
-    raise RuntimeError('cannot happen')
+    assert False
 
 
 class TestTheory(TestCase):
