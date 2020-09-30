@@ -27,7 +27,7 @@ jobs:
 
     - name: install prerequisites
       shell: pwsh
-      run: conda install clingo clingo-dl clingcon
+      run: conda install clingo clingo-dl clingcon mypy pylint
 
     - name: info
       shell: pwsh
@@ -38,4 +38,7 @@ jobs:
 
     - name: test
       shell: pwsh
-      run: python -m unittest discover -v
+      run: |
+        python -m unittest discover -v
+        mypy -p clingox
+        pylint clingox
