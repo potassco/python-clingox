@@ -4,8 +4,8 @@ Simple tests for term evaluation.
 
 from unittest import TestCase
 
-from clingo import Control, Function
-from ..theory import evaluate, require_number
+from clingo import Control
+from ..theory import evaluate
 
 
 def eval_term(s: str) -> str:
@@ -42,12 +42,6 @@ class TestTheory(TestCase):
     Tests for theory term evaluation.
     '''
 
-    def test_number(self):
-        '''
-        Test require_number function.
-        '''
-        self.assertRaises(TypeError, require_number, Function('a'))
-
     def test_binary(self):
         '''
         Test evaluation of binary terms.
@@ -81,6 +75,7 @@ class TestTheory(TestCase):
         Test failed term evaluation.
         '''
         self.assertRaises(TypeError, eval_term, "-(1,2)")
+        self.assertRaises(TypeError, eval_term, "+a")
         self.assertRaises(RuntimeError, eval_term, "{1}")
         self.assertRaises(AttributeError, eval_term, "?2")
         self.assertRaises(AttributeError, eval_term, "1?2")
