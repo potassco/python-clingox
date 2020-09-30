@@ -1,6 +1,8 @@
 '''
-Simple example showing how to use the symbolic backend.
+Simple example showing how to attach the symbolic backend to an existing
+backend.
 '''
+
 from clingo import Control, Function
 from clingox.backends import SymbolicBackend
 
