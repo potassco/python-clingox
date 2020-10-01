@@ -18,14 +18,14 @@ LEFT: bool = True
 RIGHT: bool = not LEFT
 NONE: bool = RIGHT
 
-ASTChild = TypeVar('ASTChild', AST, List[AST])
-
 class Visitor:
     '''
     A visitor for clingo's abstart syntaxt tree.
 
     This class should be derived from. Implementing functions with name
     `visit_<type>` can be used to visit nodes of the given type.
+
+    Implements: `Callable[[AST], None]`.
     '''
     def visit_children(self, x: AST, *args: Any, **kwargs: Any):
         '''
@@ -33,8 +33,12 @@ class Visitor:
         '''
         for key in x.child_keys:
             y = getattr(x, key)
-            if y is not None:
+            if isinstance(y, AST):
                 self.visit(y, *args, **kwargs)
+            elif isinstance(y, List): # pylint: disable=all
+                self.visit_list(y, *args, **kwargs)
+            else:
+                assert y is None
 
     def visit_list(self, x: List[AST], *args: Any, **kwargs: Any):
         '''
@@ -43,23 +47,18 @@ class Visitor:
         for y in x:
             self.visit(y, *args, **kwargs)
 
-    def visit(self, x: ASTChild, *args: Any, **kwargs: Any):
+    def visit(self, x: AST, *args: Any, **kwargs: Any):
         '''
         Generic visit method dispatching to specific member functions to visit
         child nodes.
         '''
-        if isinstance(x, AST):
-            attr = "visit_" + str(x.type)
-            if hasattr(self, attr):
-                getattr(self, attr)(x, *args, **kwargs)
-            else:
-                self.visit_children(x, *args, **kwargs)
-        elif isinstance(x, list):
-            self.visit_list(x, *args, **kwargs)
+        attr = "visit_" + str(x.type)
+        if hasattr(self, attr):
+            getattr(self, attr)(x, *args, **kwargs)
         else:
-            raise TypeError("unexpected type: {}".format(x))
+            self.visit_children(x, *args, **kwargs)
 
-    def __call__(self, x: ASTChild, *args: Any, **kwargs: Any):
+    def __call__(self, x: AST, *args: Any, **kwargs: Any):
         '''
         Alternative to call visit.
         '''
@@ -70,6 +69,8 @@ class Transformer:
     '''
     This class is similar to the `Visitor` but allows for mutating the AST by
     returning modified AST nodes from the visit methods.
+
+    Implements: `Callable[[AST], Optional[AST]]`.
     '''
     def visit_children(self, x: AST, *args: Any, **kwargs: Any) -> AST:
         '''
@@ -78,7 +79,13 @@ class Transformer:
         copied = False
         for key in x.child_keys:
             y = getattr(x, key)
-            z = None if y is None else self.visit(y, *args, **kwargs)
+            z: Union[AST, List, None]
+            if isinstance(y, AST):
+                z = self.visit(y, *args, **kwargs)
+            elif isinstance(y, List): # pylint: disable=all
+                z = self.visit_list(y, *args, **kwargs)
+            else:
+                z = None
             if y is z:
                 continue
             if not copied:
@@ -106,21 +113,17 @@ class Transformer:
                 return list(w for w in self._seq(i, z, x, *args, **kwargs) if w is not None)
         return x
 
-    def visit(self, x: ASTChild, *args: Any, **kwargs: Any) -> Optional[ASTChild]:
+    def visit(self, x: AST, *args: Any, **kwargs: Any) -> Optional[AST]:
         '''
         Generic visit method dispatching to specific member functions to visit
         child nodes.
         '''
-        if isinstance(x, AST):
-            attr = "visit_" + str(x.type)
-            if hasattr(self, attr):
-                return getattr(self, attr)(x, *args, **kwargs)
-            return self.visit_children(x, *args, **kwargs)
-        if isinstance(x, list):
-            return self.visit_list(x, *args, **kwargs)
-        raise TypeError("unexpected type: {}".format(x))
+        attr = "visit_" + str(x.type)
+        if hasattr(self, attr):
+            return getattr(self, attr)(x, *args, **kwargs)
+        return self.visit_children(x, *args, **kwargs)
 
-    def __call__(self, x: ASTChild, *args: Any, **kwargs: Any) -> Optional[ASTChild]:
+    def __call__(self, x: AST, *args: Any, **kwargs: Any) -> Optional[AST]:
         '''
         Alternative to call visit.
         '''
@@ -385,7 +388,7 @@ class TheoryParser(Transformer):
 
     def visit_TheoryAtom(self, x: AST) -> AST:
         """
-        Parse the given unparsed term.
+        Parse the given theory atom.
         """
         name = x.term.name
         arity = len(x.term.arguments)

@@ -26,23 +26,21 @@ Statement = TypeVar('Statement', 'Fact', 'Show', 'Rule', 'WeightRule', 'Heuristi
 @singledispatch
 def pretty_str(arg: Statement, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
     '''
-    Pretty print program constructs.
+    Pretty print statements.
     '''
     assert False, 'unexpected type'
 
 @singledispatch
 def remap(arg: Statement, mapping: AtomMap) -> Statement: # pylint: disable=unused-argument
     '''
-    Add statements or programs to the backend using the provided mapping to map
-    literals.
+    Remap literals in the given statement with the provided mapping.
     '''
     assert False, 'unexpected type'
 
 @singledispatch
 def add_to_backend(arg: Statement, backend: Backend) -> None: # pylint: disable=unused-argument
     '''
-    Add statements or programs to the backend using the provided mapping to map
-    literals.
+    Add statements to the backend using the provided mapping to map literals.
     '''
     assert False, 'unexpected type'
 

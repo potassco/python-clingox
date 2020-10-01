@@ -85,13 +85,14 @@ def test_visit(s: str) -> str:
     prg = []
     parse_program(s, prg.append)
     visitor = TestVisitor()
-    visitor(prg)
+    visitor.visit_list(prg)
     return visitor.result
 
 
 class TestTransformer(Transformer):
     '''
-    Simple transformer renaming variables.
+    Simple transformer renaming variables and dropping program statements and
+    guards of theory atoms.
     '''
     # pylint: disable=invalid-name, unused-argument
     result: str
@@ -110,6 +111,12 @@ class TestTransformer(Transformer):
         Add suffix to variable.
         '''
         return Variable(x.location, x.name + suffix)
+
+    def visit_TheoryGuard(self, x: AST, suffix: str) -> Optional[AST]:
+        '''
+        Drop guard of theory atom.
+        '''
+        return None
 
 def test_transform(s: str) -> str:
     '''
@@ -153,12 +160,12 @@ def last_stm(s: str) -> AST:
     """
     v = Extractor()
     stm = None
-    def set(x):
+    def set_stm(x):
         nonlocal stm
         stm = x
         v(stm)
 
-    parse_program(s, set)
+    parse_program(s, set_stm)
 
     return cast(AST, stm)
 
@@ -229,7 +236,6 @@ class TestAST(TestCase):
         '''
         self.assertEqual(test_visit("a(X) :- p(X)."), "rlavlav")
         self.assertEqual(test_visit("a(X) :- &p { }."), "rlavl")
-        self.assertRaises(TypeError, Visitor(), object())
 
     def test_transform(self):
         '''
@@ -239,7 +245,8 @@ class TestAST(TestCase):
         self.assertEqual(test_transform("a(X) :- p(X), q; r; s."), "a(X_x) :- p(X_x); q; r; s.")
         self.assertEqual(test_transform("a(X) :- p, q(X), r; s."), "a(X_x) :- p; q(X_x); r; s.")
         self.assertEqual(test_transform("a(X) :- p, q, r(X); s."), "a(X_x) :- p; q; r(X_x); s.")
-        self.assertRaises(TypeError, Transformer(), object())
+        self.assertEqual(test_transform("&p{} < 0."), "&p {  }.")
+        self.assertEqual(test_transform("&p{}."), "&p {  }.")
 
     def test_parse_term(self):
         '''
