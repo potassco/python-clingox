@@ -459,19 +459,37 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
 
 
 class SymbolicAtomRenamer(Transformer):
-    def __init__(self, rename_function: Callable[[str],str]):
+    '''
+    A transformer to rename symbolic atoms.
+    '''
+
+    def __init__(self, rename_function: Callable[[str], str]):
+        '''
+        Initialize the transformer with the given function to rename symbolic
+        atoms.
+        '''
         self.rename_function = rename_function
 
     def visit_SymbolicAtom(self, x: AST) -> AST:
+        '''
+        Rename the given symbolic atom and the renamed version.
+        '''
         term = x.term
         if term.type == ASTType.Symbol:
-            term = Symbol(term.location, clingo.Function(self.rename_function(term.symbol.name), [], term.symbol.positive))
+            sym = term.symbol
+            term = Symbol(term.location, clingo.Function(self.rename_function(sym.name), sym.arguments, sym.positive))
         elif term.type == ASTType.Function:
             term = Function(term.location, self.rename_function(term.name), term.arguments, term.external)
         return SymbolicAtom(term)
 
-def rename_symbolic_atoms(x: AST, rename_function: Callable[[str],str]) -> AST:
+def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
+    '''
+    Rename all symbolic atoms in the given AST node with the given function.
+    '''
     return cast(AST, SymbolicAtomRenamer(rename_function)(x))
 
 def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
-    return cast(AST, SymbolicAtomRenamer(lambda s: prefix + s)(x))
+    '''
+    Prefix all symbolic atoms in the given AST with the given string.
+    '''
+    return rename_symbolic_atoms(x, lambda s: prefix + s)
