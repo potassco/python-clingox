@@ -9,7 +9,7 @@ from clingo import parse_program
 from clingo.ast import AST, ASTType, Variable
 from .. import ast
 from ..ast import (Visitor, Transformer, TheoryTermParser, TheoryParser, TheoryAtomType,
-                   str_location, theory_parser_from_definition)
+                   prefix_symbolic_atoms, str_location, theory_parser_from_definition)
 
 
 TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
@@ -313,3 +313,20 @@ class TestAST(TestCase):
         self.assertRaises(RuntimeError, pr, "&s(1+2+3) { }.")
         self.assertRaises(RuntimeError, pr, "&p { } <= 3.")
         self.assertRaises(RuntimeError, pr, "&r { } <= 3.")
+
+
+def parse_program_to_list(s: str) -> List[AST]:
+    '''
+    Test the transformer by parsing the given program and using the
+    TestTransformer on it.
+    '''
+    prg: List[AST]
+    prg = []
+    parse_program(s, prg.append)
+    return prg
+
+class TestRenameSymbolicAtoms(TestCase):
+    def test_prefix_symbolic_atoms(self):
+        prg = parse_program_to_list("a :- b(X,Y), not c(f(3,b)).")
+        prg = [prefix_symbolic_atoms(x, "u_") for x in prg]
+        self.assertEqual(str(prg), "[#program base., u_a :- u_b(X,Y); not u_c(f(3,b)).]")
