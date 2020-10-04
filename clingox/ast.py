@@ -5,10 +5,11 @@ TODO:
 - unpooling as in clingcon
 '''
 
-from typing import Any, cast, Iterator, List, Mapping, Optional, Set, Tuple, TypeVar, Union
+from typing import Any, Callable, cast, Iterator, List, Mapping, Optional, Set, Tuple, TypeVar, Union
 from copy import copy
 
-from clingo.ast import AST, ASTType, TheoryFunction, TheoryAtomType, TheoryOperatorType
+import clingo
+from clingo.ast import AST, ASTType, Function, Symbol, SymbolicAtom, TheoryFunction, TheoryAtomType, TheoryOperatorType
 from .theory import is_operator
 
 
@@ -455,3 +456,40 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         atoms[(atom_def.name, atom_def.arity)] = (atom_def.atom_type, atom_def.elements, guard)
 
     return TheoryParser(terms, atoms)
+
+
+class SymbolicAtomRenamer(Transformer):
+    '''
+    A transformer to rename symbolic atoms.
+    '''
+
+    def __init__(self, rename_function: Callable[[str], str]):
+        '''
+        Initialize the transformer with the given function to rename symbolic
+        atoms.
+        '''
+        self.rename_function = rename_function
+
+    def visit_SymbolicAtom(self, x: AST) -> AST:
+        '''
+        Rename the given symbolic atom and the renamed version.
+        '''
+        term = x.term
+        if term.type == ASTType.Symbol:
+            sym = term.symbol
+            term = Symbol(term.location, clingo.Function(self.rename_function(sym.name), sym.arguments, sym.positive))
+        elif term.type == ASTType.Function:
+            term = Function(term.location, self.rename_function(term.name), term.arguments, term.external)
+        return SymbolicAtom(term)
+
+def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
+    '''
+    Rename all symbolic atoms in the given AST node with the given function.
+    '''
+    return cast(AST, SymbolicAtomRenamer(rename_function)(x))
+
+def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
+    '''
+    Prefix all symbolic atoms in the given AST with the given string.
+    '''
+    return rename_symbolic_atoms(x, lambda s: prefix + s)

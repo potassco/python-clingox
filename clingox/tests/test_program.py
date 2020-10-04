@@ -134,17 +134,15 @@ class TestProgram(TestCase):
         '''
         out, out10 = self._add_atoms('a', 'b', 'c')
         self.obs.rule(False, [4], [1])
-        self.assertEqual(self.prg,
-            Program(
-                output_atoms=out,
-                rules=[Rule(choice=False, head=[4], body=[1])]))
+        self.assertEqual(self.prg, Program(
+            output_atoms=out,
+            rules=[Rule(choice=False, head=[4], body=[1])]))
         self.assertEqual(str(self.prg), '__x4 :- a.')
 
         prg10 = _remap(self.prg, _plus10)
-        self.assertEqual(prg10,
-            Program(
-                output_atoms=out10,
-                rules=[Rule(choice=False, head=[14], body=[11])]))
+        self.assertEqual(prg10, Program(
+            output_atoms=out10,
+            rules=[Rule(choice=False, head=[14], body=[11])]))
         self.assertEqual(str(prg10), '__x14 :- a.')
 
         ctl = Control()

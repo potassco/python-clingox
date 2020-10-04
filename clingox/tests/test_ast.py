@@ -2,14 +2,15 @@
 Simple tests for ast manipulation.
 """
 
+from copy import deepcopy
 from unittest import TestCase
 from typing import List, Optional, cast
 
-from clingo import parse_program
+from clingo import parse_program, Function
 from clingo.ast import AST, ASTType, Variable
 from .. import ast
 from ..ast import (Visitor, Transformer, TheoryTermParser, TheoryParser, TheoryAtomType,
-                   str_location, theory_parser_from_definition)
+                   prefix_symbolic_atoms, str_location, theory_parser_from_definition)
 
 
 TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
@@ -37,6 +38,12 @@ TEST_THEORY = """\
 }\
 """
 
+LOC = {"begin": {"filename": "a",
+                 "line": 1,
+                 "column": 2},
+       "end": {"filename": "a",
+               "line": 1,
+               "column": 2}}
 
 class TestVisitor(Visitor):
     '''
@@ -216,12 +223,7 @@ class TestAST(TestCase):
         '''
         Test string representation of location.
         '''
-        loc = { "begin": { "filename": "a",
-                           "line": 1,
-                           "column": 2 },
-                "end": { "filename": "a",
-                         "line": 1,
-                         "column": 2 } }
+        loc = deepcopy(LOC)
         self.assertEqual(str_location(loc), "a:1:2")
         loc['end']['column'] = 4
         self.assertEqual(str_location(loc), "a:1:2-4")
@@ -313,3 +315,35 @@ class TestAST(TestCase):
         self.assertRaises(RuntimeError, pr, "&s(1+2+3) { }.")
         self.assertRaises(RuntimeError, pr, "&p { } <= 3.")
         self.assertRaises(RuntimeError, pr, "&r { } <= 3.")
+
+
+def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
+    '''
+    Parse the given program and rename symbolic atoms in it.
+    '''
+    prg: List[str]
+    prg = []
+    def append(stm):
+        nonlocal prg
+        ret = f(stm)
+        if ret is not None:
+            prg.append(str(ret))
+    parse_program(s, append)
+    return prg
+
+class TestRenameSymbolicAtoms(TestCase):
+    '''
+    Tests for renaming symbolic atoms.
+    '''
+    def test_rename(self):
+        '''
+        Test renaming symbolic atoms.
+        '''
+        self.assertEqual(
+            test_rename("a :- b(X,Y), not c(f(3,b))."),
+            ['#program base.', 'u_a :- u_b(X,Y); not u_c(f(3,b)).'])
+
+        sym = ast.SymbolicAtom(ast.Symbol(LOC, Function('a', [Function('b')])))
+        self.assertEqual(
+            str(prefix_symbolic_atoms(sym, 'u_')),
+            'u_a(b)')
