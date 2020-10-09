@@ -11,7 +11,7 @@ from clingo.ast import AST, ASTType, Variable
 from .. import ast
 from ..ast import (Visitor, Transformer, TheoryTermParser, TheoryParser, TheoryAtomType,
                    prefix_symbolic_atoms, str_location, theory_parser_from_definition)
-
+from ..ast_repr import as_dict, from_dict
 
 TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
                     ("**", ast.BINARY): (2, ast.RIGHT),
@@ -347,3 +347,16 @@ class TestRenameSymbolicAtoms(TestCase):
         self.assertEqual(
             str(prefix_symbolic_atoms(sym, 'u_')),
             'u_a(b)')
+
+
+class TestRepr(TestCase):
+    '''
+    Tests for converting between python and ast representation.
+    '''
+    def test_encode(self):
+        '''
+        Test encoding of AST's as dicts.
+        '''
+        prg = []
+        parse_program('a :- b.', lambda x: prg.append(as_dict(x)))
+        print(prg)
