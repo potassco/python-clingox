@@ -10,7 +10,7 @@ from clingo import parse_program, Function
 from clingo.ast import AST, ASTType, Variable
 from .. import ast
 from ..ast import (Visitor, Transformer, TheoryTermParser, TheoryParser, TheoryAtomType,
-                   prefix_symbolic_atoms, str_location, theory_parser_from_definition)
+                   location_to_str, prefix_symbolic_atoms, str_to_location, theory_parser_from_definition)
 from ..ast_repr import as_dict, from_dict
 
 TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
@@ -224,13 +224,22 @@ class TestAST(TestCase):
         Test string representation of location.
         '''
         loc = deepcopy(LOC)
-        self.assertEqual(str_location(loc), "a:1:2")
+        self.assertEqual(location_to_str(loc), "a:1:2")
+        self.assertEqual(str_to_location(location_to_str(loc)), loc)
         loc['end']['column'] = 4
-        self.assertEqual(str_location(loc), "a:1:2-4")
+        self.assertEqual(location_to_str(loc), "a:1:2-4")
+        self.assertEqual(str_to_location(location_to_str(loc)), loc)
         loc['end']['line'] = 3
-        self.assertEqual(str_location(loc), "a:1:2-3:4")
+        self.assertEqual(location_to_str(loc), "a:1:2-3:4")
+        self.assertEqual(str_to_location(location_to_str(loc)), loc)
         loc['end']['filename'] = 'b'
-        self.assertEqual(str_location(loc), "a:1:2-b:3:4")
+        self.assertEqual(location_to_str(loc), "a:1:2-b:3:4")
+        self.assertEqual(str_to_location(location_to_str(loc)), loc)
+        loc['begin']['filename'] = r'a:1:2-3\:'
+        loc['end']['filename'] = 'b:1:2-3'
+        self.assertEqual(location_to_str(loc), r'a\:1\:2-3\\\::1:2-b\:1\:2-3:3:4')
+        self.assertEqual(str_to_location(location_to_str(loc)), loc)
+        self.assertRaises(RuntimeError, str_to_location, 'a:1:2-')
 
     def test_visit(self):
         '''

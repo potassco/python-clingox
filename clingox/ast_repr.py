@@ -6,8 +6,7 @@ from functools import singledispatch
 
 from clingo.ast import AST, ASTType
 
-from .ast import str_location
-
+from .ast import location_to_str, str_to_location
 
 @singledispatch
 def _encode(x: Any) -> Any:
@@ -19,10 +18,7 @@ def _encode_str(x: str) -> Any:
 
 @_encode.register
 def _encode_loc(x: dict) -> Any:
-    '''
-    TODO: encoding a location as a string requires some kind of quoting
-    '''
-    return str_location(x)
+    return location_to_str(x)
 
 @_encode.register
 def _encode_list(x: list) -> Any:
