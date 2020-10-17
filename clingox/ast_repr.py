@@ -1,31 +1,45 @@
 """
 This is either going to be merged into the ast module or put into a submodule.
 """
-from typing import Any
+from typing import List, Any
 from functools import singledispatch
 
-from clingo.ast import AST, ASTType
+from clingo import Symbol
+from clingo.ast import AST, ASTType, Sign
 
 from .ast import location_to_str, str_to_location
 
 @singledispatch
 def _encode(x: Any) -> Any:
-    return f"todo encode: {x}"
+    raise RuntimeError(f"todo encode: {x}")
 
 @_encode.register
-def _encode_str(x: str) -> Any:
+def _encode_str(x: str) -> str:
     return x
 
 @_encode.register
-def _encode_loc(x: dict) -> Any:
-    return location_to_str(x)
+def _encode_symbol(x: Symbol) -> str:
+    return str(x)
 
 @_encode.register
-def _encode_list(x: list) -> Any:
+def _encode_bool(x: bool) -> bool:
+    return x
+
+@_encode.register
+def _encode_sign(x: Sign) -> str:
+    if x == Sign.NoSign:
+        return 'NoSign'
+    if x == Sign.Negation:
+        return 'Negation'
+    assert x == Sign.DoubleNegation
+    return 'DoubleNegation'
+
+@_encode.register
+def _encode_list(x: list) -> List[Any]:
     return [_encode(y) for y in x]
 
 @_encode.register
-def _encode_none(x: None) -> Any:
+def _encode_none(x: None) -> None:
     return x
 
 @_encode.register
@@ -38,10 +52,12 @@ def as_dict(x: AST) -> dict:
     only involve the data structures: `dict`, `list`, `int`, and `str`.
     """
     ret = {"type": str(x.type)}
-    for key, value in x.items():
-        # TODO: there should probably be a method inbetween that also recieves
-        #       the key...
-        ret[key] = _encode(value)
+    for key, val in x.items():
+        if key == 'location':
+            enc = location_to_str(val)
+        else:
+            enc = _encode(val)
+        ret[key] = enc
     return ret
 
 
