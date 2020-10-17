@@ -368,4 +368,15 @@ class TestRepr(TestCase):
         '''
         prg = []
         parse_program('a :- b.', lambda x: prg.append(as_dict(x)))
-        print(prg)
+        # TODO: needs a condensed form
+        chk = [{'type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []},
+               {'type': 'Rule', 'location': '<string>:1:1-8',
+                'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
+                         'atom': {'type': 'SymbolicAtom',
+                                  'term': {'type': 'Function', 'location': '<string>:1:1-2',
+                                           'name': 'a', 'arguments': [], 'external': False}}},
+                'body': [{'type': 'Literal', 'location': '<string>:1:6-7', 'sign': 'NoSign',
+                          'atom': {'type': 'SymbolicAtom',
+                                   'term': {'type': 'Function', 'location': '<string>:1:6-7',
+                                            'name': 'b', 'arguments': [], 'external': False}}}]}]
+        self.assertEqual(prg, chk)
