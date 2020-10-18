@@ -358,19 +358,127 @@ class TestRenameSymbolicAtoms(TestCase):
             'u_a(b)')
 
 
+def test_as_dict(s: str):
+    '''
+    Parse and transform a program to its dictionary representation.
+    '''
+    prg = []
+    parse_program(s, lambda x: prg.append(as_dict(x)))
+    preamble = {'type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []}
+    assert prg[0] == preamble
+    return prg[1:]
+
 class TestRepr(TestCase):
     '''
     Tests for converting between python and ast representation.
     '''
-    def test_encode(self):
+    def test_encode_term(self):
+        '''
+        Test encoding of terms in AST.
+        '''
+        self.assertEqual(
+            test_as_dict('a(1).'),
+            [{'type': 'Rule', 'location': '<string>:1:1-6',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-5', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:1-5', 'name': 'a',
+                                         'arguments': [{'type': 'Symbol', 'location': '<string>:1:3-4', 'symbol': '1'}],
+                                         'external': False}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a(X).'),
+            [{'type': 'Rule', 'location': '<string>:1:1-6',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-5', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:1-5', 'name': 'a',
+                                         'arguments': [{'type': 'Variable', 'location': '<string>:1:3-4', 'name': 'X'}],
+                                         'external': False}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a(-1).'),
+            [{'type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:1-6', 'name': 'a',
+                                         'arguments': [{'type': 'UnaryOperation', 'location': '<string>:1:3-5',
+                                                        'operator': 'Minus',
+                                                        'argument': {'type': 'Symbol', 'location': '<string>:1:4-5',
+                                                                     'symbol': '1'}}],
+                                         'external': False}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a(1+2).'),
+            [{'type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                        'operator': '+',
+                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
+                                                                 'symbol': '1'},
+                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
+                                                                  'symbol': '2'}}],
+                                         'external': False}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a(1..2).'),
+            [{'type': 'Rule', 'location': '<string>:1:1-9',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-8', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:1-8', 'name': 'a',
+                                         'arguments': [{'type': 'Interval', 'location': '<string>:1:3-7',
+                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
+                                                                 'symbol': '1'},
+                                                        'right': {'type': 'Symbol', 'location': '<string>:1:6-7',
+                                                                  'symbol': '2'}}],
+                                         'external': False}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a(1;2).'),
+            [{'type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Pool', 'location': '<string>:1:1-7',
+                                         'arguments': [{'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                                        'arguments': [{'type': 'Symbol', 'location': '<string>:1:3-4',
+                                                                       'symbol': '1'}],
+                                                        'external': False},
+                                                       {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                                        'arguments': [{'type': 'Symbol', 'location': '<string>:1:5-6',
+                                                                       'symbol': '2'}],
+                                                        'external': False}]}}},
+              'body': []}])
+
+    # literal
+    #   simple
+    #   conditional literal
+    #   disjunction
+    #   aggregate (head/body)
+    # theory
+    #   definition
+    #   term
+    #   atom
+    # statements
+    #   rule
+    #   definition
+    #   show
+    #   show sig
+    #   defined
+    #   minimize
+    #   script
+    #   program
+    #   external
+    #   edge
+    #   heuristic
+    #   project
+    #   project sig
+    # print(repr(test_as_dict('a(1;2).')))
+
+    def test_encode_statement(self):
         '''
         Test encoding of AST's as dicts.
         '''
-        prg = []
-        parse_program('a :- b.', lambda x: prg.append(as_dict(x)))
-        # TODO: needs a condensed form
-        chk = [{'type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []},
-               {'type': 'Rule', 'location': '<string>:1:1-8',
+        chk = [{'type': 'Rule', 'location': '<string>:1:1-8',
                 'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
                          'atom': {'type': 'SymbolicAtom',
                                   'term': {'type': 'Function', 'location': '<string>:1:1-2',
@@ -379,4 +487,4 @@ class TestRepr(TestCase):
                           'atom': {'type': 'SymbolicAtom',
                                    'term': {'type': 'Function', 'location': '<string>:1:6-7',
                                             'name': 'b', 'arguments': [], 'external': False}}}]}]
-        self.assertEqual(prg, chk)
+        self.assertEqual(test_as_dict('a :- b.'), chk)

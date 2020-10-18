@@ -5,7 +5,7 @@ from typing import List, Any
 from functools import singledispatch
 
 from clingo import Symbol
-from clingo.ast import AST, ASTType, Sign
+from clingo.ast import AST, ASTType, Sign, UnaryOperator, BinaryOperator
 
 from .ast import location_to_str, str_to_location
 
@@ -33,6 +33,14 @@ def _encode_sign(x: Sign) -> str:
         return 'Negation'
     assert x == Sign.DoubleNegation
     return 'DoubleNegation'
+
+@_encode.register
+def _encode_unop(x: UnaryOperator) -> str:
+    return str(x)
+
+@_encode.register
+def _encode_binop(x: BinaryOperator) -> str:
+    return str(x)
 
 @_encode.register
 def _encode_list(x: list) -> List[Any]:
