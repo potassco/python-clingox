@@ -5,7 +5,7 @@ from typing import List, Any
 from functools import singledispatch
 
 from clingo import Symbol
-from clingo.ast import AST, ASTType, Sign, UnaryOperator, BinaryOperator
+from clingo.ast import AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, Sign, UnaryOperator
 
 from .ast import location_to_str, str_to_location
 
@@ -33,6 +33,34 @@ def _encode_sign(x: Sign) -> str:
         return 'Negation'
     assert x == Sign.DoubleNegation
     return 'DoubleNegation'
+
+@_encode.register
+def _encode_afun(x: AggregateFunction) -> str:
+    if x == AggregateFunction.Count:
+        return 'Count'
+    if x == AggregateFunction.Sum:
+        return 'Sum'
+    if x == AggregateFunction.SumPlus:
+        return 'SumPlus'
+    if x == AggregateFunction.Min:
+        return 'Min'
+    assert x == AggregateFunction.Max
+    return 'max'
+
+@_encode.register
+def _encode_comp(x: ComparisonOperator) -> str:
+    if x == ComparisonOperator.GreaterThan:
+        return 'GreaterThan'
+    if x == ComparisonOperator.LessThan:
+        return 'LessThan'
+    if x == ComparisonOperator.LessEqual:
+        return 'LessEqual'
+    if x == ComparisonOperator.GreaterEqual:
+        return 'GreaterEqual'
+    if x == ComparisonOperator.NotEqual:
+        return 'NotEqual'
+    assert x == ComparisonOperator.Equal
+    return 'Equal'
 
 @_encode.register
 def _encode_unop(x: UnaryOperator) -> str:

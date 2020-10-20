@@ -370,7 +370,7 @@ def test_as_dict(s: str):
 
 class TestRepr(TestCase):
     '''
-    Tests for converting between python and ast representation.
+    Tests for converting between python and ast representation of terms.
     '''
     def test_encode_term(self):
         '''
@@ -449,34 +449,130 @@ class TestRepr(TestCase):
                                                         'external': False}]}}},
               'body': []}])
 
-    # literal
-    #   simple
-    #   conditional literal
-    #   disjunction
-    #   aggregate (head/body)
-    # theory
-    #   definition
-    #   term
-    #   atom
-    # statements
-    #   rule
-    #   definition
-    #   show
-    #   show sig
-    #   defined
-    #   minimize
-    #   script
-    #   program
-    #   external
-    #   edge
-    #   heuristic
-    #   project
-    #   project sig
-    # print(repr(test_as_dict('a(1;2).')))
+    def test_encode_literal(self):
+        '''
+        Tests for converting between python and ast representation of literals.
+        '''
+        self.assertEqual(
+            test_as_dict('a.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-3',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:1-2', 'name': 'a', 'arguments': [],
+                                         'external': False}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('not a.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'Negation',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:5-6', 'name': 'a', 'arguments': [],
+                                         'external': False}}}, 'body': []}])
+        self.assertEqual(
+            test_as_dict('not not a.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-11',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-10', 'sign': 'DoubleNegation',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:9-10', 'name': 'a',
+                                         'arguments': [], 'external': False}}},
+              'body': []}])
+        # TODO
+        print(repr(test_as_dict('a <= b.')))
+        print(repr(test_as_dict('a < b.')))
+        print(repr(test_as_dict('a >= b.')))
+        print(repr(test_as_dict('a > b.')))
+        print(repr(test_as_dict('a = b.')))
+        print(repr(test_as_dict('a != b.')))
+        self.assertEqual(
+            test_as_dict('a : b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'type': 'Disjunction', 'location': '<string>:1:1-6',
+                       'elements': [{'type': 'ConditionalLiteral', 'location': '<string>:1:1-6',
+                                     'literal': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
+                                                 'atom': {'type': 'SymbolicAtom',
+                                                          'term': {'type': 'Function', 'location': '<string>:1:1-2',
+                                                                   'name': 'a', 'arguments': [], 'external': False}}},
+                                     'condition': [{'type': 'Literal', 'location': '<string>:1:5-6', 'sign': 'NoSign',
+                                                    'atom': {'type': 'SymbolicAtom',
+                                                             'term': {'type': 'Function', 'location': '<string>:1:5-6',
+                                                                      'name': 'b', 'arguments': [],
+                                                                      'external': False}}}]}]},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict(':- a : b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-10',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-10', 'sign': 'NoSign',
+                       'atom': {'type': 'BooleanConstant', 'value': False}},
+              'body': [{'type': 'ConditionalLiteral', 'location': '<string>:1:4-9',
+                        'literal': {'type': 'Literal', 'location': '<string>:1:4-5', 'sign': 'NoSign',
+                                    'atom': {'type': 'SymbolicAtom',
+                                             'term': {'type': 'Function', 'location': '<string>:1:4-5', 'name': 'a',
+                                                      'arguments': [], 'external': False}}},
+                        'condition': [{'type': 'Literal', 'location': '<string>:1:8-9', 'sign': 'NoSign',
+                                       'atom': {'type': 'SymbolicAtom',
+                                                'term': {'type': 'Function', 'location': '<string>:1:8-9', 'name': 'b',
+                                                         'arguments': [], 'external': False}}}]}]}])
+        self.assertEqual(
+            test_as_dict('#sum {1:a:b} <= 2.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-19',
+              'head': {'type': 'HeadAggregate', 'location': '<string>:1:1-18',
+                       'left_guard': {'type': 'AggregateGuard', 'comparison': 'GreaterEqual',
+                                      'term': {'type': 'Symbol', 'location': '<string>:1:17-18', 'symbol': '2'}},
+                       'function': 'Sum',
+                       'elements': [{'type': 'HeadAggregateElement',
+                                     'tuple': [{'type': 'Symbol', 'location': '<string>:1:7-8', 'symbol': '1'}],
+                                     'condition': {'type': 'ConditionalLiteral', 'location': '<string>:1:9-12',
+                                                   'literal': {'type': 'Literal', 'location': '<string>:1:9-10',
+                                                               'sign': 'NoSign',
+                                                               'atom': {'type': 'SymbolicAtom',
+                                                                        'term': {'type': 'Function',
+                                                                                 'location': '<string>:1:9-10',
+                                                                                 'name': 'a', 'arguments': [],
+                                                                                 'external': False}}},
+                                                   'condition': [{'type': 'Literal', 'location': '<string>:1:11-12',
+                                                                  'sign': 'NoSign',
+                                                                  'atom': {'type': 'SymbolicAtom',
+                                                                           'term': {'type': 'Function',
+                                                                                    'location': '<string>:1:11-12',
+                                                                                    'name': 'b', 'arguments': [],
+                                                                                    'external': False}}}]}}],
+                       'right_guard': None},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict(':- #sum {1:b} <= 2.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-20',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-20', 'sign': 'NoSign',
+                       'atom': {'type': 'BooleanConstant', 'value': False}},
+              'body': [{'type': 'Literal', 'location': '<string>:1:4-19', 'sign': 'NoSign',
+                        'atom': {'type': 'BodyAggregate', 'location': '<string>:1:4-19',
+                                 'left_guard': {'type': 'AggregateGuard', 'comparison': 'GreaterEqual',
+                                                'term': {'type': 'Symbol', 'location': '<string>:1:18-19',
+                                                         'symbol': '2'}},
+                                 'function': 'Sum',
+                                 'elements': [{'type': 'BodyAggregateElement',
+                                               'tuple': [{'type': 'Symbol', 'location': '<string>:1:10-11',
+                                                          'symbol': '1'}],
+                                               'condition': [{'type': 'Literal', 'location': '<string>:1:12-13',
+                                                              'sign': 'NoSign',
+                                                              'atom': {'type': 'SymbolicAtom',
+                                                                       'term': {'type': 'Function',
+                                                                                'location': '<string>:1:12-13',
+                                                                                'name': 'b', 'arguments': [],
+                                                                                'external': False}}}]}],
+                                 'right_guard': None}}]}])
+    def test_encode_theory(self):
+        '''
+        Tests for converting between python and ast representation of theory
+        releated constructs.
+        '''
+        # theory
+        #   definition
+        #   term
+        #   atom
 
     def test_encode_statement(self):
         '''
-        Test encoding of AST's as dicts.
+        Tests for converting between python and ast representation of statements.
         '''
         chk = [{'type': 'Rule', 'location': '<string>:1:1-8',
                 'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
@@ -488,3 +584,17 @@ class TestRepr(TestCase):
                                    'term': {'type': 'Function', 'location': '<string>:1:6-7',
                                             'name': 'b', 'arguments': [], 'external': False}}}]}]
         self.assertEqual(test_as_dict('a :- b.'), chk)
+        # statements
+        #   definition
+        #   show
+        #   show sig
+        #   defined
+        #   minimize
+        #   script
+        #   program
+        #   external
+        #   edge
+        #   heuristic
+        #   project
+        #   project sig
+        # print(repr(test_as_dict('a(1;2).')))
