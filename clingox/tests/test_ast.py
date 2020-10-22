@@ -11,7 +11,7 @@ from clingo.ast import AST, ASTType, Variable
 from .. import ast
 from ..ast import (Visitor, Transformer, TheoryTermParser, TheoryParser, TheoryAtomType,
                    location_to_str, prefix_symbolic_atoms, str_to_location, theory_parser_from_definition)
-from ..ast_repr import as_dict, from_dict
+from ..ast_repr import as_dict
 
 TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
                     ("**", ast.BINARY): (2, ast.RIGHT),
@@ -476,13 +476,54 @@ class TestRepr(TestCase):
                                 'term': {'type': 'Function', 'location': '<string>:1:9-10', 'name': 'a',
                                          'arguments': [], 'external': False}}},
               'body': []}])
-        # TODO
-        print(repr(test_as_dict('a <= b.')))
-        print(repr(test_as_dict('a < b.')))
-        print(repr(test_as_dict('a >= b.')))
-        print(repr(test_as_dict('a > b.')))
-        print(repr(test_as_dict('a = b.')))
-        print(repr(test_as_dict('a != b.')))
+        self.assertEqual(
+            test_as_dict('a <= b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
+                       'atom': {'type': 'Comparison', 'comparison': 'LessEqual',
+                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'type': 'Symbol', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a < b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
+                       'atom': {'type': 'Comparison', 'comparison': 'LessThan',
+                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'type': 'Symbol', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a >= b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
+                       'atom': {'type': 'Comparison', 'comparison': 'GreaterEqual',
+                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'type': 'Symbol', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a > b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
+                       'atom': {'type': 'Comparison', 'comparison': 'GreaterThan',
+                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'type': 'Symbol', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a = b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
+                       'atom': {'type': 'Comparison', 'comparison': 'Equal',
+                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'type': 'Symbol', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('a != b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
+                       'atom': {'type': 'Comparison', 'comparison': 'NotEqual',
+                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'type': 'Symbol', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+              'body': []}])
         self.assertEqual(
             test_as_dict('a : b.'),
             [{'type': 'Rule', 'location': '<string>:1:1-7',
@@ -560,6 +601,7 @@ class TestRepr(TestCase):
                                                                                 'name': 'b', 'arguments': [],
                                                                                 'external': False}}}]}],
                                  'right_guard': None}}]}])
+
     def test_encode_theory(self):
         '''
         Tests for converting between python and ast representation of theory
