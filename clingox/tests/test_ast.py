@@ -607,8 +607,34 @@ class TestRepr(TestCase):
         Tests for converting between python and ast representation of theory
         releated constructs.
         '''
+        self.assertEqual(
+            test_as_dict('#theory t { }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-15', 'name': 't', 'terms': [], 'atoms': []}])
+        self.assertEqual(
+            test_as_dict('#theory t { t { + : 1, unary } }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-34', 'name': 't',
+              'terms': [{'type': 'TheoryTermDefinition', 'location': '<string>:1:13-31', 'name': 't',
+                         'operators': [{'type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-29',
+                                        'name': '+', 'priority': 1, 'operator_type': 'Unary'}]}],
+              'atoms': []}])
+        self.assertEqual(
+            test_as_dict('#theory t { t { + : 1, binary, left } }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-41', 'name': 't',
+              'terms': [{'type': 'TheoryTermDefinition', 'location': '<string>:1:13-38', 'name': 't',
+                         'operators': [{'type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-36',
+                                        'name': '+', 'priority': 1, 'operator_type': 'BinaryLeft'}]}],
+              'atoms': []}])
+        self.assertEqual(
+            test_as_dict('#theory t { t { + : 1, binary, right } }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-42', 'name': 't',
+              'terms': [{'type': 'TheoryTermDefinition', 'location': '<string>:1:13-39', 'name': 't',
+                         'operators': [{'type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-37',
+                                        'name': '+', 'priority': 1, 'operator_type': 'BinaryRight'}]}],
+              'atoms': []}])
+        # print(repr(test_as_dict('a(1;2).')))
         # theory
         #   definition
+        #     atom defs
         #   term
         #   atom
 
@@ -616,16 +642,17 @@ class TestRepr(TestCase):
         '''
         Tests for converting between python and ast representation of statements.
         '''
-        chk = [{'type': 'Rule', 'location': '<string>:1:1-8',
-                'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
-                         'atom': {'type': 'SymbolicAtom',
-                                  'term': {'type': 'Function', 'location': '<string>:1:1-2',
-                                           'name': 'a', 'arguments': [], 'external': False}}},
-                'body': [{'type': 'Literal', 'location': '<string>:1:6-7', 'sign': 'NoSign',
-                          'atom': {'type': 'SymbolicAtom',
-                                   'term': {'type': 'Function', 'location': '<string>:1:6-7',
-                                            'name': 'b', 'arguments': [], 'external': False}}}]}]
-        self.assertEqual(test_as_dict('a :- b.'), chk)
+        self.assertEqual(
+            test_as_dict('a :- b.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
+                       'atom': {'type': 'SymbolicAtom',
+                                'term': {'type': 'Function', 'location': '<string>:1:1-2',
+                                         'name': 'a', 'arguments': [], 'external': False}}},
+              'body': [{'type': 'Literal', 'location': '<string>:1:6-7', 'sign': 'NoSign',
+                        'atom': {'type': 'SymbolicAtom',
+                                 'term': {'type': 'Function', 'location': '<string>:1:6-7',
+                                          'name': 'b', 'arguments': [], 'external': False}}}]}])
         # statements
         #   definition
         #   show
