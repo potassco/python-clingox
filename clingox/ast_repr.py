@@ -5,7 +5,9 @@ from typing import List, Any
 from functools import singledispatch
 
 from clingo import Symbol
-from clingo.ast import AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, Sign, TheoryOperatorType, UnaryOperator
+from clingo.ast import (
+    AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, Sign, TheoryAtomType,
+    TheoryOperatorType, UnaryOperator)
 
 from .ast import location_to_str, str_to_location
 
@@ -74,6 +76,17 @@ def _encode_comp(x: ComparisonOperator) -> str:
         return 'NotEqual'
     assert x == ComparisonOperator.Equal
     return 'Equal'
+
+@_encode.register
+def _encode_tatype(x: TheoryAtomType) -> str:
+    if x == TheoryAtomType.Any:
+        return 'Any'
+    if x == TheoryAtomType.Head:
+        return 'Head'
+    if x == TheoryAtomType.Body:
+        return 'Body'
+    assert x == TheoryAtomType.Directive
+    return 'Directive'
 
 @_encode.register
 def _encode_unop(x: UnaryOperator) -> str:

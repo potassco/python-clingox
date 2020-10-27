@@ -631,12 +631,78 @@ class TestRepr(TestCase):
                          'operators': [{'type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-37',
                                         'name': '+', 'priority': 1, 'operator_type': 'BinaryRight'}]}],
               'atoms': []}])
-        # print(repr(test_as_dict('a(1;2).')))
-        # theory
-        #   definition
-        #     atom defs
-        #   term
-        #   atom
+        self.assertEqual(
+            test_as_dict('#theory t { &p/0 : t, any }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-29', 'name': 't', 'terms': [],
+              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-26', 'atom_type': 'Any',
+                         'name': 'p', 'arity': 0, 'elements': 't', 'guard': None}]}])
+        self.assertEqual(
+            test_as_dict('#theory t { &p/0 : t, head }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-30', 'name': 't', 'terms': [],
+              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-27', 'atom_type': 'Head',
+                         'name': 'p', 'arity': 0, 'elements': 't', 'guard': None}]}])
+        self.assertEqual(
+            test_as_dict('#theory t { &p/1 : t, body }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-30', 'name': 't', 'terms': [],
+              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-27', 'atom_type': 'Body',
+                         'name': 'p', 'arity': 1, 'elements': 't', 'guard': None}]}])
+        self.assertEqual(
+            test_as_dict('#theory t { &p/2 : t, { < }, t, directive }.'),
+            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-45', 'name': 't', 'terms': [],
+              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-42', 'atom_type': 'Directive',
+                         'name': 'p', 'arity': 2, 'elements': 't',
+                         'guard': {'type': 'TheoryGuardDefinition', 'operators': ['<'], 'term': 't'}}]}])
+        self.assertEqual(
+            test_as_dict('&p { }.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'type': 'TheoryAtom', 'location': '<string>:1:1-7',
+                       'term': {'type': 'Function', 'location': '<string>:1:2-3', 'name': 'p',
+                                'arguments': [], 'external': False},
+                       'elements': [], 'guard': None}, 'body': []}])
+        self.assertEqual(
+            test_as_dict(':- &p { }.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-11',
+              'head': {'type': 'Literal', 'location': '<string>:1:1-11', 'sign': 'NoSign',
+                       'atom': {'type': 'BooleanConstant', 'value': False}},
+              'body': [{'type': 'Literal', 'location': '<string>:1:4-10', 'sign': 'NoSign',
+                        'atom': {'type': 'TheoryAtom', 'location': '<string>:1:4-10',
+                                 'term': {'type': 'Function', 'location': '<string>:1:5-6', 'name': 'p',
+                                          'arguments': [], 'external': False},
+                                 'elements': [], 'guard': None}}]}])
+        self.assertEqual(
+            test_as_dict('&p { } > 2.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-12',
+              'head': {'type': 'TheoryAtom', 'location': '<string>:1:1-11',
+                       'term': {'type': 'Function', 'location': '<string>:1:2-3', 'name': 'p',
+                                'arguments': [], 'external': False}, 'elements': [],
+                       'guard': {'type': 'TheoryGuard', 'operator_name': '>',
+                                 'term': {'type': 'TheoryUnparsedTerm', 'location': '<string>:1:10-11',
+                                          'elements': [{'type': 'TheoryUnparsedTermElement', 'operators': [],
+                                                        'term': {'type': 'Symbol', 'location': '<string>:1:10-11',
+                                                                 'symbol': '2'}}]}}},
+              'body': []}])
+        self.assertEqual(
+            test_as_dict('&p { a,b: q }.'),
+            [{'type': 'Rule', 'location': '<string>:1:1-15',
+              'head': {'type': 'TheoryAtom', 'location': '<string>:1:1-14',
+                       'term': {'type': 'Function', 'location': '<string>:1:2-3', 'name': 'p',
+                                'arguments': [], 'external': False},
+                       'elements': [{'type': 'TheoryAtomElement',
+                                     'tuple': [{'type': 'TheoryUnparsedTerm', 'location': '<string>:1:6-7',
+                                                'elements': [{'type': 'TheoryUnparsedTermElement', 'operators': [],
+                                                              'term': {'type': 'Symbol', 'location': '<string>:1:6-7',
+                                                                       'symbol': 'a'}}]},
+                                               {'type': 'TheoryUnparsedTerm', 'location': '<string>:1:8-9',
+                                                'elements': [{'type': 'TheoryUnparsedTermElement', 'operators': [],
+                                                              'term': {'type': 'Symbol', 'location': '<string>:1:8-9',
+                                                                       'symbol': 'b'}}]}],
+                                     'condition': [{'type': 'Literal', 'location': '<string>:1:11-12', 'sign': 'NoSign',
+                                                    'atom': {'type': 'SymbolicAtom',
+                                                             'term': {'type': 'Function',
+                                                                      'location': '<string>:1:11-12', 'name': 'q',
+                                                                      'arguments': [], 'external': False}}}]}],
+                       'guard': None},
+              'body': []}])
 
     def test_encode_statement(self):
         '''
@@ -653,6 +719,7 @@ class TestRepr(TestCase):
                         'atom': {'type': 'SymbolicAtom',
                                  'term': {'type': 'Function', 'location': '<string>:1:6-7',
                                           'name': 'b', 'arguments': [], 'external': False}}}]}])
+        # print(repr(test_as_dict('a(1;2).')))
         # statements
         #   definition
         #   show
@@ -666,4 +733,3 @@ class TestRepr(TestCase):
         #   heuristic
         #   project
         #   project sig
-        # print(repr(test_as_dict('a(1;2).')))
