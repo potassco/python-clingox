@@ -213,6 +213,30 @@ def parse_theory(s: str) -> TheoryParser:
     parse_program(f"{s}.", extract)
     return cast(TheoryParser, parser)
 
+def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
+    '''
+    Parse the given program and rename symbolic atoms in it.
+    '''
+    prg: List[str]
+    prg = []
+    def append(stm):
+        nonlocal prg
+        ret = f(stm)
+        if ret is not None:
+            prg.append(str(ret))
+    parse_program(s, append)
+    return prg
+
+def test_as_dict(s: str):
+    '''
+    Parse and transform a program to its dictionary representation.
+    '''
+    prg = []
+    parse_program(s, lambda x: prg.append(as_dict(x)))
+    preamble = {'type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []}
+    assert prg[0] == preamble
+    return prg[1:]
+
 
 class TestAST(TestCase):
     '''
@@ -325,25 +349,6 @@ class TestAST(TestCase):
         self.assertRaises(RuntimeError, pr, "&p { } <= 3.")
         self.assertRaises(RuntimeError, pr, "&r { } <= 3.")
 
-
-def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
-    '''
-    Parse the given program and rename symbolic atoms in it.
-    '''
-    prg: List[str]
-    prg = []
-    def append(stm):
-        nonlocal prg
-        ret = f(stm)
-        if ret is not None:
-            prg.append(str(ret))
-    parse_program(s, append)
-    return prg
-
-class TestRenameSymbolicAtoms(TestCase):
-    '''
-    Tests for renaming symbolic atoms.
-    '''
     def test_rename(self):
         '''
         Test renaming symbolic atoms.
@@ -357,21 +362,6 @@ class TestRenameSymbolicAtoms(TestCase):
             str(prefix_symbolic_atoms(sym, 'u_')),
             'u_a(b)')
 
-
-def test_as_dict(s: str):
-    '''
-    Parse and transform a program to its dictionary representation.
-    '''
-    prg = []
-    parse_program(s, lambda x: prg.append(as_dict(x)))
-    preamble = {'type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []}
-    assert prg[0] == preamble
-    return prg[1:]
-
-class TestRepr(TestCase):
-    '''
-    Tests for converting between python and ast representation of terms.
-    '''
     def test_encode_term(self):
         '''
         Test encoding of terms in AST.
@@ -719,17 +709,86 @@ class TestRepr(TestCase):
                         'atom': {'type': 'SymbolicAtom',
                                  'term': {'type': 'Function', 'location': '<string>:1:6-7',
                                           'name': 'b', 'arguments': [], 'external': False}}}]}])
-        # print(repr(test_as_dict('a(1;2).')))
-        # statements
-        #   definition
-        #   show
-        #   show sig
-        #   defined
-        #   minimize
-        #   script
-        #   program
-        #   external
-        #   edge
-        #   heuristic
-        #   project
-        #   project sig
+        self.assertEqual(
+            test_as_dict('#defined x/0.'),
+            [{'type': 'Defined', 'location': '<string>:1:1-14', 'name': 'x', 'arity': 0, 'positive': True}])
+        self.assertEqual(
+            test_as_dict('#show a : b.'),
+            [{'type': 'ShowTerm', 'location': '<string>:1:1-13',
+              'term': {'type': 'Symbol', 'location': '<string>:1:7-8', 'symbol': 'a'},
+              'body': [{'type': 'Literal', 'location': '<string>:1:11-12', 'sign': 'NoSign',
+                        'atom': {'type': 'SymbolicAtom',
+                                 'term': {'type': 'Function', 'location': '<string>:1:11-12', 'name': 'b',
+                                          'arguments': [], 'external': False}}}],
+              'csp': False}])
+        self.assertEqual(
+            test_as_dict('#show a/0.'),
+            [{'type': 'ShowSignature', 'location': '<string>:1:1-11', 'name': 'a', 'arity': 0, 'positive': True,
+              'csp': False}])
+        self.assertEqual(
+            test_as_dict('#minimize { 1@2,a : b }.'),
+            [{'type': 'Minimize', 'location': '<string>:1:13-22',
+              'weight': {'type': 'Symbol', 'location': '<string>:1:13-14', 'symbol': '1'},
+              'priority': {'type': 'Symbol', 'location': '<string>:1:15-16', 'symbol': '2'},
+              'tuple': [{'type': 'Symbol', 'location': '<string>:1:17-18', 'symbol': 'a'}],
+              'body': [{'type': 'Literal', 'location': '<string>:1:21-22', 'sign': 'NoSign',
+                        'atom': {'type': 'SymbolicAtom',
+                                 'term': {'type': 'Function', 'location': '<string>:1:21-22', 'name': 'b',
+                                          'arguments': [], 'external': False}}}]}])
+        self.assertEqual(
+            test_as_dict('#script (python) blub! #end.'),
+            [{'type': 'Script', 'location': '<string>:1:1-29', 'script_type': 'Python',
+              'code': '#script (python) blub! #end\n'}])
+        self.assertEqual(
+            test_as_dict('#script (lua) blub! #end.'),
+            [{'type': 'Script', 'location': '<string>:1:1-26', 'script_type': 'Lua', 'code': ' blub! '}])
+        self.assertEqual(
+            test_as_dict('#program x(y).'),
+            [{'type': 'Program', 'location': '<string>:1:1-15', 'name': 'x',
+              'parameters': [{'type': 'Id', 'location': '<string>:1:12-13', 'id': 'y'}]}])
+        self.assertEqual(
+            test_as_dict('#project a/0.'),
+            [{'type': 'ProjectSignature', 'location': '<string>:1:1-14', 'name': 'a', 'arity': 0, 'positive': True}])
+        self.assertEqual(
+            test_as_dict('#project a : b.'),
+            [{'type': 'ProjectAtom', 'location': '<string>:1:1-16',
+              'atom': {'type': 'SymbolicAtom',
+                       'term': {'type': 'Function', 'location': '<string>:1:10-11', 'name': 'a',
+                                'arguments': [], 'external': False}},
+              'body': [{'type': 'Literal', 'location': '<string>:1:14-15', 'sign': 'NoSign',
+                        'atom': {'type': 'SymbolicAtom',
+                                 'term': {'type': 'Function', 'location': '<string>:1:14-15', 'name': 'b',
+                                          'arguments': [], 'external': False}}}]}])
+        self.assertEqual(
+            test_as_dict('#external x : y. [X]'),
+            [{'type': 'External', 'location': '<string>:1:1-21',
+              'atom': {'type': 'SymbolicAtom',
+                       'term': {'type': 'Function', 'location': '<string>:1:11-12', 'name': 'x',
+                                'arguments': [], 'external': False}},
+              'body': [{'type': 'Literal', 'location': '<string>:1:15-16', 'sign': 'NoSign',
+                        'atom': {'type': 'SymbolicAtom',
+                                 'term': {'type': 'Function', 'location': '<string>:1:15-16', 'name': 'y',
+                                          'arguments': [], 'external': False}}}],
+              'external_type': {'type': 'Variable', 'location': '<string>:1:19-20', 'name': 'X'}}])
+        self.assertEqual(
+            test_as_dict('#edge (u,v) : b.'),
+            [{'type': 'Edge', 'location': '<string>:1:1-17',
+              'u': {'type': 'Symbol', 'location': '<string>:1:8-9', 'symbol': 'u'},
+              'v': {'type': 'Symbol', 'location': '<string>:1:10-11', 'symbol': 'v'},
+              'body': [{'type': 'Literal', 'location': '<string>:1:15-16', 'sign': 'NoSign',
+                        'atom': {'type': 'SymbolicAtom',
+                                 'term': {'type': 'Function', 'location': '<string>:1:15-16', 'name': 'b',
+                                          'arguments': [], 'external': False}}}]}])
+        self.assertEqual(
+            test_as_dict('#heuristic a : b. [p,X]'),
+            [{'type': 'Heuristic', 'location': '<string>:1:1-24',
+              'atom': {'type': 'SymbolicAtom',
+                       'term': {'type': 'Function', 'location': '<string>:1:12-13', 'name': 'a',
+                                'arguments': [], 'external': False}},
+              'body': [{'type': 'Literal', 'location': '<string>:1:16-17', 'sign': 'NoSign',
+                        'atom': {'type': 'SymbolicAtom',
+                                 'term': {'type': 'Function', 'location': '<string>:1:16-17', 'name': 'b',
+                                          'arguments': [], 'external': False}}}],
+              'bias': {'type': 'Symbol', 'location': '<string>:1:20-21', 'symbol': 'p'},
+              'priority': {'type': 'Symbol', 'location': '<string>:1:1-24', 'symbol': '0'},
+              'modifier': {'type': 'Variable', 'location': '<string>:1:22-23', 'name': 'X'}}])

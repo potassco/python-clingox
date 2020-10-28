@@ -6,8 +6,8 @@ from functools import singledispatch
 
 from clingo import Symbol
 from clingo.ast import (
-    AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, Sign, TheoryAtomType,
-    TheoryOperatorType, UnaryOperator)
+    AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, ScriptType, Sign,
+    TheoryAtomType, TheoryOperatorType, UnaryOperator)
 
 from .ast import location_to_str, str_to_location
 
@@ -87,6 +87,13 @@ def _encode_tatype(x: TheoryAtomType) -> str:
         return 'Body'
     assert x == TheoryAtomType.Directive
     return 'Directive'
+
+@_encode.register
+def _encode_sctype(x: ScriptType) -> str:
+    if x == ScriptType.Python:
+        return 'Python'
+    assert x == ScriptType.Lua
+    return 'Lua'
 
 @_encode.register
 def _encode_unop(x: UnaryOperator) -> str:
