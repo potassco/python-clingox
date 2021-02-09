@@ -2,12 +2,11 @@
 Simple tests for ast manipulation.
 """
 
-from copy import deepcopy
 from unittest import TestCase
 from typing import List, Optional, cast
 
 from clingo import Function
-from clingo.ast import AST, ASTType, Transformer, Variable, parse_string
+from clingo.ast import AST, ASTType, Location, Position, Transformer, parse_string
 from .. import ast
 from ..ast import (
     TheoryTermParser, TheoryParser, TheoryAtomType,
@@ -38,12 +37,8 @@ TEST_THEORY = """\
 }\
 """
 
-LOC = {"begin": {"filename": "a",
-                 "line": 1,
-                 "column": 2},
-       "end": {"filename": "a",
-               "line": 1,
-               "column": 2}}
+LOC = Location(Position("a", 1, 2),
+               Position("a", 1, 2))
 
 class Extractor(Transformer):
     '''
@@ -144,7 +139,7 @@ def test_ast_dict(tc: TestCase, s: str):
     prg: list = []
     parse_string(s, prg.append)
     ret = [ast_to_dict(x) for x in prg]
-    preamble = {'type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []}
+    preamble = {'ast_type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []}
     tc.assertEqual(ret[0], preamble)
     tc.assertEqual(prg, [dict_to_ast(x) for x in ret])
     return ret[1:]
@@ -159,20 +154,20 @@ class TestAST(TestCase):
         '''
         Test string representation of location.
         '''
-        loc = deepcopy(LOC)
+        loc = LOC
         self.assertEqual(location_to_str(loc), "a:1:2")
         self.assertEqual(str_to_location(location_to_str(loc)), loc)
-        loc['end']['column'] = 4
+        loc = Location(loc.begin, Position(loc.end.filename, loc.end.line, 4))
         self.assertEqual(location_to_str(loc), "a:1:2-4")
         self.assertEqual(str_to_location(location_to_str(loc)), loc)
-        loc['end']['line'] = 3
+        loc = Location(loc.begin, Position(loc.end.filename, 3, loc.end.column))
         self.assertEqual(location_to_str(loc), "a:1:2-3:4")
         self.assertEqual(str_to_location(location_to_str(loc)), loc)
-        loc['end']['filename'] = 'b'
+        loc = Location(loc.begin, Position('b', loc.end.line, loc.end.column))
         self.assertEqual(location_to_str(loc), "a:1:2-b:3:4")
         self.assertEqual(str_to_location(location_to_str(loc)), loc)
-        loc['begin']['filename'] = r'a:1:2-3\:'
-        loc['end']['filename'] = 'b:1:2-3'
+        loc = Location(Position(r'a:1:2-3\:', loc.begin.line, loc.begin.column),
+                       Position('b:1:2-3', loc.end.line, loc.end.column))
         self.assertEqual(location_to_str(loc), r'a\:1\:2-3\\\::1:2-b\:1\:2-3:3:4')
         self.assertEqual(str_to_location(location_to_str(loc)), loc)
         self.assertRaises(RuntimeError, str_to_location, 'a:1:2-')
@@ -251,7 +246,7 @@ class TestAST(TestCase):
             test_rename("a :- b(X,Y), not c(f(3,b))."),
             ['#program base.', 'u_a :- u_b(X,Y); not u_c(f(3,b)).'])
 
-        sym = ast.SymbolicAtom(ast.Symbol(LOC, Function('a', [Function('b')])))
+        sym = ast.SymbolicAtom(ast.SymbolicTerm(LOC, Function('a', [Function('b')])))
         self.assertEqual(
             str(prefix_symbolic_atoms(sym, 'u_')),
             'u_a(b)')
@@ -262,211 +257,215 @@ class TestAST(TestCase):
         '''
         self.assertEqual(
             test_ast_dict(self, 'a(1).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-6',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-5', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-5', 'name': 'a',
-                                         'arguments': [{'type': 'Symbol', 'location': '<string>:1:3-4', 'symbol': '1'}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-6',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-5', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-5', 'name': 'a',
+                                           'arguments': [{'ast_type': 'SymbolicTerm', 'location': '<string>:1:3-4',
+                                                          'symbol': '1'}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(X).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-6',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-5', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-5', 'name': 'a',
-                                         'arguments': [{'type': 'Variable', 'location': '<string>:1:3-4', 'name': 'X'}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-6',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-5', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-5', 'name': 'a',
+                                           'arguments': [{'ast_type': 'Variable', 'location': '<string>:1:3-4',
+                                                          'name': 'X'}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(-1).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-7',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-6', 'name': 'a',
-                                         'arguments': [{'type': 'UnaryOperation', 'location': '<string>:1:3-5',
-                                                        'operator': 'UnaryMinus',
-                                                        'argument': {'type': 'Symbol', 'location': '<string>:1:4-5',
-                                                                     'symbol': '1'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-6', 'name': 'a',
+                                           'arguments': [{'ast_type': 'UnaryOperation', 'location': '<string>:1:3-5',
+                                                          'operator_type': 0,
+                                                          'argument': {'ast_type': 'SymbolicTerm',
+                                                                       'location': '<string>:1:4-5', 'symbol': '1'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(~1).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-7',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-6', 'name': 'a',
-                                         'arguments': [{'type': 'UnaryOperation', 'location': '<string>:1:3-5',
-                                                        'operator': 'Negation',
-                                                        'argument': {'type': 'Symbol', 'location': '<string>:1:4-5',
-                                                                     'symbol': '1'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-6', 'name': 'a',
+                                           'arguments': [{'ast_type': 'UnaryOperation', 'location': '<string>:1:3-5',
+                                                          'operator_type': 1,
+                                                          'argument': {'ast_type': 'SymbolicTerm',
+                                                                       'location': '<string>:1:4-5', 'symbol': '1'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(|1|).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'UnaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'Absolute',
-                                                        'argument': {'type': 'Symbol', 'location': '<string>:1:4-5',
-                                                                     'symbol': '1'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'UnaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 2,
+                                                          'argument': {'ast_type': 'SymbolicTerm',
+                                                                       'location': '<string>:1:4-5', 'symbol': '1'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1+2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'Plus',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 3,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1-2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'Minus',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 4,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1*2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'Multiplication',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 5,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1/2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'Division',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 6,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1\\2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'Modulo',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 7,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1**2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-9',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-8', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-8', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-7',
-                                                        'operator': 'Power',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:6-7',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-9',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-8', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-8', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-7',
+                                                          'operator_type': 8,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:6-7', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1^2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'XOr',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 0,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1?2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'Or',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 1,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1&2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                         'arguments': [{'type': 'BinaryOperation', 'location': '<string>:1:3-6',
-                                                        'operator': 'And',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
+                                           'arguments': [{'ast_type': 'BinaryOperation', 'location': '<string>:1:3-6',
+                                                          'operator_type': 2,
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:5-6', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1..2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-9',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-8', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-8', 'name': 'a',
-                                         'arguments': [{'type': 'Interval', 'location': '<string>:1:3-7',
-                                                        'left': {'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                 'symbol': '1'},
-                                                        'right': {'type': 'Symbol', 'location': '<string>:1:6-7',
-                                                                  'symbol': '2'}}],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-9',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-8', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-8', 'name': 'a',
+                                           'arguments': [{'ast_type': 'Interval', 'location': '<string>:1:3-7',
+                                                          'left': {'ast_type': 'SymbolicTerm',
+                                                                   'location': '<string>:1:3-4', 'symbol': '1'},
+                                                          'right': {'ast_type': 'SymbolicTerm',
+                                                                    'location': '<string>:1:6-7', 'symbol': '2'}}],
+                                           'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a(1;2).'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Pool', 'location': '<string>:1:1-7',
-                                         'arguments': [{'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                                        'arguments': [{'type': 'Symbol', 'location': '<string>:1:3-4',
-                                                                       'symbol': '1'}],
-                                                        'external': False},
-                                                       {'type': 'Function', 'location': '<string>:1:1-7', 'name': 'a',
-                                                        'arguments': [{'type': 'Symbol', 'location': '<string>:1:5-6',
-                                                                       'symbol': '2'}],
-                                                        'external': False}]}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Pool', 'location': '<string>:1:1-7',
+                                           'arguments': [{'ast_type': 'Function', 'location': '<string>:1:1-7',
+                                                          'name': 'a',
+                                                          'arguments': [{'ast_type': 'SymbolicTerm',
+                                                                         'location': '<string>:1:3-4', 'symbol': '1'}],
+                                                          'external': 0},
+                                                         {'ast_type': 'Function', 'location': '<string>:1:1-7',
+                                                          'name': 'a',
+                                                          'arguments': [{'ast_type': 'SymbolicTerm',
+                                                                         'location': '<string>:1:5-6', 'symbol': '2'}],
+                                                          'external': 0}]}}},
               'body': []}])
 
     def test_encode_literal(self):
@@ -475,175 +474,179 @@ class TestAST(TestCase):
         '''
         self.assertEqual(
             test_ast_dict(self, 'a.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-3',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-2', 'name': 'a', 'arguments': [],
-                                         'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-3',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-2', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-2', 'name': 'a',
+                                           'arguments': [], 'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'not a.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-7',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'Negation',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:5-6', 'name': 'a', 'arguments': [],
-                                         'external': False}}}, 'body': []}])
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 1,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:5-6', 'name': 'a',
+                                           'arguments': [], 'external': 0}}},
+              'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'not not a.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-11',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-10', 'sign': 'DoubleNegation',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:9-10', 'name': 'a',
-                                         'arguments': [], 'external': False}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-11',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-10', 'sign': 2,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:9-10', 'name': 'a',
+                                           'arguments': [], 'external': 0}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a <= b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'Comparison', 'comparison': 'LessEqual',
-                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'type': 'Symbol', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'Comparison', 'comparison': 2,
+                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a < b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-7',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
-                       'atom': {'type': 'Comparison', 'comparison': 'LessThan',
-                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'type': 'Symbol', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
+                       'atom': {'ast_type': 'Comparison', 'comparison': 1,
+                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a >= b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'Comparison', 'comparison': 'GreaterEqual',
-                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'type': 'Symbol', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'Comparison', 'comparison': 3,
+                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a > b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-7',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
-                       'atom': {'type': 'Comparison', 'comparison': 'GreaterThan',
-                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'type': 'Symbol', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
+                       'atom': {'ast_type': 'Comparison', 'comparison': 0,
+                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a = b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-7',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-6', 'sign': 'NoSign',
-                       'atom': {'type': 'Comparison', 'comparison': 'Equal',
-                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'type': 'Symbol', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
+                       'atom': {'ast_type': 'Comparison', 'comparison': 5,
+                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a != b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-7', 'sign': 'NoSign',
-                       'atom': {'type': 'Comparison', 'comparison': 'NotEqual',
-                                'left': {'type': 'Symbol', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'type': 'Symbol', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
+                       'atom': {'ast_type': 'Comparison', 'comparison': 4,
+                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a : b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-7',
-              'head': {'type': 'Disjunction', 'location': '<string>:1:1-6',
-                       'elements': [{'type': 'ConditionalLiteral', 'location': '<string>:1:1-6',
-                                     'literal': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
-                                                 'atom': {'type': 'SymbolicAtom',
-                                                          'term': {'type': 'Function', 'location': '<string>:1:1-2',
-                                                                   'name': 'a', 'arguments': [], 'external': False}}},
-                                     'condition': [{'type': 'Literal', 'location': '<string>:1:5-6', 'sign': 'NoSign',
-                                                    'atom': {'type': 'SymbolicAtom',
-                                                             'term': {'type': 'Function', 'location': '<string>:1:5-6',
-                                                                      'name': 'b', 'arguments': [],
-                                                                      'external': False}}}]}]},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
+              'head': {'ast_type': 'Disjunction', 'location': '<string>:1:1-6',
+                       'elements': [{'ast_type': 'ConditionalLiteral', 'location': '<string>:1:1-2',
+                                     'literal': {'ast_type': 'Literal', 'location': '<string>:1:1-2', 'sign': 0,
+                                                 'atom': {'ast_type': 'SymbolicAtom',
+                                                          'symbol': {'ast_type': 'Function',
+                                                                     'location': '<string>:1:1-2', 'name': 'a',
+                                                                     'arguments': [], 'external': 0}}},
+                                     'condition': [{'ast_type': 'Literal', 'location': '<string>:1:5-6', 'sign': 0,
+                                                    'atom': {'ast_type': 'SymbolicAtom',
+                                                             'symbol': {'ast_type': 'Function',
+                                                                        'location': '<string>:1:5-6', 'name': 'b',
+                                                                        'arguments': [], 'external': 0}}}]}]},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, ':- a : b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-10',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-10', 'sign': 'NoSign',
-                       'atom': {'type': 'BooleanConstant', 'value': False}},
-              'body': [{'type': 'ConditionalLiteral', 'location': '<string>:1:4-9',
-                        'literal': {'type': 'Literal', 'location': '<string>:1:4-5', 'sign': 'NoSign',
-                                    'atom': {'type': 'SymbolicAtom',
-                                             'term': {'type': 'Function', 'location': '<string>:1:4-5', 'name': 'a',
-                                                      'arguments': [], 'external': False}}},
-                        'condition': [{'type': 'Literal', 'location': '<string>:1:8-9', 'sign': 'NoSign',
-                                       'atom': {'type': 'SymbolicAtom',
-                                                'term': {'type': 'Function', 'location': '<string>:1:8-9', 'name': 'b',
-                                                         'arguments': [], 'external': False}}}]}]}])
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-10',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-10', 'sign': 0,
+                       'atom': {'ast_type': 'BooleanConstant', 'value': 0}},
+              'body': [{'ast_type': 'ConditionalLiteral', 'location': '<string>:1:4-9',
+                        'literal': {'ast_type': 'Literal', 'location': '<string>:1:4-5', 'sign': 0,
+                                    'atom': {'ast_type': 'SymbolicAtom',
+                                             'symbol': {'ast_type': 'Function', 'location': '<string>:1:4-5',
+                                                        'name': 'a', 'arguments': [], 'external': 0}}},
+                        'condition': [{'ast_type': 'Literal', 'location': '<string>:1:8-9', 'sign': 0,
+                                       'atom': {'ast_type': 'SymbolicAtom',
+                                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:8-9',
+                                                           'name': 'b', 'arguments': [], 'external': 0}}}]}]}])
         self.assertEqual(
             test_ast_dict(self, '#sum {1:a:b} <= 2.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-19',
-              'head': {'type': 'HeadAggregate', 'location': '<string>:1:1-18',
-                       'left_guard': {'type': 'AggregateGuard', 'comparison': 'GreaterEqual',
-                                      'term': {'type': 'Symbol', 'location': '<string>:1:17-18', 'symbol': '2'}},
-                       'function': 'Sum',
-                       'elements': [{'type': 'HeadAggregateElement',
-                                     'tuple': [{'type': 'Symbol', 'location': '<string>:1:7-8', 'symbol': '1'}],
-                                     'condition': {'type': 'ConditionalLiteral', 'location': '<string>:1:9-12',
-                                                   'literal': {'type': 'Literal', 'location': '<string>:1:9-10',
-                                                               'sign': 'NoSign',
-                                                               'atom': {'type': 'SymbolicAtom',
-                                                                        'term': {'type': 'Function',
-                                                                                 'location': '<string>:1:9-10',
-                                                                                 'name': 'a', 'arguments': [],
-                                                                                 'external': False}}},
-                                                   'condition': [{'type': 'Literal', 'location': '<string>:1:11-12',
-                                                                  'sign': 'NoSign',
-                                                                  'atom': {'type': 'SymbolicAtom',
-                                                                           'term': {'type': 'Function',
-                                                                                    'location': '<string>:1:11-12',
-                                                                                    'name': 'b', 'arguments': [],
-                                                                                    'external': False}}}]}}],
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-19',
+              'head': {'ast_type': 'HeadAggregate', 'location': '<string>:1:1-18',
+                       'left_guard': {'ast_type': 'AggregateGuard', 'comparison': 3,
+                                      'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:17-18',
+                                               'symbol': '2'}},
+                       'function': 1,
+                       'elements': [{'ast_type': 'HeadAggregateElement',
+                                     'terms': [{'ast_type': 'SymbolicTerm', 'location': '<string>:1:7-8',
+                                                'symbol': '1'}],
+                                     'condition': {'ast_type': 'ConditionalLiteral', 'location': '<string>:1:9-10',
+                                                   'literal': {'ast_type': 'Literal', 'location': '<string>:1:9-10',
+                                                               'sign': 0,
+                                                               'atom': {'ast_type': 'SymbolicAtom',
+                                                                        'symbol': {'ast_type': 'Function',
+                                                                                   'location': '<string>:1:9-10',
+                                                                                   'name': 'a', 'arguments': [],
+                                                                                   'external': 0}}},
+                                                   'condition': [{'ast_type': 'Literal', 'location': '<string>:1:11-12',
+                                                                  'sign': 0,
+                                                                  'atom': {'ast_type': 'SymbolicAtom',
+                                                                           'symbol': {'ast_type': 'Function',
+                                                                                      'location': '<string>:1:11-12',
+                                                                                      'name': 'b', 'arguments': [],
+                                                                                      'external': 0}}}]}}],
                        'right_guard': None},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, ':- #sum {1:b} <= 2.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-20',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-20', 'sign': 'NoSign',
-                       'atom': {'type': 'BooleanConstant', 'value': False}},
-              'body': [{'type': 'Literal', 'location': '<string>:1:4-19', 'sign': 'NoSign',
-                        'atom': {'type': 'BodyAggregate', 'location': '<string>:1:4-19',
-                                 'left_guard': {'type': 'AggregateGuard', 'comparison': 'GreaterEqual',
-                                                'term': {'type': 'Symbol', 'location': '<string>:1:18-19',
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-20',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-20', 'sign': 0,
+                       'atom': {'ast_type': 'BooleanConstant', 'value': 0}},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:4-19', 'sign': 0,
+                        'atom': {'ast_type': 'BodyAggregate', 'location': '<string>:1:4-19',
+                                 'left_guard': {'ast_type': 'AggregateGuard', 'comparison': 3,
+                                                'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:18-19',
                                                          'symbol': '2'}},
-                                 'function': 'Sum',
-                                 'elements': [{'type': 'BodyAggregateElement',
-                                               'tuple': [{'type': 'Symbol', 'location': '<string>:1:10-11',
+                                 'function': 1,
+                                 'elements': [{'ast_type': 'BodyAggregateElement',
+                                               'terms': [{'ast_type': 'SymbolicTerm', 'location': '<string>:1:10-11',
                                                           'symbol': '1'}],
-                                               'condition': [{'type': 'Literal', 'location': '<string>:1:12-13',
-                                                              'sign': 'NoSign',
-                                                              'atom': {'type': 'SymbolicAtom',
-                                                                       'term': {'type': 'Function',
-                                                                                'location': '<string>:1:12-13',
-                                                                                'name': 'b', 'arguments': [],
-                                                                                'external': False}}}]}],
+                                               'condition': [{'ast_type': 'Literal', 'location': '<string>:1:12-13',
+                                                              'sign': 0,
+                                                              'atom': {'ast_type': 'SymbolicAtom',
+                                                                       'symbol': {'ast_type': 'Function',
+                                                                                  'location': '<string>:1:12-13',
+                                                                                  'name': 'b', 'arguments': [],
+                                                                                  'external': 0}}}]}],
                                  'right_guard': None}}]}])
         self.assertEqual(
             test_ast_dict(self, '#count {}.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-11',
-              'head': {'type': 'HeadAggregate', 'location': '<string>:1:1-10', 'left_guard': None,
-                       'function': 'Count', 'elements': [], 'right_guard': None},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-11',
+              'head': {'ast_type': 'HeadAggregate', 'location': '<string>:1:1-10', 'left_guard': None,
+                       'function': 0, 'elements': [], 'right_guard': None},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, '#min {}.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-9',
-              'head': {'type': 'HeadAggregate', 'location': '<string>:1:1-8', 'left_guard': None,
-                       'function': 'Min', 'elements': [], 'right_guard': None},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-9',
+              'head': {'ast_type': 'HeadAggregate', 'location': '<string>:1:1-8', 'left_guard': None,
+                       'function': 3, 'elements': [], 'right_guard': None},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, '#max {}.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-9',
-              'head': {'type': 'HeadAggregate', 'location': '<string>:1:1-8', 'left_guard': None,
-                       'function': 'Max', 'elements': [], 'right_guard': None},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-9',
+              'head': {'ast_type': 'HeadAggregate', 'location': '<string>:1:1-8', 'left_guard': None,
+                       'function': 4, 'elements': [], 'right_guard': None},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, '#sum+ {}.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-10',
-              'head': {'type': 'HeadAggregate', 'location': '<string>:1:1-9', 'left_guard': None,
-                       'function': 'SumPlus', 'elements': [], 'right_guard': None},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-10',
+              'head': {'ast_type': 'HeadAggregate', 'location': '<string>:1:1-9', 'left_guard': None,
+                       'function': 2, 'elements': [], 'right_guard': None},
               'body': []}])
 
     def test_encode_theory(self):
@@ -653,98 +656,92 @@ class TestAST(TestCase):
         '''
         self.assertEqual(
             test_ast_dict(self, '#theory t { }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-15', 'name': 't', 'terms': [], 'atoms': []}])
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-15', 'name': 't', 'terms': [], 'atoms': []}])
         self.assertEqual(
             test_ast_dict(self, '#theory t { t { + : 1, unary } }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-34', 'name': 't',
-              'terms': [{'type': 'TheoryTermDefinition', 'location': '<string>:1:13-31', 'name': 't',
-                         'operators': [{'type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-29',
-                                        'name': '+', 'priority': 1, 'operator_type': 'Unary'}]}],
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-34', 'name': 't',
+              'terms': [{'ast_type': 'TheoryTermDefinition', 'location': '<string>:1:13-31', 'name': 't',
+                         'operators': [{'ast_type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-29',
+                                        'name': '+', 'priority': 1, 'operator_type': 0}]}],
               'atoms': []}])
         self.assertEqual(
             test_ast_dict(self, '#theory t { t { + : 1, binary, left } }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-41', 'name': 't',
-              'terms': [{'type': 'TheoryTermDefinition', 'location': '<string>:1:13-38', 'name': 't',
-                         'operators': [{'type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-36',
-                                        'name': '+', 'priority': 1, 'operator_type': 'BinaryLeft'}]}],
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-41', 'name': 't',
+              'terms': [{'ast_type': 'TheoryTermDefinition', 'location': '<string>:1:13-38', 'name': 't',
+                         'operators': [{'ast_type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-36',
+                                        'name': '+', 'priority': 1, 'operator_type': 1}]}],
               'atoms': []}])
         self.assertEqual(
             test_ast_dict(self, '#theory t { t { + : 1, binary, right } }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-42', 'name': 't',
-              'terms': [{'type': 'TheoryTermDefinition', 'location': '<string>:1:13-39', 'name': 't',
-                         'operators': [{'type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-37',
-                                        'name': '+', 'priority': 1, 'operator_type': 'BinaryRight'}]}],
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-42', 'name': 't',
+              'terms': [{'ast_type': 'TheoryTermDefinition', 'location': '<string>:1:13-39', 'name': 't',
+                         'operators': [{'ast_type': 'TheoryOperatorDefinition', 'location': '<string>:1:17-37',
+                                        'name': '+', 'priority': 1, 'operator_type': 2}]}],
               'atoms': []}])
         self.assertEqual(
             test_ast_dict(self, '#theory t { &p/0 : t, any }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-29', 'name': 't', 'terms': [],
-              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-26', 'atom_type': 'Any',
-                         'name': 'p', 'arity': 0, 'elements': 't', 'guard': None}]}])
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-29', 'name': 't', 'terms': [],
+              'atoms': [{'ast_type': 'TheoryAtomDefinition', 'location': '<string>:1:13-26', 'atom_type': 2,
+                         'name': 'p', 'arity': 0, 'term': 't', 'guard': None}]}])
         self.assertEqual(
             test_ast_dict(self, '#theory t { &p/0 : t, head }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-30', 'name': 't', 'terms': [],
-              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-27', 'atom_type': 'Head',
-                         'name': 'p', 'arity': 0, 'elements': 't', 'guard': None}]}])
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-30', 'name': 't', 'terms': [],
+              'atoms': [{'ast_type': 'TheoryAtomDefinition', 'location': '<string>:1:13-27', 'atom_type': 0,
+                         'name': 'p', 'arity': 0, 'term': 't', 'guard': None}]}])
         self.assertEqual(
             test_ast_dict(self, '#theory t { &p/1 : t, body }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-30', 'name': 't', 'terms': [],
-              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-27', 'atom_type': 'Body',
-                         'name': 'p', 'arity': 1, 'elements': 't', 'guard': None}]}])
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-30', 'name': 't', 'terms': [],
+              'atoms': [{'ast_type': 'TheoryAtomDefinition', 'location': '<string>:1:13-27', 'atom_type': 1,
+                         'name': 'p', 'arity': 1, 'term': 't', 'guard': None}]}])
         self.assertEqual(
             test_ast_dict(self, '#theory t { &p/2 : t, { < }, t, directive }.'),
-            [{'type': 'TheoryDefinition', 'location': '<string>:1:1-45', 'name': 't', 'terms': [],
-              'atoms': [{'type': 'TheoryAtomDefinition', 'location': '<string>:1:13-42', 'atom_type': 'Directive',
-                         'name': 'p', 'arity': 2, 'elements': 't',
-                         'guard': {'type': 'TheoryGuardDefinition', 'operators': ['<'], 'term': 't'}}]}])
+            [{'ast_type': 'TheoryDefinition', 'location': '<string>:1:1-45', 'name': 't', 'terms': [],
+              'atoms': [{'ast_type': 'TheoryAtomDefinition', 'location': '<string>:1:13-42', 'atom_type': 3,
+                         'name': 'p', 'arity': 2, 'term': 't',
+                         'guard': {'ast_type': 'TheoryGuardDefinition', 'operators': ['<'], 'term': 't'}}]}])
         self.assertEqual(
             test_ast_dict(self, '&p { }.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'TheoryAtom', 'location': '<string>:1:1-7',
-                       'term': {'type': 'Function', 'location': '<string>:1:2-3', 'name': 'p',
-                                'arguments': [], 'external': False},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'TheoryAtom', 'location': '<string>:1:2-3',
+                       'term': {'ast_type': 'Function', 'location': '<string>:1:2-3', 'name': 'p',
+                                'arguments': [], 'external': 0},
                        'elements': [], 'guard': None}, 'body': []}])
         self.assertEqual(
             test_ast_dict(self, ':- &p { }.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-11',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-11', 'sign': 'NoSign',
-                       'atom': {'type': 'BooleanConstant', 'value': False}},
-              'body': [{'type': 'Literal', 'location': '<string>:1:4-10', 'sign': 'NoSign',
-                        'atom': {'type': 'TheoryAtom', 'location': '<string>:1:4-10',
-                                 'term': {'type': 'Function', 'location': '<string>:1:5-6', 'name': 'p',
-                                          'arguments': [], 'external': False},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-11',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-11', 'sign': 0,
+                       'atom': {'ast_type': 'BooleanConstant', 'value': 0}},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:4-10', 'sign': 0,
+                        'atom': {'ast_type': 'TheoryAtom', 'location': '<string>:1:5-6',
+                                 'term': {'ast_type': 'Function', 'location': '<string>:1:5-6', 'name': 'p',
+                                          'arguments': [], 'external': 0},
                                  'elements': [], 'guard': None}}]}])
         self.assertEqual(
             test_ast_dict(self, '&p { } > 2.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-12',
-              'head': {'type': 'TheoryAtom', 'location': '<string>:1:1-11',
-                       'term': {'type': 'Function', 'location': '<string>:1:2-3', 'name': 'p',
-                                'arguments': [], 'external': False}, 'elements': [],
-                       'guard': {'type': 'TheoryGuard', 'operator_name': '>',
-                                 'term': {'type': 'TheoryUnparsedTerm', 'location': '<string>:1:10-11',
-                                          'elements': [{'type': 'TheoryUnparsedTermElement', 'operators': [],
-                                                        'term': {'type': 'Symbol', 'location': '<string>:1:10-11',
-                                                                 'symbol': '2'}}]}}},
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-12',
+              'head': {'ast_type': 'TheoryAtom', 'location': '<string>:1:2-3',
+                       'term': {'ast_type': 'Function', 'location': '<string>:1:2-3', 'name': 'p', 'arguments': [],
+                                'external': 0},
+                       'elements': [], 'guard': {'ast_type': 'TheoryGuard', 'operator_name': '>',
+                                                 'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:10-11',
+                                                          'symbol': '2'}}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, '&p { a,b: q }.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-15',
-              'head': {'type': 'TheoryAtom', 'location': '<string>:1:1-14',
-                       'term': {'type': 'Function', 'location': '<string>:1:2-3', 'name': 'p',
-                                'arguments': [], 'external': False},
-                       'elements': [{'type': 'TheoryAtomElement',
-                                     'tuple': [{'type': 'TheoryUnparsedTerm', 'location': '<string>:1:6-7',
-                                                'elements': [{'type': 'TheoryUnparsedTermElement', 'operators': [],
-                                                              'term': {'type': 'Symbol', 'location': '<string>:1:6-7',
-                                                                       'symbol': 'a'}}]},
-                                               {'type': 'TheoryUnparsedTerm', 'location': '<string>:1:8-9',
-                                                'elements': [{'type': 'TheoryUnparsedTermElement', 'operators': [],
-                                                              'term': {'type': 'Symbol', 'location': '<string>:1:8-9',
-                                                                       'symbol': 'b'}}]}],
-                                     'condition': [{'type': 'Literal', 'location': '<string>:1:11-12', 'sign': 'NoSign',
-                                                    'atom': {'type': 'SymbolicAtom',
-                                                             'term': {'type': 'Function',
-                                                                      'location': '<string>:1:11-12', 'name': 'q',
-                                                                      'arguments': [], 'external': False}}}]}],
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-15',
+              'head': {'ast_type': 'TheoryAtom', 'location': '<string>:1:2-3',
+                       'term': {'ast_type': 'Function', 'location': '<string>:1:2-3', 'name': 'p', 'arguments': [],
+                                'external': 0},
+                       'elements': [{'ast_type': 'TheoryAtomElement',
+                                     'terms': [{'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7',
+                                                'symbol': 'a'},
+                                               {'ast_type': 'SymbolicTerm', 'location': '<string>:1:8-9',
+                                                'symbol': 'b'}],
+                                     'condition': [{'ast_type': 'Literal', 'location': '<string>:1:11-12', 'sign': 0,
+                                                    'atom': {'ast_type': 'SymbolicAtom',
+                                                             'symbol': {'ast_type': 'Function',
+                                                                        'location': '<string>:1:11-12', 'name': 'q',
+                                                                        'arguments': [], 'external': 0}}}]}],
                        'guard': None},
               'body': []}])
 
@@ -754,98 +751,99 @@ class TestAST(TestCase):
         '''
         self.assertEqual(
             test_ast_dict(self, 'a :- b.'),
-            [{'type': 'Rule', 'location': '<string>:1:1-8',
-              'head': {'type': 'Literal', 'location': '<string>:1:1-2', 'sign': 'NoSign',
-                       'atom': {'type': 'SymbolicAtom',
-                                'term': {'type': 'Function', 'location': '<string>:1:1-2',
-                                         'name': 'a', 'arguments': [], 'external': False}}},
-              'body': [{'type': 'Literal', 'location': '<string>:1:6-7', 'sign': 'NoSign',
-                        'atom': {'type': 'SymbolicAtom',
-                                 'term': {'type': 'Function', 'location': '<string>:1:6-7',
-                                          'name': 'b', 'arguments': [], 'external': False}}}]}])
+            [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
+              'head': {'ast_type': 'Literal', 'location': '<string>:1:1-2', 'sign': 0,
+                       'atom': {'ast_type': 'SymbolicAtom',
+                                'symbol': {'ast_type': 'Function', 'location': '<string>:1:1-2',
+                                           'name': 'a', 'arguments': [], 'external': 0}}},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:6-7', 'sign': 0,
+                        'atom': {'ast_type': 'SymbolicAtom',
+                                 'symbol': {'ast_type': 'Function', 'location': '<string>:1:6-7',
+                                            'name': 'b', 'arguments': [], 'external': 0}}}]}])
         self.assertEqual(
             test_ast_dict(self, '#defined x/0.'),
-            [{'type': 'Defined', 'location': '<string>:1:1-14', 'name': 'x', 'arity': 0, 'positive': True}])
+            [{'ast_type': 'Defined', 'location': '<string>:1:1-14', 'name': 'x', 'arity': 0, 'positive': True}])
         self.assertEqual(
             test_ast_dict(self, '#show a : b.'),
-            [{'type': 'ShowTerm', 'location': '<string>:1:1-13',
-              'term': {'type': 'Symbol', 'location': '<string>:1:7-8', 'symbol': 'a'},
-              'body': [{'type': 'Literal', 'location': '<string>:1:11-12', 'sign': 'NoSign',
-                        'atom': {'type': 'SymbolicAtom',
-                                 'term': {'type': 'Function', 'location': '<string>:1:11-12', 'name': 'b',
-                                          'arguments': [], 'external': False}}}],
-              'csp': False}])
+            [{'ast_type': 'ShowTerm', 'location': '<string>:1:1-13',
+              'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:7-8', 'symbol': 'a'},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:11-12', 'sign': 0,
+                        'atom': {'ast_type': 'SymbolicAtom',
+                                 'symbol': {'ast_type': 'Function', 'location': '<string>:1:11-12', 'name': 'b',
+                                            'arguments': [], 'external': 0}}}],
+              'csp': 0}])
         self.assertEqual(
             test_ast_dict(self, '#show a/0.'),
-            [{'type': 'ShowSignature', 'location': '<string>:1:1-11', 'name': 'a', 'arity': 0, 'positive': True,
-              'csp': False}])
+            [{'ast_type': 'ShowSignature', 'location': '<string>:1:1-11', 'name': 'a', 'arity': 0, 'positive': True,
+              'csp': 0}])
         self.assertEqual(
             test_ast_dict(self, '#minimize { 1@2,a : b }.'),
-            [{'type': 'Minimize', 'location': '<string>:1:13-22',
-              'weight': {'type': 'Symbol', 'location': '<string>:1:13-14', 'symbol': '1'},
-              'priority': {'type': 'Symbol', 'location': '<string>:1:15-16', 'symbol': '2'},
-              'tuple': [{'type': 'Symbol', 'location': '<string>:1:17-18', 'symbol': 'a'}],
-              'body': [{'type': 'Literal', 'location': '<string>:1:21-22', 'sign': 'NoSign',
-                        'atom': {'type': 'SymbolicAtom',
-                                 'term': {'type': 'Function', 'location': '<string>:1:21-22', 'name': 'b',
-                                          'arguments': [], 'external': False}}}]}])
+            [{'ast_type': 'Minimize', 'location': '<string>:1:13-22',
+              'weight': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:13-14', 'symbol': '1'},
+              'priority': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:15-16', 'symbol': '2'},
+              'terms': [{'ast_type': 'SymbolicTerm', 'location': '<string>:1:17-18', 'symbol': 'a'}],
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:21-22', 'sign': 0,
+                        'atom': {'ast_type': 'SymbolicAtom',
+                                 'symbol': {'ast_type': 'Function', 'location': '<string>:1:21-22', 'name': 'b',
+                                            'arguments': [], 'external': 0}}}]}])
         self.assertEqual(
             test_ast_dict(self, '#script (python) blub! #end.'),
-            [{'type': 'Script', 'location': '<string>:1:1-29', 'script_type': 'Python',
+            [{'ast_type': 'Script', 'location': '<string>:1:1-29', 'script_type': 1,
               'code': '#script (python) blub! #end\n'}])
         self.assertEqual(
             test_ast_dict(self, '#script (lua) blub! #end.'),
-            [{'type': 'Script', 'location': '<string>:1:1-26', 'script_type': 'Lua', 'code': ' blub! '}])
+            [{'ast_type': 'Script', 'location': '<string>:1:1-26', 'script_type': 0, 'code': ' blub! '}])
         self.assertEqual(
             test_ast_dict(self, '#program x(y).'),
-            [{'type': 'Program', 'location': '<string>:1:1-15', 'name': 'x',
-              'parameters': [{'type': 'Id', 'location': '<string>:1:12-13', 'id': 'y'}]}])
+            [{'ast_type': 'Program', 'location': '<string>:1:1-15', 'name': 'x',
+              'parameters': [{'ast_type': 'Id', 'location': '<string>:1:12-13', 'name': 'y'}]}])
         self.assertEqual(
             test_ast_dict(self, '#project a/0.'),
-            [{'type': 'ProjectSignature', 'location': '<string>:1:1-14', 'name': 'a', 'arity': 0, 'positive': True}])
+            [{'ast_type': 'ProjectSignature', 'location': '<string>:1:1-14', 'name': 'a', 'arity': 0,
+              'positive': True}])
         self.assertEqual(
             test_ast_dict(self, '#project a : b.'),
-            [{'type': 'ProjectAtom', 'location': '<string>:1:1-16',
-              'atom': {'type': 'SymbolicAtom',
-                       'term': {'type': 'Function', 'location': '<string>:1:10-11', 'name': 'a',
-                                'arguments': [], 'external': False}},
-              'body': [{'type': 'Literal', 'location': '<string>:1:14-15', 'sign': 'NoSign',
-                        'atom': {'type': 'SymbolicAtom',
-                                 'term': {'type': 'Function', 'location': '<string>:1:14-15', 'name': 'b',
-                                          'arguments': [], 'external': False}}}]}])
+            [{'ast_type': 'ProjectAtom', 'location': '<string>:1:1-16',
+              'atom': {'ast_type': 'SymbolicAtom',
+                       'symbol': {'ast_type': 'Function', 'location': '<string>:1:10-11', 'name': 'a',
+                                  'arguments': [], 'external': 0}},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:14-15', 'sign': 0,
+                        'atom': {'ast_type': 'SymbolicAtom',
+                                 'symbol': {'ast_type': 'Function', 'location': '<string>:1:14-15', 'name': 'b',
+                                            'arguments': [], 'external': 0}}}]}])
         self.assertEqual(
             test_ast_dict(self, '#external x : y. [X]'),
-            [{'type': 'External', 'location': '<string>:1:1-21',
-              'atom': {'type': 'SymbolicAtom',
-                       'term': {'type': 'Function', 'location': '<string>:1:11-12', 'name': 'x',
-                                'arguments': [], 'external': False}},
-              'body': [{'type': 'Literal', 'location': '<string>:1:15-16', 'sign': 'NoSign',
-                        'atom': {'type': 'SymbolicAtom',
-                                 'term': {'type': 'Function', 'location': '<string>:1:15-16', 'name': 'y',
-                                          'arguments': [], 'external': False}}}],
-              'external_type': {'type': 'Variable', 'location': '<string>:1:19-20', 'name': 'X'}}])
+            [{'ast_type': 'External', 'location': '<string>:1:1-21',
+              'atom': {'ast_type': 'SymbolicAtom',
+                       'symbol': {'ast_type': 'Function', 'location': '<string>:1:11-12', 'name': 'x',
+                                  'arguments': [], 'external': 0}},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:15-16', 'sign': 0,
+                        'atom': {'ast_type': 'SymbolicAtom',
+                                 'symbol': {'ast_type': 'Function', 'location': '<string>:1:15-16', 'name': 'y',
+                                            'arguments': [], 'external': 0}}}],
+              'external_type': {'ast_type': 'Variable', 'location': '<string>:1:19-20', 'name': 'X'}}])
         self.assertEqual(
             test_ast_dict(self, '#edge (u,v) : b.'),
-            [{'type': 'Edge', 'location': '<string>:1:1-17',
-              'u': {'type': 'Symbol', 'location': '<string>:1:8-9', 'symbol': 'u'},
-              'v': {'type': 'Symbol', 'location': '<string>:1:10-11', 'symbol': 'v'},
-              'body': [{'type': 'Literal', 'location': '<string>:1:15-16', 'sign': 'NoSign',
-                        'atom': {'type': 'SymbolicAtom',
-                                 'term': {'type': 'Function', 'location': '<string>:1:15-16', 'name': 'b',
-                                          'arguments': [], 'external': False}}}]}])
+            [{'ast_type': 'Edge', 'location': '<string>:1:1-17',
+              'node_u': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:8-9', 'symbol': 'u'},
+              'node_v': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:10-11', 'symbol': 'v'},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:15-16', 'sign': 0,
+                        'atom': {'ast_type': 'SymbolicAtom',
+                                 'symbol': {'ast_type': 'Function', 'location': '<string>:1:15-16', 'name': 'b',
+                                            'arguments': [], 'external': 0}}}]}])
         self.assertEqual(
             test_ast_dict(self, '#heuristic a : b. [p,X]'),
-            [{'type': 'Heuristic', 'location': '<string>:1:1-24',
-              'atom': {'type': 'SymbolicAtom',
-                       'term': {'type': 'Function', 'location': '<string>:1:12-13', 'name': 'a',
-                                'arguments': [], 'external': False}},
-              'body': [{'type': 'Literal', 'location': '<string>:1:16-17', 'sign': 'NoSign',
-                        'atom': {'type': 'SymbolicAtom',
-                                 'term': {'type': 'Function', 'location': '<string>:1:16-17', 'name': 'b',
-                                          'arguments': [], 'external': False}}}],
-              'bias': {'type': 'Symbol', 'location': '<string>:1:20-21', 'symbol': 'p'},
-              'priority': {'type': 'Symbol', 'location': '<string>:1:1-24', 'symbol': '0'},
-              'modifier': {'type': 'Variable', 'location': '<string>:1:22-23', 'name': 'X'}}])
+            [{'ast_type': 'Heuristic', 'location': '<string>:1:1-24',
+              'atom': {'ast_type': 'SymbolicAtom',
+                       'symbol': {'ast_type': 'Function', 'location': '<string>:1:12-13', 'name': 'a',
+                                  'arguments': [], 'external': 0}},
+              'body': [{'ast_type': 'Literal', 'location': '<string>:1:16-17', 'sign': 0,
+                        'atom': {'ast_type': 'SymbolicAtom',
+                                 'symbol': {'ast_type': 'Function', 'location': '<string>:1:16-17', 'name': 'b',
+                                            'arguments': [], 'external': 0}}}],
+              'bias': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:20-21', 'symbol': 'p'},
+              'priority': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-24', 'symbol': '0'},
+              'modifier': {'ast_type': 'Variable', 'location': '<string>:1:22-23', 'name': 'X'}}])
 
     def test_dict_ast_error(self):
         '''

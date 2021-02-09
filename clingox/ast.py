@@ -5,15 +5,18 @@ TODO:
 - unpooling as in clingcon
 '''
 
-from typing import Any, Callable, cast, Iterator, List, Mapping, Optional, Set, Tuple, TypeVar, Union
+from typing import Any, Callable, cast, List, Mapping, Optional, Set, Tuple, Union
 from functools import singledispatch
 from copy import copy
 from re import fullmatch
 
 import clingo
+from clingo import ast
 from clingo.ast import (
-    AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, Function, ScriptType, Sign,
-    Symbol, SymbolicAtom, TheoryAtomType, TheoryFunction, TheoryOperatorType, Transformer, UnaryOperator)
+    AggregateFunction, AST, ASTSequence, ASTType, BinaryOperator,
+    ComparisonOperator, Function, Location, Position, ScriptType, Sign,
+    StrSequence, SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
+    TheoryOperatorType, Transformer, UnaryOperator)
 from .theory import is_operator
 
 
@@ -35,7 +38,7 @@ def _quote(s: str) -> str:
 def _unquote(s: str) -> str:
     return s.replace('\\:', ':').replace('\\\\', '\\')
 
-def location_to_str(loc: dict) -> str:
+def location_to_str(loc: Location) -> str:
     """
     This function takes a location from a clingo AST and transforms it into a
     readable format.
@@ -43,24 +46,24 @@ def location_to_str(loc: dict) -> str:
     Colons in the location will be quoted ensuring that the location is
     parsable.
     """
-    begin, end = loc["begin"], loc["end"]
-    bf, ef = _quote(begin['filename']), _quote(end['filename'])
-    ret = "{}:{}:{}".format(bf, begin["line"], begin["column"])
+    begin, end = loc.begin, loc.end
+    bf, ef = _quote(begin.filename), _quote(end.filename)
+    ret = "{}:{}:{}".format(bf, begin.line, begin.column)
     dash, eq = True, bf == ef
     if not eq:
         ret += "{}{}".format("-" if dash else ":", ef)
         dash = False
-    eq = eq and begin["line"] == end["line"]
+    eq = eq and begin.line == end.line
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["line"])
+        ret += "{}{}".format("-" if dash else ":", end.line)
         dash = False
-    eq = eq and begin["column"] == end["column"]
+    eq = eq and begin.column == end.column
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["column"])
+        ret += "{}{}".format("-" if dash else ":", end.column)
         dash = False
     return ret
 
-def str_to_location(s: str) -> dict:
+def str_to_location(s: str) -> Location:
     """
     This function parses a location string and returns it as a dictionary as
     accepted by clingo's AST.
@@ -70,13 +73,9 @@ def str_to_location(s: str) -> dict:
         r'(-(((?P<ef>([^\\:]|\\\\|\\:)*):)?(?P<el>[0-9]*):)?(?P<ec>[0-9]+))?', s)
     if not m:
         raise RuntimeError('could not parse location')
-    ret = {'begin': {'filename': _unquote(m['bf']),
-                     'line': int(m['bl']),
-                     'column': int(m['bc'])},
-           'end': {'filename': _unquote(_s(m, 'bf', 'ef')),
-                   'line': int(_s(m, 'bl', 'el')),
-                   'column':  int(_s(m, 'bc', 'ec'))}}
-    return ret
+    begin = Position(_unquote(m['bf']), int(m['bl']), int(m['bc']))
+    end = Position(_unquote(_s(m, 'bf', 'ef')), int(_s(m, 'bl', 'el')), int(_s(m, 'bc', 'ec')))
+    return Location(begin, end)
 
 
 class TheoryUnparsedTermParser:
@@ -137,7 +136,7 @@ class TheoryUnparsedTermParser:
             self._terms.append(TheoryFunction(b.location, operator, [b]))
         else:
             a = self._terms.pop()
-            l = {"begin": a.location["begin"], "end": b.location["end"]}
+            l = Location(a.location.begin, b.location.end)
             self._terms.append(TheoryFunction(l, operator, [a, b]))
 
     def check_operator(self, operator: str, unary: bool, location: Any):
@@ -206,7 +205,7 @@ class TheoryTermParser(Transformer):
         if (unary or binary) and is_operator(x.name):
             self._parser.check_operator(x.name, unary, x.location)
 
-        return self.visit_children(x)
+        return x.update(**self.visit_children(x))
 
     def visit_TheoryUnparsedTerm(self, x: AST) -> AST:
         """
@@ -214,6 +213,19 @@ class TheoryTermParser(Transformer):
         """
         return cast(AST, self(self._parser.parse(x)))
 
+def _transform_seq(seq, visit):
+    '''
+    Transform an AST sequence returning the sequnce if no changed are done or
+    the a list of ASTs otherwise.
+
+    TODO: This is a good candiate to put into the AST class.
+    '''
+    ret, lst = seq, []
+    for old in seq:
+        lst.append(visit(old))
+        if lst[-1] is not old:
+            ret = lst
+    return ret
 
 class TheoryParser(Transformer):
     """
@@ -256,7 +268,7 @@ class TheoryParser(Transformer):
     def _visit_body(self, x: AST) -> AST:
         try:
             self._reset(False, True, False)
-            body = self.visit_list(x.body)
+            body = _transform_seq(x.body, self)
             if body is not x.body:
                 x = copy(x)
                 x.body = body
@@ -330,7 +342,7 @@ class TheoryParser(Transformer):
 
         x = copy(x)
         x.term = element_parser(x.term)
-        x.elements = element_parser.visit_list(x.elements)
+        x.elements = _transform_seq(x.elements, element_parser)
 
         if x.guard is not None:
             if guard_table is None:
@@ -349,7 +361,7 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
     """
     Turn an AST node of type TheoryDefinition into a TheoryParser.
     """
-    assert x.type is ASTType.TheoryDefinition
+    assert x.ast_type is ASTType.TheoryDefinition
 
     terms = {}
     atoms = {}
@@ -386,6 +398,7 @@ class SymbolicAtomRenamer(Transformer):
     '''
     A transformer to rename symbolic atoms.
     '''
+    # pylint: disable=invalid-name
 
     def __init__(self, rename_function: Callable[[str], str]):
         '''
@@ -399,10 +412,11 @@ class SymbolicAtomRenamer(Transformer):
         Rename the given symbolic atom and the renamed version.
         '''
         term = x.term
-        if term.type == ASTType.Symbol:
+        if term.ast_type == ASTType.SymbolicTerm:
             sym = term.symbol
-            term = Symbol(term.location, clingo.Function(self.rename_function(sym.name), sym.arguments, sym.positive))
-        elif term.type == ASTType.Function:
+            term = SymbolicTerm(term.location,
+                                clingo.Function(self.rename_function(sym.name), sym.arguments, sym.positive))
+        elif term.ast_type == ASTType.Function:
             term = Function(term.location, self.rename_function(term.name), term.arguments, term.external)
         return SymbolicAtom(term)
 
@@ -432,109 +446,15 @@ def _encode_symbol(x: clingo.Symbol) -> str:
     return str(x)
 
 @_encode.register
-def _encode_bool(x: bool) -> bool:
-    return x
-
-@_encode.register
 def _encode_int(x: int) -> int:
     return x
 
 @_encode.register
-def _encode_sign(x: Sign) -> str:
-    if x == Sign.NoSign:
-        return 'NoSign'
-    if x == Sign.Negation:
-        return 'Negation'
-    assert x == Sign.DoubleNegation
-    return 'DoubleNegation'
+def _encode_ast_seq(x: ASTSequence) -> List[Any]:
+    return [_encode(y) for y in x]
 
 @_encode.register
-def _encode_theoryoptype(x: TheoryOperatorType) -> str:
-    if x == TheoryOperatorType.Unary:
-        return 'Unary'
-    if x == TheoryOperatorType.BinaryLeft:
-        return 'BinaryLeft'
-    assert x == TheoryOperatorType.BinaryRight
-    return 'BinaryRight'
-
-@_encode.register
-def _encode_afun(x: AggregateFunction) -> str:
-    if x == AggregateFunction.Count:
-        return 'Count'
-    if x == AggregateFunction.Sum:
-        return 'Sum'
-    if x == AggregateFunction.SumPlus:
-        return 'SumPlus'
-    if x == AggregateFunction.Min:
-        return 'Min'
-    assert x == AggregateFunction.Max
-    return 'Max'
-
-@_encode.register
-def _encode_comp(x: ComparisonOperator) -> str:
-    if x == ComparisonOperator.GreaterThan:
-        return 'GreaterThan'
-    if x == ComparisonOperator.LessThan:
-        return 'LessThan'
-    if x == ComparisonOperator.LessEqual:
-        return 'LessEqual'
-    if x == ComparisonOperator.GreaterEqual:
-        return 'GreaterEqual'
-    if x == ComparisonOperator.NotEqual:
-        return 'NotEqual'
-    assert x == ComparisonOperator.Equal
-    return 'Equal'
-
-@_encode.register
-def _encode_tatype(x: TheoryAtomType) -> str:
-    if x == TheoryAtomType.Any:
-        return 'Any'
-    if x == TheoryAtomType.Head:
-        return 'Head'
-    if x == TheoryAtomType.Body:
-        return 'Body'
-    assert x == TheoryAtomType.Directive
-    return 'Directive'
-
-@_encode.register
-def _encode_sctype(x: ScriptType) -> str:
-    if x == ScriptType.Python:
-        return 'Python'
-    assert x == ScriptType.Lua
-    return 'Lua'
-
-@_encode.register
-def _encode_unop(x: UnaryOperator) -> str:
-    if x == UnaryOperator.Negation:
-        return 'Negation'
-    if x == UnaryOperator.Minus:
-        return 'UnaryMinus'
-    assert x == UnaryOperator.Absolute
-    return 'Absolute'
-
-@_encode.register
-def _encode_binop(x: BinaryOperator) -> str:
-    if x == BinaryOperator.And:
-        return 'And'
-    if x == BinaryOperator.Division:
-        return 'Division'
-    if x == BinaryOperator.Minus:
-        return 'Minus'
-    if x == BinaryOperator.Modulo:
-        return 'Modulo'
-    if x == BinaryOperator.Multiplication:
-        return 'Multiplication'
-    if x == BinaryOperator.Or:
-        return 'Or'
-    if x == BinaryOperator.Plus:
-        return 'Plus'
-    if x == BinaryOperator.Power:
-        return 'Power'
-    assert x == BinaryOperator.XOr
-    return 'XOr'
-
-@_encode.register
-def _encode_list(x: list) -> List[Any]:
+def _encode_str_seq(x: StrSequence) -> List[Any]:
     return [_encode(y) for y in x]
 
 @_encode.register
@@ -553,9 +473,10 @@ def ast_to_dict(x: AST) -> dict:
     The resulting value can be used with other python modules like the `yaml`
     or `pickle` modules.
     """
-    ret = {"type": str(x.type)}
+    ret = {"ast_type": str(x.ast_type).replace('ASTType.', '')}
     for key, val in x.items():
         if key == 'location':
+            # TODO: It seems like loctaion is missing
             enc = location_to_str(val)
         else:
             enc = _encode(val)
@@ -627,4 +548,4 @@ def dict_to_ast(x: dict) -> AST:
     """
     Convert the dictionary representation of an AST node into an AST node.
     """
-    return AST(getattr(ASTType, x['type']), **{key: _decode(value, key) for key, value in x.items() if key != "type"})
+    return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
