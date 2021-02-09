@@ -87,7 +87,7 @@ class TermEvaluator:
         '''
         # tuples
         if term.type == TheoryTermType.Tuple:
-            return Tuple_(self(x) for x in term.arguments)
+            return Tuple_([self(x) for x in term.arguments])
 
         # functions and arithmetic operations
         if term.type == TheoryTermType.Function:
