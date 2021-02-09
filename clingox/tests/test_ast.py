@@ -6,11 +6,11 @@ from copy import deepcopy
 from unittest import TestCase
 from typing import List, Optional, cast
 
-from clingo import parse_program, Function
-from clingo.ast import AST, ASTType, Variable
+from clingo import Function
+from clingo.ast import AST, ASTType, Transformer, Variable, parse_string
 from .. import ast
 from ..ast import (
-    Visitor, Transformer, TheoryTermParser, TheoryParser, TheoryAtomType,
+    TheoryTermParser, TheoryParser, TheoryAtomType,
     ast_to_dict, dict_to_ast, location_to_str, prefix_symbolic_atoms, str_to_location, theory_parser_from_definition)
 
 TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
@@ -45,99 +45,7 @@ LOC = {"begin": {"filename": "a",
                "line": 1,
                "column": 2}}
 
-class TestVisitor(Visitor):
-    '''
-    Simple visitor marking what was visited in the string result.
-    '''
-    # pylint: disable=invalid-name
-    result: str
-
-    def __init__(self):
-        self.result = ""
-
-    def visit_Variable(self, x: AST):
-        '''
-        Visit a variable and add mark "v".
-        '''
-        self.result += "v"
-        self.visit_children(x)
-
-    def visit_SymbolicAtom(self, x: AST):
-        '''
-        Visit an atom and add mark "a".
-        '''
-        self.result += "a"
-        self.visit_children(x)
-
-    def visit_Literal(self, x: AST):
-        '''
-        Visit a literal and add mark "l".
-        '''
-        self.result += "l"
-        self.visit_children(x)
-
-    def visit_Rule(self, x: AST):
-        '''
-        Visit a rule and add mark "r".
-        '''
-        self.result += "r"
-        self.visit_children(x)
-
-def test_visit(s: str) -> str:
-    '''
-    Test the visitor by parsing the given program and using the TestVistor on
-    it.
-    '''
-    prg: List[AST]
-    prg = []
-    parse_program(s, prg.append)
-    visitor = TestVisitor()
-    visitor.visit_list(prg)
-    return visitor.result
-
-
-class TestTransformer(Transformer):
-    '''
-    Simple transformer renaming variables and dropping program statements and
-    guards of theory atoms.
-    '''
-    # pylint: disable=invalid-name, unused-argument
-    result: str
-
-    def __init__(self):
-        self.result = ""
-
-    def visit_Program(self, x: AST, suffix: str) -> Optional[AST]:
-        '''
-        Remove program parts.
-        '''
-        return None
-
-    def visit_Variable(self, x: AST, suffix: str) -> Optional[AST]:
-        '''
-        Add suffix to variable.
-        '''
-        return Variable(x.location, x.name + suffix)
-
-    def visit_TheoryGuard(self, x: AST, suffix: str) -> Optional[AST]:
-        '''
-        Drop guard of theory atom.
-        '''
-        return None
-
-def test_transform(s: str) -> str:
-    '''
-    Test the transformer by parsing the given program and using the
-    TestTransformer on it.
-    '''
-    prg: List[AST]
-    prg = []
-    parse_program(s, prg.append)
-    v = TestTransformer()
-    return "\n".join(str(x) for x in v.visit_list(prg, "_x"))
-
-
-class Extractor(Visitor):
+class Extractor(Transformer):
     '''
     Simple visitor returning the first theory term in a program.
     '''
@@ -158,7 +66,9 @@ def theory_atom(s: str) -> AST:
     Convert string to theory term.
     """
     v = Extractor()
-    parse_program(f"{s}.", v)
+    def visit(stm):
+        v(stm)
+    parse_string(f"{s}.", visit)
     return cast(AST, v.atom)
 
 def last_stm(s: str) -> AST:
@@ -172,7 +82,7 @@ def last_stm(s: str) -> AST:
         stm = x
         v(stm)
 
-    parse_program(s, set_stm)
+    parse_string(s, set_stm)
 
     return cast(AST, stm)
 
@@ -210,7 +120,7 @@ def parse_theory(s: str) -> TheoryParser:
         nonlocal parser
         if stm.type == ASTType.TheoryDefinition:
             parser = theory_parser_from_definition(stm)
-    parse_program(f"{s}.", extract)
+    parse_string(f"{s}.", extract)
     return cast(TheoryParser, parser)
 
 def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
@@ -224,7 +134,7 @@ def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
         ret = f(stm)
         if ret is not None:
             prg.append(str(ret))
-    parse_program(s, append)
+    parse_string(s, append)
     return prg
 
 def test_ast_dict(tc: TestCase, s: str):
@@ -232,7 +142,7 @@ def test_ast_dict(tc: TestCase, s: str):
     Parse and transform a program to its dictionary representation.
     '''
     prg: list = []
-    parse_program(s, prg.append)
+    parse_string(s, prg.append)
     ret = [ast_to_dict(x) for x in prg]
     preamble = {'type': 'Program', 'location': '<string>:1:1', 'name': 'base', 'parameters': []}
     tc.assertEqual(ret[0], preamble)
@@ -266,24 +176,6 @@ class TestAST(TestCase):
         self.assertEqual(location_to_str(loc), r'a\:1\:2-3\\\::1:2-b\:1\:2-3:3:4')
         self.assertEqual(str_to_location(location_to_str(loc)), loc)
         self.assertRaises(RuntimeError, str_to_location, 'a:1:2-')
-
-    def test_visit(self):
-        '''
-        Test the visitor.
-        '''
-        self.assertEqual(test_visit("a(X) :- p(X)."), "rlavlav")
-        self.assertEqual(test_visit("a(X) :- &p { }."), "rlavl")
-
-    def test_transform(self):
-        '''
-        Test the transformer.
-        '''
-        self.assertEqual(test_transform("a(X) :- p(X)."), "a(X_x) :- p(X_x).")
-        self.assertEqual(test_transform("a(X) :- p(X), q; r; s."), "a(X_x) :- p(X_x); q; r; s.")
-        self.assertEqual(test_transform("a(X) :- p, q(X), r; s."), "a(X_x) :- p; q(X_x); r; s.")
-        self.assertEqual(test_transform("a(X) :- p, q, r(X); s."), "a(X_x) :- p; q; r(X_x); s.")
-        self.assertEqual(test_transform("&p{} < 0."), "&p {  }.")
-        self.assertEqual(test_transform("&p{}."), "&p {  }.")
 
     def test_parse_term(self):
         '''

@@ -13,7 +13,7 @@ from re import fullmatch
 import clingo
 from clingo.ast import (
     AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, Function, ScriptType, Sign,
-    Symbol, SymbolicAtom, TheoryAtomType, TheoryFunction, TheoryOperatorType, UnaryOperator)
+    Symbol, SymbolicAtom, TheoryAtomType, TheoryFunction, TheoryOperatorType, Transformer, UnaryOperator)
 from .theory import is_operator
 
 
@@ -22,117 +22,6 @@ BINARY: bool = not UNARY
 LEFT: bool = True
 RIGHT: bool = not LEFT
 NONE: bool = RIGHT
-
-class Visitor:
-    '''
-    A visitor for clingo's abstart syntaxt tree.
-
-    This class should be derived from. Implementing functions with name
-    `visit_<type>` can be used to visit nodes of the given type.
-
-    Implements: `Callable[[AST], None]`.
-    '''
-    def visit_children(self, x: AST, *args: Any, **kwargs: Any):
-        '''
-        Visit the children of an AST node.
-        '''
-        for key in x.child_keys:
-            y = getattr(x, key)
-            if isinstance(y, AST):
-                self.visit(y, *args, **kwargs)
-            elif isinstance(y, List): # pylint: disable=all
-                self.visit_list(y, *args, **kwargs)
-            else:
-                assert y is None
-
-    def visit_list(self, x: List[AST], *args: Any, **kwargs: Any):
-        '''
-        Visit a sequence of AST nodes.
-        '''
-        for y in x:
-            self.visit(y, *args, **kwargs)
-
-    def visit(self, x: AST, *args: Any, **kwargs: Any):
-        '''
-        Generic visit method dispatching to specific member functions to visit
-        child nodes.
-        '''
-        attr = "visit_" + str(x.type)
-        if hasattr(self, attr):
-            getattr(self, attr)(x, *args, **kwargs)
-        else:
-            self.visit_children(x, *args, **kwargs)
-
-    def __call__(self, x: AST, *args: Any, **kwargs: Any):
-        '''
-        Alternative to call visit.
-        '''
-        self.visit(x, *args, **kwargs)
-
-
-class Transformer:
-    '''
-    This class is similar to the `Visitor` but allows for mutating the AST by
-    returning modified AST nodes from the visit methods.
-
-    Implements: `Callable[[AST], Optional[AST]]`.
-    '''
-    def visit_children(self, x: AST, *args: Any, **kwargs: Any) -> AST:
-        '''
-        Visit the children of an AST node.
-        '''
-        copied = False
-        for key in x.child_keys:
-            y = getattr(x, key)
-            z: Union[AST, List, None]
-            if isinstance(y, AST):
-                z = self.visit(y, *args, **kwargs)
-            elif isinstance(y, List): # pylint: disable=all
-                z = self.visit_list(y, *args, **kwargs)
-            else:
-                z = None
-            if y is z:
-                continue
-            if not copied:
-                copied = True
-                x = copy(x)
-            setattr(x, key, z)
-        return x
-
-    def _seq(self, i: int, z: Optional[AST], x: List[AST], *args: Any, **kwargs: Any) -> Iterator[Optional[AST]]:
-        for y in x[:i]:
-            yield y
-        yield z
-        for y in x[i+1:]:
-            yield self.visit(y, *args, **kwargs)
-
-    def visit_list(self, x: List[AST], *args: Any, **kwargs: Any) -> List[AST]:
-        '''
-        Visit a sequence of AST nodes.
-
-        If a transformer returns None, the element is removed from the list.
-        '''
-        for i, y in enumerate(x):
-            z = self.visit(y, *args, **kwargs)
-            if y is not z:
-                return list(w for w in self._seq(i, z, x, *args, **kwargs) if w is not None)
-        return x
-
-    def visit(self, x: AST, *args: Any, **kwargs: Any) -> Optional[AST]:
-        '''
-        Generic visit method dispatching to specific member functions to visit
-        child nodes.
-        '''
-        attr = "visit_" + str(x.type)
-        if hasattr(self, attr):
-            return getattr(self, attr)(x, *args, **kwargs)
-        return self.visit_children(x, *args, **kwargs)
-
-    def __call__(self, x: AST, *args: Any, **kwargs: Any) -> Optional[AST]:
-        '''
-        Alternative to call visit.
-        '''
-        return self.visit(x, *args, **kwargs)
 
 def _s(m, a: str, b: str):
     '''
