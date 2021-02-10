@@ -13,10 +13,9 @@ from re import fullmatch
 import clingo
 from clingo import ast
 from clingo.ast import (
-    AggregateFunction, AST, ASTSequence, ASTType, BinaryOperator,
-    ComparisonOperator, Function, Location, Position, ScriptType, Sign,
-    StrSequence, SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
-    TheoryOperatorType, Transformer, UnaryOperator)
+    AST, ASTSequence, ASTType, Function, Location, Position, StrSequence,
+    SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
+    TheoryOperatorType, Transformer)
 from .theory import is_operator
 
 
@@ -143,7 +142,7 @@ class TheoryUnparsedTermParser:
         """
         Check if the given operator is in the parse table.
         """
-        if not (operator, unary) in self._table:
+        if (operator, unary) not in self._table:
             raise RuntimeError("cannot parse operator `{}`: {}".format(operator, location_to_str(location)))
 
     def parse(self, x: AST) -> AST:
@@ -213,20 +212,6 @@ class TheoryTermParser(Transformer):
         """
         return cast(AST, self(self._parser.parse(x)))
 
-def _transform_seq(seq, visit):
-    '''
-    Transform an AST sequence returning the sequnce if no changed are done or
-    the a list of ASTs otherwise.
-
-    TODO: This is a good candiate to put into the AST class.
-    '''
-    ret, lst = seq, []
-    for old in seq:
-        lst.append(visit(old))
-        if lst[-1] is not old:
-            ret = lst
-    return ret
-
 class TheoryParser(Transformer):
     """
     This class parses theory atoms in the same way as clingo's internal parser.
@@ -268,20 +253,18 @@ class TheoryParser(Transformer):
     def _visit_body(self, x: AST) -> AST:
         try:
             self._reset(False, True, False)
-            body = _transform_seq(x.body, self)
-            if body is not x.body:
-                x = copy(x)
-                x.body = body
+            old = x.body
+            new = self.visit_sequence(old)
+            return x if new is old else x.update(body=new)
         finally:
             self._reset()
-        return x
 
     def visit_Rule(self, x: AST) -> AST:
         """
         Parse theory atoms in body and head.
         """
+        ret = self._visit_body(x)
         try:
-            ret = self._visit_body(x)
             self._reset(True, False, not x.body)
             head = self(x.head)
             if head is not x.head:
@@ -333,16 +316,16 @@ class TheoryParser(Transformer):
             raise RuntimeError(f"theory atom definiton not found: {location_to_str(x.location)}")
 
         type_, element_parser, guard_table = self._table[(name, arity)]
-        if type_ is TheoryAtomType.Head and not self.in_head:
+        if type_ == TheoryAtomType.Head and not self.in_head:
             raise RuntimeError(f"theory atom only accepted in head: {location_to_str(x.location)}")
-        if type_ is TheoryAtomType.Body and not self.in_body:
+        if type_ == TheoryAtomType.Body and not self.in_body:
             raise RuntimeError(f"theory atom only accepted in body: {location_to_str(x.location)}")
-        if type_ is TheoryAtomType.Directive and not (self.in_head and self.is_directive):
+        if type_ == TheoryAtomType.Directive and not (self.in_head and self.is_directive):
             raise RuntimeError(f"theory atom must be a directive: {location_to_str(x.location)}")
 
         x = copy(x)
         x.term = element_parser(x.term)
-        x.elements = _transform_seq(x.elements, element_parser)
+        x.elements = element_parser.visit_sequence(x.elements)
 
         if x.guard is not None:
             if guard_table is None:
@@ -361,7 +344,7 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
     """
     Turn an AST node of type TheoryDefinition into a TheoryParser.
     """
-    assert x.ast_type is ASTType.TheoryDefinition
+    assert x.ast_type == ASTType.TheoryDefinition
 
     terms = {}
     atoms = {}
@@ -370,10 +353,10 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         term_table = {}
 
         for op_def in term_def.operators:
-            if op_def.operator_type is TheoryOperatorType.BinaryLeft:
+            if op_def.operator_type == TheoryOperatorType.BinaryLeft:
                 op_type = BINARY
                 op_assoc = LEFT
-            elif op_def.operator_type is TheoryOperatorType.BinaryRight:
+            elif op_def.operator_type == TheoryOperatorType.BinaryRight:
                 op_type = BINARY
                 op_assoc = RIGHT
             else:
@@ -389,7 +372,7 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         if atom_def.guard is not None:
             guard = (atom_def.guard.operators, atom_def.guard.term)
 
-        atoms[(atom_def.name, atom_def.arity)] = (atom_def.atom_type, atom_def.elements, guard)
+        atoms[(atom_def.name, atom_def.arity)] = (atom_def.atom_type, atom_def.term, guard)
 
     return TheoryParser(terms, atoms)
 
@@ -411,7 +394,7 @@ class SymbolicAtomRenamer(Transformer):
         '''
         Rename the given symbolic atom and the renamed version.
         '''
-        term = x.term
+        term = x.symbol
         if term.ast_type == ASTType.SymbolicTerm:
             sym = term.symbol
             term = SymbolicTerm(term.location,
@@ -435,7 +418,7 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 
 @singledispatch
 def _encode(x: Any) -> Any:
-    raise RuntimeError(f"unknown value to encode: {x}")
+    assert False, f"unknown value to encode: {x}"
 
 @_encode.register
 def _encode_str(x: str) -> str:
@@ -476,7 +459,7 @@ def ast_to_dict(x: AST) -> dict:
     ret = {"ast_type": str(x.ast_type).replace('ASTType.', '')}
     for key, val in x.items():
         if key == 'location':
-            # TODO: It seems like loctaion is missing
+            assert isinstance(val, Location)
             enc = location_to_str(val)
         else:
             enc = _encode(val)
@@ -495,31 +478,6 @@ def _decode_str(x: str, key: str) -> Any:
 
     if key == "symbol":
         return clingo.parse_term(x)
-
-    if key == "sign":
-        return getattr(Sign, x)
-
-    if key == "comparison":
-        return getattr(ComparisonOperator, x)
-
-    if key == "script_type":
-        return getattr(ScriptType, x)
-
-    if key == "function":
-        return getattr(AggregateFunction, x)
-
-    if key == "operator":
-        if x == "UnaryMinus":
-            return UnaryOperator.Minus
-        if hasattr(BinaryOperator, x):
-            return getattr(BinaryOperator, x)
-        return getattr(UnaryOperator, x)
-
-    if key == "operator_type":
-        return getattr(TheoryOperatorType, x)
-
-    if key == "atom_type":
-        return getattr(TheoryAtomType, x)
 
     assert key in ("name", "id", "code", "elements", "term", "list", "operator_name")
     return x

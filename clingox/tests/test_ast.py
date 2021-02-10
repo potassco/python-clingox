@@ -55,6 +55,7 @@ class Extractor(Transformer):
         Extract theory atom.
         '''
         self.atom = x
+        return x
 
 def theory_atom(s: str) -> AST:
     """
@@ -85,7 +86,7 @@ def parse_term(s: str) -> str:
     """
     Parse the given theory term using a simple parse table for testing.
     """
-    return str(TheoryTermParser(TERM_TABLE["t"])(theory_atom(f"&p {{{s}}}").elements[0].tuple[0]))
+    return str(TheoryTermParser(TERM_TABLE["t"])(theory_atom(f"&p {{{s}}}").elements[0].terms[0]))
 
 def parse_atom(s: str, parser: Optional[TheoryParser] = None) -> str:
     """
@@ -113,7 +114,7 @@ def parse_theory(s: str) -> TheoryParser:
     parser = None
     def extract(stm):
         nonlocal parser
-        if stm.type == ASTType.TheoryDefinition:
+        if stm.ast_type == ASTType.TheoryDefinition:
             parser = theory_parser_from_definition(stm)
     parse_string(f"{s}.", extract)
     return cast(TheoryParser, parser)
@@ -188,23 +189,23 @@ class TestAST(TestCase):
         '''
         Test parsing of theory atoms.
         '''
-        self.assertEqual(parse_atom("&p {1+2}"), "&p { +(1,2) :  }")
-        self.assertEqual(parse_atom("&p {1+2+3}"), "&p { +(+(1,2),3) :  }")
-        self.assertEqual(parse_atom("&q(1+2+3) { }"), "&q(((1+2)+3)) {  }")
-        self.assertEqual(parse_atom("&r { } < 1+2+3"), "&r {  } < +(+(1,2),3)")
+        self.assertEqual(parse_atom("&p {1+2}"), "&p { +(1,2) }")
+        self.assertEqual(parse_atom("&p {1+2+3}"), "&p { +(+(1,2),3) }")
+        self.assertEqual(parse_atom("&q(1+2+3) { }"), "&q(((1+2)+3)) { }")
+        self.assertEqual(parse_atom("&r { } < 1+2+3"), "&r { } < +(+(1,2),3)")
         # for coverage
         p = TheoryParser({'t': TheoryTermParser(TERM_TABLE["t"])}, ATOM_TABLE)
-        self.assertEqual(parse_atom("&p {1+2}", p), "&p { +(1,2) :  }")
+        self.assertEqual(parse_atom("&p {1+2}", p), "&p { +(1,2) }")
 
     def test_parse_atom_occ(self):
         """
         Test parsing of different theory atom types.
         """
-        self.assertEqual(parse_stm("&p {1+2}."), "&p { +(1,2) :  }.")
+        self.assertEqual(parse_stm("&p {1+2}."), "&p { +(1,2) }.")
         self.assertRaises(RuntimeError, parse_stm, ":- &p {1+2}.")
         self.assertRaises(RuntimeError, parse_stm, "&q(1+2+3) { }.")
-        self.assertEqual(parse_stm(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) {  }.")
-        self.assertEqual(parse_stm("&r { } < 1+2+3."), "&r {  } < +(+(1,2),3).")
+        self.assertEqual(parse_stm(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) { }.")
+        self.assertEqual(parse_stm("&r { } < 1+2+3."), "&r { } < +(+(1,2),3).")
         self.assertRaises(RuntimeError, parse_stm, "&r { } < 1+2+3 :- x.")
         self.assertRaises(RuntimeError, parse_stm, ":- &r { } < 1+2+3.")
 
@@ -216,22 +217,22 @@ class TestAST(TestCase):
         pa = lambda s: parse_atom(s, parser)
         pr = lambda s: parse_stm(s, parser)
 
-        self.assertEqual(parse_atom("&p {1+2}", pa), "&p { +(1,2) :  }")
-        self.assertEqual(parse_atom("&p {1+2+3}", pa), "&p { +(+(1,2),3) :  }")
-        self.assertEqual(parse_atom("&q(1+2+3) { }", pa), "&q(((1+2)+3)) {  }")
-        self.assertEqual(parse_atom("&r { } < 1+2+3", pa), "&r {  } < +(+(1,2),3)")
+        self.assertEqual(parse_atom("&p {1+2}", pa), "&p { +(1,2) }")
+        self.assertEqual(parse_atom("&p {1+2+3}", pa), "&p { +(+(1,2),3) }")
+        self.assertEqual(parse_atom("&q(1+2+3) { }", pa), "&q(((1+2)+3)) { }")
+        self.assertEqual(parse_atom("&r { } < 1+2+3", pa), "&r { } < +(+(1,2),3)")
 
-        self.assertEqual(pr("&p {1+2}."), "&p { +(1,2) :  }.")
-        self.assertEqual(pr("#show x : &q(0) {1+2}."), "#show x : &q(0) { +(1,2) :  }.")
-        self.assertEqual(pr(":~ &q(0) {1+2}. [0]"), ":~ &q(0) { +(1,2) :  }. [0@0]")
-        self.assertEqual(pr("#edge (u, v) : &q(0) {1+2}."), "#edge (u,v) : &q(0) { +(1,2) :  }.")
+        self.assertEqual(pr("&p {1+2}."), "&p { +(1,2) }.")
+        self.assertEqual(pr("#show x : &q(0) {1+2}."), "#show x : &q(0) { +(1,2) }.")
+        self.assertEqual(pr(":~ &q(0) {1+2}. [0]"), ":~ &q(0) { +(1,2) }. [0@0]")
+        self.assertEqual(pr("#edge (u, v) : &q(0) {1+2}."), "#edge (u,v) : &q(0) { +(1,2) }.")
         self.assertEqual(pr("#heuristic a : &q(0) {1+2}. [sign,true]"),
-                         "#heuristic a : &q(0) { +(1,2) :  }. [sign@0,true]")
-        self.assertEqual(pr("#project a : &q(0) {1+2}."), "#project a : &q(0) { +(1,2) :  }.")
+                         "#heuristic a : &q(0) { +(1,2) }. [sign@0,true]")
+        self.assertEqual(pr("#project a : &q(0) {1+2}."), "#project a : &q(0) { +(1,2) }.")
         self.assertRaises(RuntimeError, pr, ":- &p {1+2}.")
         self.assertRaises(RuntimeError, pr, "&q(1+2+3) { }.")
-        self.assertEqual(pr(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) {  }.")
-        self.assertEqual(pr("&r { } < 1+2+3."), "&r {  } < +(+(1,2),3).")
+        self.assertEqual(pr(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) { }.")
+        self.assertEqual(pr("&r { } < 1+2+3."), "&r { } < +(+(1,2),3).")
         self.assertRaises(RuntimeError, pr, "&r { } < 1+2+3 :- x.")
         self.assertRaises(RuntimeError, pr, ":- &r { } < 1+2+3.")
         self.assertRaises(RuntimeError, pr, "&s(1+2+3) { }.")
@@ -849,5 +850,4 @@ class TestAST(TestCase):
         '''
         Test error condititons when converting between ast and dict.
         '''
-        self.assertRaises(RuntimeError, ast_to_dict, AST(ASTType.Rule, body=set()))
-        self.assertRaises(RuntimeError, dict_to_ast, {"type": "Rule", "body": set()})
+        self.assertRaises(RuntimeError, dict_to_ast, {"ast_type": "Rule", "body": set()})
