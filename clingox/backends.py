@@ -23,7 +23,7 @@ class SymbolicBackend():
 
     See Also
     --------
-    clingo.Backend, clingo.Control.backend
+    clingo.backend.Backend, clingo.control.Control.backend
 
     Notes
     --------
