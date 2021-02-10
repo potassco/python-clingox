@@ -355,6 +355,9 @@ class Heuristic(NamedTuple):
     priority: Weight
     condition: Sequence[Literal]
 
+def _pretty_str_heuristic_type(type_):
+    return str(type_).replace('HeuristicType.', '')
+
 @pretty_str.register(Heuristic)
 def _pretty_str_heuristic(arg: Heuristic, output_atoms: OutputTable) -> str:
     '''
@@ -362,7 +365,8 @@ def _pretty_str_heuristic(arg: Heuristic, output_atoms: OutputTable) -> str:
     '''
     body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in arg.condition)
     head = _pretty_str_lit(arg.atom, output_atoms)
-    return f'#heuristic {head}{": " if body else ""}{body}. [{arg.bias}@{arg.priority}, {arg.type_}]'
+    type_ = _pretty_str_heuristic_type(arg.type_)
+    return f'#heuristic {head}{": " if body else ""}{body}. [{arg.bias}@{arg.priority}, {type_}]'
 
 @remap.register
 def _remap_heuristic(arg: Heuristic, mapping: AtomMap) -> Heuristic:
@@ -525,8 +529,8 @@ class Program: # pylint: disable=too-many-instance-attributes
             else:
                 backend.add_project([])
 
-        backend.add_assume(_remap_lit(lit, mapping) if mapping else lit
-                           for lit in self.assumptions)
+        backend.add_assume([_remap_lit(lit, mapping) if mapping else lit
+                            for lit in self.assumptions])
 
         return self
 

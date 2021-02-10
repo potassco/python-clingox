@@ -5,15 +5,17 @@ TODO:
 - unpooling as in clingcon
 '''
 
-from typing import Any, Callable, cast, Iterator, List, Mapping, Optional, Set, Tuple, TypeVar, Union
+from typing import Any, Callable, cast, List, Mapping, Optional, Set, Tuple, Union
 from functools import singledispatch
 from copy import copy
 from re import fullmatch
 
 import clingo
+from clingo import ast
 from clingo.ast import (
-    AggregateFunction, AST, ASTType, BinaryOperator, ComparisonOperator, Function, ScriptType, Sign,
-    Symbol, SymbolicAtom, TheoryAtomType, TheoryFunction, TheoryOperatorType, UnaryOperator)
+    AST, ASTSequence, ASTType, Function, Location, Position, StrSequence,
+    SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
+    TheoryOperatorType, Transformer)
 from .theory import is_operator
 
 
@@ -22,117 +24,6 @@ BINARY: bool = not UNARY
 LEFT: bool = True
 RIGHT: bool = not LEFT
 NONE: bool = RIGHT
-
-class Visitor:
-    '''
-    A visitor for clingo's abstart syntaxt tree.
-
-    This class should be derived from. Implementing functions with name
-    `visit_<type>` can be used to visit nodes of the given type.
-
-    Implements: `Callable[[AST], None]`.
-    '''
-    def visit_children(self, x: AST, *args: Any, **kwargs: Any):
-        '''
-        Visit the children of an AST node.
-        '''
-        for key in x.child_keys:
-            y = getattr(x, key)
-            if isinstance(y, AST):
-                self.visit(y, *args, **kwargs)
-            elif isinstance(y, List): # pylint: disable=all
-                self.visit_list(y, *args, **kwargs)
-            else:
-                assert y is None
-
-    def visit_list(self, x: List[AST], *args: Any, **kwargs: Any):
-        '''
-        Visit a sequence of AST nodes.
-        '''
-        for y in x:
-            self.visit(y, *args, **kwargs)
-
-    def visit(self, x: AST, *args: Any, **kwargs: Any):
-        '''
-        Generic visit method dispatching to specific member functions to visit
-        child nodes.
-        '''
-        attr = "visit_" + str(x.type)
-        if hasattr(self, attr):
-            getattr(self, attr)(x, *args, **kwargs)
-        else:
-            self.visit_children(x, *args, **kwargs)
-
-    def __call__(self, x: AST, *args: Any, **kwargs: Any):
-        '''
-        Alternative to call visit.
-        '''
-        self.visit(x, *args, **kwargs)
-
-
-class Transformer:
-    '''
-    This class is similar to the `Visitor` but allows for mutating the AST by
-    returning modified AST nodes from the visit methods.
-
-    Implements: `Callable[[AST], Optional[AST]]`.
-    '''
-    def visit_children(self, x: AST, *args: Any, **kwargs: Any) -> AST:
-        '''
-        Visit the children of an AST node.
-        '''
-        copied = False
-        for key in x.child_keys:
-            y = getattr(x, key)
-            z: Union[AST, List, None]
-            if isinstance(y, AST):
-                z = self.visit(y, *args, **kwargs)
-            elif isinstance(y, List): # pylint: disable=all
-                z = self.visit_list(y, *args, **kwargs)
-            else:
-                z = None
-            if y is z:
-                continue
-            if not copied:
-                copied = True
-                x = copy(x)
-            setattr(x, key, z)
-        return x
-
-    def _seq(self, i: int, z: Optional[AST], x: List[AST], *args: Any, **kwargs: Any) -> Iterator[Optional[AST]]:
-        for y in x[:i]:
-            yield y
-        yield z
-        for y in x[i+1:]:
-            yield self.visit(y, *args, **kwargs)
-
-    def visit_list(self, x: List[AST], *args: Any, **kwargs: Any) -> List[AST]:
-        '''
-        Visit a sequence of AST nodes.
-
-        If a transformer returns None, the element is removed from the list.
-        '''
-        for i, y in enumerate(x):
-            z = self.visit(y, *args, **kwargs)
-            if y is not z:
-                return list(w for w in self._seq(i, z, x, *args, **kwargs) if w is not None)
-        return x
-
-    def visit(self, x: AST, *args: Any, **kwargs: Any) -> Optional[AST]:
-        '''
-        Generic visit method dispatching to specific member functions to visit
-        child nodes.
-        '''
-        attr = "visit_" + str(x.type)
-        if hasattr(self, attr):
-            return getattr(self, attr)(x, *args, **kwargs)
-        return self.visit_children(x, *args, **kwargs)
-
-    def __call__(self, x: AST, *args: Any, **kwargs: Any) -> Optional[AST]:
-        '''
-        Alternative to call visit.
-        '''
-        return self.visit(x, *args, **kwargs)
 
 def _s(m, a: str, b: str):
     '''
@@ -146,7 +37,7 @@ def _quote(s: str) -> str:
 def _unquote(s: str) -> str:
     return s.replace('\\:', ':').replace('\\\\', '\\')
 
-def location_to_str(loc: dict) -> str:
+def location_to_str(loc: Location) -> str:
     """
     This function takes a location from a clingo AST and transforms it into a
     readable format.
@@ -154,24 +45,24 @@ def location_to_str(loc: dict) -> str:
     Colons in the location will be quoted ensuring that the location is
     parsable.
     """
-    begin, end = loc["begin"], loc["end"]
-    bf, ef = _quote(begin['filename']), _quote(end['filename'])
-    ret = "{}:{}:{}".format(bf, begin["line"], begin["column"])
+    begin, end = loc.begin, loc.end
+    bf, ef = _quote(begin.filename), _quote(end.filename)
+    ret = "{}:{}:{}".format(bf, begin.line, begin.column)
     dash, eq = True, bf == ef
     if not eq:
         ret += "{}{}".format("-" if dash else ":", ef)
         dash = False
-    eq = eq and begin["line"] == end["line"]
+    eq = eq and begin.line == end.line
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["line"])
+        ret += "{}{}".format("-" if dash else ":", end.line)
         dash = False
-    eq = eq and begin["column"] == end["column"]
+    eq = eq and begin.column == end.column
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end["column"])
+        ret += "{}{}".format("-" if dash else ":", end.column)
         dash = False
     return ret
 
-def str_to_location(s: str) -> dict:
+def str_to_location(s: str) -> Location:
     """
     This function parses a location string and returns it as a dictionary as
     accepted by clingo's AST.
@@ -181,13 +72,9 @@ def str_to_location(s: str) -> dict:
         r'(-(((?P<ef>([^\\:]|\\\\|\\:)*):)?(?P<el>[0-9]*):)?(?P<ec>[0-9]+))?', s)
     if not m:
         raise RuntimeError('could not parse location')
-    ret = {'begin': {'filename': _unquote(m['bf']),
-                     'line': int(m['bl']),
-                     'column': int(m['bc'])},
-           'end': {'filename': _unquote(_s(m, 'bf', 'ef')),
-                   'line': int(_s(m, 'bl', 'el')),
-                   'column':  int(_s(m, 'bc', 'ec'))}}
-    return ret
+    begin = Position(_unquote(m['bf']), int(m['bl']), int(m['bc']))
+    end = Position(_unquote(_s(m, 'bf', 'ef')), int(_s(m, 'bl', 'el')), int(_s(m, 'bc', 'ec')))
+    return Location(begin, end)
 
 
 class TheoryUnparsedTermParser:
@@ -248,14 +135,14 @@ class TheoryUnparsedTermParser:
             self._terms.append(TheoryFunction(b.location, operator, [b]))
         else:
             a = self._terms.pop()
-            l = {"begin": a.location["begin"], "end": b.location["end"]}
+            l = Location(a.location.begin, b.location.end)
             self._terms.append(TheoryFunction(l, operator, [a, b]))
 
     def check_operator(self, operator: str, unary: bool, location: Any):
         """
         Check if the given operator is in the parse table.
         """
-        if not (operator, unary) in self._table:
+        if (operator, unary) not in self._table:
             raise RuntimeError("cannot parse operator `{}`: {}".format(operator, location_to_str(location)))
 
     def parse(self, x: AST) -> AST:
@@ -317,14 +204,13 @@ class TheoryTermParser(Transformer):
         if (unary or binary) and is_operator(x.name):
             self._parser.check_operator(x.name, unary, x.location)
 
-        return self.visit_children(x)
+        return x.update(**self.visit_children(x))
 
     def visit_TheoryUnparsedTerm(self, x: AST) -> AST:
         """
         Parse the given unparsed term.
         """
         return cast(AST, self(self._parser.parse(x)))
-
 
 class TheoryParser(Transformer):
     """
@@ -367,20 +253,18 @@ class TheoryParser(Transformer):
     def _visit_body(self, x: AST) -> AST:
         try:
             self._reset(False, True, False)
-            body = self.visit_list(x.body)
-            if body is not x.body:
-                x = copy(x)
-                x.body = body
+            old = x.body
+            new = self.visit_sequence(old)
+            return x if new is old else x.update(body=new)
         finally:
             self._reset()
-        return x
 
     def visit_Rule(self, x: AST) -> AST:
         """
         Parse theory atoms in body and head.
         """
+        ret = self._visit_body(x)
         try:
-            ret = self._visit_body(x)
             self._reset(True, False, not x.body)
             head = self(x.head)
             if head is not x.head:
@@ -432,16 +316,16 @@ class TheoryParser(Transformer):
             raise RuntimeError(f"theory atom definiton not found: {location_to_str(x.location)}")
 
         type_, element_parser, guard_table = self._table[(name, arity)]
-        if type_ is TheoryAtomType.Head and not self.in_head:
+        if type_ == TheoryAtomType.Head and not self.in_head:
             raise RuntimeError(f"theory atom only accepted in head: {location_to_str(x.location)}")
-        if type_ is TheoryAtomType.Body and not self.in_body:
+        if type_ == TheoryAtomType.Body and not self.in_body:
             raise RuntimeError(f"theory atom only accepted in body: {location_to_str(x.location)}")
-        if type_ is TheoryAtomType.Directive and not (self.in_head and self.is_directive):
+        if type_ == TheoryAtomType.Directive and not (self.in_head and self.is_directive):
             raise RuntimeError(f"theory atom must be a directive: {location_to_str(x.location)}")
 
         x = copy(x)
         x.term = element_parser(x.term)
-        x.elements = element_parser.visit_list(x.elements)
+        x.elements = element_parser.visit_sequence(x.elements)
 
         if x.guard is not None:
             if guard_table is None:
@@ -460,7 +344,7 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
     """
     Turn an AST node of type TheoryDefinition into a TheoryParser.
     """
-    assert x.type is ASTType.TheoryDefinition
+    assert x.ast_type == ASTType.TheoryDefinition
 
     terms = {}
     atoms = {}
@@ -469,10 +353,10 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         term_table = {}
 
         for op_def in term_def.operators:
-            if op_def.operator_type is TheoryOperatorType.BinaryLeft:
+            if op_def.operator_type == TheoryOperatorType.BinaryLeft:
                 op_type = BINARY
                 op_assoc = LEFT
-            elif op_def.operator_type is TheoryOperatorType.BinaryRight:
+            elif op_def.operator_type == TheoryOperatorType.BinaryRight:
                 op_type = BINARY
                 op_assoc = RIGHT
             else:
@@ -488,7 +372,7 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         if atom_def.guard is not None:
             guard = (atom_def.guard.operators, atom_def.guard.term)
 
-        atoms[(atom_def.name, atom_def.arity)] = (atom_def.atom_type, atom_def.elements, guard)
+        atoms[(atom_def.name, atom_def.arity)] = (atom_def.atom_type, atom_def.term, guard)
 
     return TheoryParser(terms, atoms)
 
@@ -497,6 +381,7 @@ class SymbolicAtomRenamer(Transformer):
     '''
     A transformer to rename symbolic atoms.
     '''
+    # pylint: disable=invalid-name
 
     def __init__(self, rename_function: Callable[[str], str]):
         '''
@@ -509,11 +394,12 @@ class SymbolicAtomRenamer(Transformer):
         '''
         Rename the given symbolic atom and the renamed version.
         '''
-        term = x.term
-        if term.type == ASTType.Symbol:
+        term = x.symbol
+        if term.ast_type == ASTType.SymbolicTerm:
             sym = term.symbol
-            term = Symbol(term.location, clingo.Function(self.rename_function(sym.name), sym.arguments, sym.positive))
-        elif term.type == ASTType.Function:
+            term = SymbolicTerm(term.location,
+                                clingo.Function(self.rename_function(sym.name), sym.arguments, sym.positive))
+        elif term.ast_type == ASTType.Function:
             term = Function(term.location, self.rename_function(term.name), term.arguments, term.external)
         return SymbolicAtom(term)
 
@@ -532,7 +418,7 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 
 @singledispatch
 def _encode(x: Any) -> Any:
-    raise RuntimeError(f"unknown value to encode: {x}")
+    assert False, f"unknown value to encode: {x}"
 
 @_encode.register
 def _encode_str(x: str) -> str:
@@ -543,109 +429,15 @@ def _encode_symbol(x: clingo.Symbol) -> str:
     return str(x)
 
 @_encode.register
-def _encode_bool(x: bool) -> bool:
-    return x
-
-@_encode.register
 def _encode_int(x: int) -> int:
     return x
 
 @_encode.register
-def _encode_sign(x: Sign) -> str:
-    if x == Sign.NoSign:
-        return 'NoSign'
-    if x == Sign.Negation:
-        return 'Negation'
-    assert x == Sign.DoubleNegation
-    return 'DoubleNegation'
+def _encode_ast_seq(x: ASTSequence) -> List[Any]:
+    return [_encode(y) for y in x]
 
 @_encode.register
-def _encode_theoryoptype(x: TheoryOperatorType) -> str:
-    if x == TheoryOperatorType.Unary:
-        return 'Unary'
-    if x == TheoryOperatorType.BinaryLeft:
-        return 'BinaryLeft'
-    assert x == TheoryOperatorType.BinaryRight
-    return 'BinaryRight'
-
-@_encode.register
-def _encode_afun(x: AggregateFunction) -> str:
-    if x == AggregateFunction.Count:
-        return 'Count'
-    if x == AggregateFunction.Sum:
-        return 'Sum'
-    if x == AggregateFunction.SumPlus:
-        return 'SumPlus'
-    if x == AggregateFunction.Min:
-        return 'Min'
-    assert x == AggregateFunction.Max
-    return 'Max'
-
-@_encode.register
-def _encode_comp(x: ComparisonOperator) -> str:
-    if x == ComparisonOperator.GreaterThan:
-        return 'GreaterThan'
-    if x == ComparisonOperator.LessThan:
-        return 'LessThan'
-    if x == ComparisonOperator.LessEqual:
-        return 'LessEqual'
-    if x == ComparisonOperator.GreaterEqual:
-        return 'GreaterEqual'
-    if x == ComparisonOperator.NotEqual:
-        return 'NotEqual'
-    assert x == ComparisonOperator.Equal
-    return 'Equal'
-
-@_encode.register
-def _encode_tatype(x: TheoryAtomType) -> str:
-    if x == TheoryAtomType.Any:
-        return 'Any'
-    if x == TheoryAtomType.Head:
-        return 'Head'
-    if x == TheoryAtomType.Body:
-        return 'Body'
-    assert x == TheoryAtomType.Directive
-    return 'Directive'
-
-@_encode.register
-def _encode_sctype(x: ScriptType) -> str:
-    if x == ScriptType.Python:
-        return 'Python'
-    assert x == ScriptType.Lua
-    return 'Lua'
-
-@_encode.register
-def _encode_unop(x: UnaryOperator) -> str:
-    if x == UnaryOperator.Negation:
-        return 'Negation'
-    if x == UnaryOperator.Minus:
-        return 'UnaryMinus'
-    assert x == UnaryOperator.Absolute
-    return 'Absolute'
-
-@_encode.register
-def _encode_binop(x: BinaryOperator) -> str:
-    if x == BinaryOperator.And:
-        return 'And'
-    if x == BinaryOperator.Division:
-        return 'Division'
-    if x == BinaryOperator.Minus:
-        return 'Minus'
-    if x == BinaryOperator.Modulo:
-        return 'Modulo'
-    if x == BinaryOperator.Multiplication:
-        return 'Multiplication'
-    if x == BinaryOperator.Or:
-        return 'Or'
-    if x == BinaryOperator.Plus:
-        return 'Plus'
-    if x == BinaryOperator.Power:
-        return 'Power'
-    assert x == BinaryOperator.XOr
-    return 'XOr'
-
-@_encode.register
-def _encode_list(x: list) -> List[Any]:
+def _encode_str_seq(x: StrSequence) -> List[Any]:
     return [_encode(y) for y in x]
 
 @_encode.register
@@ -664,9 +456,10 @@ def ast_to_dict(x: AST) -> dict:
     The resulting value can be used with other python modules like the `yaml`
     or `pickle` modules.
     """
-    ret = {"type": str(x.type)}
+    ret = {"ast_type": str(x.ast_type).replace('ASTType.', '')}
     for key, val in x.items():
         if key == 'location':
+            assert isinstance(val, Location)
             enc = location_to_str(val)
         else:
             enc = _encode(val)
@@ -685,31 +478,6 @@ def _decode_str(x: str, key: str) -> Any:
 
     if key == "symbol":
         return clingo.parse_term(x)
-
-    if key == "sign":
-        return getattr(Sign, x)
-
-    if key == "comparison":
-        return getattr(ComparisonOperator, x)
-
-    if key == "script_type":
-        return getattr(ScriptType, x)
-
-    if key == "function":
-        return getattr(AggregateFunction, x)
-
-    if key == "operator":
-        if x == "UnaryMinus":
-            return UnaryOperator.Minus
-        if hasattr(BinaryOperator, x):
-            return getattr(BinaryOperator, x)
-        return getattr(UnaryOperator, x)
-
-    if key == "operator_type":
-        return getattr(TheoryOperatorType, x)
-
-    if key == "atom_type":
-        return getattr(TheoryAtomType, x)
 
     assert key in ("name", "id", "code", "elements", "term", "list", "operator_name")
     return x
@@ -738,4 +506,4 @@ def dict_to_ast(x: dict) -> AST:
     """
     Convert the dictionary representation of an AST node into an AST node.
     """
-    return AST(getattr(ASTType, x['type']), **{key: _decode(value, key) for key, value in x.items() if key != "type"})
+    return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
