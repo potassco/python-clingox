@@ -1,7 +1,4 @@
 [run]
-omit = 
-    clingox/tefoli.py
-    clingox/tests/test_tefoli.py
 [report]
 exclude_lines =
     assert
