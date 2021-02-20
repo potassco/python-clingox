@@ -4,6 +4,40 @@ This module provides functions to work with ground programs.
 This includes constructing a ground representation using an observer, pretty
 printing the ground representation, and adding ground program to control
 objects via the backend.
+
+Example
+-------
+
+The following example shows how to:
+
+- use the `ProgramObserver` to construct a `Program`, and
+- add it to another `clingo.control.Control` obeject.
+
+```python-repl
+>>> from clingo.control import Control
+>>> from clingox.program import Program, ProgramObserver, Remapping
+>>>
+>>> prg = Program()
+>>> ctl_a = Control()
+>>> ctl_a.register_observer(ProgramObserver(prg))
+>>>
+>>> ctl_a.add('base', [], 'a. {b}. c :- b.')
+>>> ctl_a.ground([('base', [])])
+>>> print(prg)
+a.
+__x1.
+c :- b.
+{b}.
+>>>
+>>> ctl_b = Control(['0'])
+>>> with ctl_b.backend() as backend:
+...     mapping = Remapping(backend, prg.output_atoms, prg.facts)
+...     prg.add_to_backend(backend, mapping)
+...
+>>> ctl_b.solve(on_model=print)
+a
+b c a
+```
 '''
 
 from typing import (Callable, Iterable, List, Mapping, MutableMapping, MutableSequence, NamedTuple, Optional, Sequence,
@@ -725,6 +759,11 @@ class ProgramObserver(Observer):
 
     This class explicitly ignores theory atoms because they already have a
     ground representation.
+
+    Parameters
+    ----------
+    program
+        The program to add statements to.
     '''
     _program: Program
 
@@ -755,6 +794,15 @@ class ProgramObserver(Observer):
     def rule(self, choice: bool, head: Sequence[Atom], body: Sequence[Literal]) -> None:
         '''
         Add a rule to the ground representation.
+
+        Parameters
+        ----------
+        choice
+            Determines if the head is a choice or a disjunction.
+        head
+            List of program atoms forming the rule head.
+        body
+            List of program literals forming the rule body.
         '''
         self._program.rules.append(Rule(choice, head, body))
 
@@ -762,12 +810,29 @@ class ProgramObserver(Observer):
                     body: Sequence[Tuple[Literal, Weight]]) -> None:
         '''
         Add a weight rule to the ground representation.
+
+        Parameters
+        ----------
+        choice
+            Determines if the head is a choice or a disjunction.
+        head
+            List of program atoms forming the head of the rule.
+        lower_bound
+            The lower bound of the weight constraint in the rule body.
+        body
+            List of weighted literals (pairs of literal and weight) forming the
+            elements of the weight constraint.
         '''
         self._program.weight_rules.append(WeightRule(choice, head, lower_bound, body))
 
     def project(self, atoms: Sequence[Atom]) -> None:
         '''
         Add a project statement to the ground representation.
+
+        Parameters
+        ----------
+        atoms
+            The program atoms to project on.
         '''
         if self._program.projects is None:
             self._program.projects = []
@@ -776,24 +841,55 @@ class ProgramObserver(Observer):
     def external(self, atom: Atom, value: TruthValue) -> None:
         '''
         Add an external statement to the ground representation.
+
+        Parameters
+        ----------
+        atom
+            The external atom in form of a program literal.
+        value
+            The truth value of the external statement.
         '''
         self._program.externals.append(External(atom, value))
 
     def assume(self, literals: Sequence[Literal]) -> None:
         '''
         Extend the program with the given assumptions.
+
+        Parameters
+        ----------
+        literals
+            The program literals to assume (positive literals are true and
+            negative literals false for the next solve call).
         '''
         self._program.assumptions.extend(literals)
 
     def minimize(self, priority: Weight, literals: Sequence[Tuple[Literal, Weight]]) -> None:
         '''
         Add a minimize statement to the ground representation.
+
+        Parameters
+        ----------
+        priority
+            The priority of the directive.
+        literals
+            List of weighted literals whose sum to minimize (pairs of literal
+            and weight).
         '''
         self._program.minimizes.append(Minimize(priority, literals))
 
     def acyc_edge(self, node_u: int, node_v: int, condition: Sequence[Literal]) -> None:
         '''
         Add an edge statement to the gronud representation.
+
+        Parameters
+        ----------
+        node_u
+            The start vertex of the edge (in form of an integer).
+        node_v
+            Тhe end vertex of the edge (in form of an integer).
+        condition
+            The list of program literals forming th condition under which to
+            add the edge.
         '''
         self._program.edges.append(Edge(node_u, node_v, condition))
 
@@ -801,5 +897,18 @@ class ProgramObserver(Observer):
                   condition: Sequence[Literal]) -> None:
         '''
         Add heurisitic statement to the gronud representation.
+
+        Parameters
+        ----------
+        atom
+            The program atom heuristically modified.
+        type_
+            The type of the modification.
+        bias
+            A signed integer.
+        priority
+            An unsigned integer.
+        condition
+            List of program literals.
         '''
         self._program.heuristics.append(Heuristic(atom, type_, bias, priority, condition))
