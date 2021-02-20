@@ -346,10 +346,7 @@ class TheoryTermParser(Transformer):
     # pylint: disable=invalid-name
 
     def __init__(self, table: Union[OperatorTable, TheoryUnparsedTermParser]):
-        if isinstance(table, TheoryUnparsedTermParser):
-            self._parser = table
-        else:
-            self._parser = TheoryUnparsedTermParser(table)
+        self._parser = table if isinstance(table, TheoryUnparsedTermParser) else TheoryUnparsedTermParser(table)
 
     def visit_TheoryFunction(self, x) -> AST:
         """
