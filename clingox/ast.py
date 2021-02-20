@@ -33,7 +33,7 @@ The same parser can also be constructed from a theory:
 >>> from clingo.ast import parse_string, ASTType
 >>> from clingox.ast import theory_parser_from_definition
 >>>
->>> theory = """\
+>>> theory = """\\
 ... #theory test {
 ...     term {
 ...         -  : 3, unary;
