@@ -218,4 +218,4 @@ def evaluate(term: TheoryTerm) -> Symbol:
     -------
     The evaluated term in form of a symbol.
     '''
-    return TermEvaluator()(term)
+    return TermEvaluator().evaluate(term)
