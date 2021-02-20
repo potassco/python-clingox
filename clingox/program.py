@@ -49,6 +49,11 @@ from copy import copy
 
 from clingo import Backend, HeuristicType, Observer, Symbol, TruthValue
 
+__all__ = ['add_to_backend', 'pretty_str', 'remap', 'Edge', 'External', 'Fact',
+           'Heuristic', 'Minimize', 'Program', 'ProgramObserver', 'Project',
+           'Remapping', 'Rule', 'Show', 'WeightRule']
+__pdoc__ = {}
+
 Atom = int
 Literal = int
 Weight = int
@@ -56,8 +61,6 @@ OutputTable = Mapping[Atom, Symbol]
 AtomMap = Callable[[Atom], Atom]
 Statement = TypeVar('Statement', 'Fact', 'Show', 'Rule', 'WeightRule', 'Heuristic', 'Edge', 'Minimize', 'External',
                     'Project')
-
-__pdoc__ = {}
 
 @singledispatch
 def pretty_str(stm: Statement, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
