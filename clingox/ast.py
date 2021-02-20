@@ -119,6 +119,13 @@ from clingo.ast import (
     TheoryOperatorType, Transformer)
 from .theory import is_operator
 
+__all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
+           'prefix_symbolic_atoms', 'rename_symbolic_atoms', 'str_to_location',
+           'theory_parser_from_definition', 'Arity', 'Associativity',
+           'AtomTable', 'OperatorTable', 'SymbolicAtomRenamer', 'TheoryParser',
+           'TheoryTermParser', 'TheoryUnparsedTermParser',
+           'TheoryUnparsedTermParser']
+
 
 class Arity(Enum):
     '''
@@ -285,7 +292,7 @@ class TheoryUnparsedTermParser:
         arity
             The arity of the operator.
         location
-            Location of the operator.
+            Location of the operator for error reporting.
         """
         if (operator, arity) not in self._table:
             raise RuntimeError("cannot parse operator `{}`: {}".format(operator, location_to_str(location)))

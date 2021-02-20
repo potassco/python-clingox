@@ -1,8 +1,41 @@
 '''
 This module provides functions to work with clingo's theories.
+
+Example
+-------
+
+```python-repl
+>>> from clingo.control import Control
+>>> from clingox.theory import evaluate
+>>>
+>>> prg = """\
+... #theory test {
+...     term {
+...         -  : 3, unary;
+...         ** : 2, binary, right;
+...         *  : 1, binary, left;
+...         +  : 0, binary, left;
+...         -  : 0, binary, left
+...     };
+...     &eval/0 : term, head
+... }.
+...
+... &eval{ 3**5-201 }.
+... """
+>>>
+>>> ctl = Control()
+>>> ctl.add('base', [], prg)
+>>> ctl.ground([('base', [])])
+>>>
+>>> atom = next(ctl.theory_atoms)
+>>> print(evaluate(atom.elements[0].terms[0]))
+42
+```
 '''
 
 from clingo import Symbol, Function, Tuple_, Number, SymbolType, TheoryTerm, TheoryTermType
+
+__all__ = ['evaluate', 'invert_symbol', 'is_operator', 'require_number', 'TermEvaluator']
 
 
 def require_number(x: Symbol) -> int:
@@ -15,75 +48,132 @@ def require_number(x: Symbol) -> int:
 
     raise TypeError('number exepected')
 
-def invert_symbol(x: Symbol) -> Symbol:
+def invert_symbol(sym: Symbol) -> Symbol:
     '''
-    Inverts a symbol.
-    '''
-    if x.type == SymbolType.Number:
-        return Number(-x.number)
+    Inverts the given symbol.
 
-    if x.type == SymbolType.Function and x.name:
-        return Function(x.name, x.arguments, not x.positive)
+    Parameters
+    ----------
+    sym
+        The symbol to invert.
+
+    Returns
+    -------
+    The inverted symbol.
+    '''
+    if sym.type == SymbolType.Number:
+        return Number(-sym.number)
+
+    if sym.type == SymbolType.Function and sym.name:
+        return Function(sym.name, sym.arguments, not sym.positive)
 
     raise TypeError('cannot invert symbol')
 
-def is_operator(x: str):
+def is_operator(op: str):
     '''
     Return true if the given string is an operator.
+
+    Parameters
+    ----------
+    op
+        The operator name to check.
+
+    Returns
+    -------
+    Whether the string is an operator name.
     '''
-    return x and x[0] in "/!<=>+-*\\?&@|:;~^."
+    return op and op[0] in "/!<=>+-*\\?&@|:;~^."
 
 class TermEvaluator:
     '''
-    Evaluates the operators in a theory term in the same fashion as clingo
-    evaluates its arithmetic functions.
+    This class provides a call operator to evaluates the operators in a theory
+    term in the same fashion as clingo evaluates its arithmetic functions.
 
     This class can easily be extended for additional binary and unary
     operators.
     '''
 
-    def evaluate_binary(self, f: str, x: Symbol, y: Symbol) -> Symbol:
+    def evaluate_binary(self, op: str, lhs: Symbol, rhs: Symbol) -> Symbol:
         '''
         Evaluate binary terms as clingo would.
-        '''
-        if f == "+":
-            return Number(require_number(x) + require_number(y))
-        if f == "-":
-            return Number(require_number(x) - require_number(y))
-        if f == "*":
-            return Number(require_number(x) * require_number(y))
-        if f == "**":
-            return Number(require_number(x) ** require_number(y))
-        if f == "\\":
-            if y == Number(0):
-                raise ZeroDivisionError("division by zero")
-            return Number(require_number(x) % require_number(y))
-        if f == "/":
-            if y == Number(0):
-                raise ZeroDivisionError("division by zero")
-            return Number(require_number(x) // require_number(y))
 
-        if is_operator(f):
+        Parameters
+        ----------
+        op
+            The operator name.
+        lhs
+            The left-hand-side argument.
+        lhs
+            The right-hand-side argument.
+
+        Returns
+        -------
+        The evaluated operator in form of a symbol.
+        '''
+        if op == "+":
+            return Number(require_number(lhs) + require_number(rhs))
+        if op == "-":
+            return Number(require_number(lhs) - require_number(rhs))
+        if op == "*":
+            return Number(require_number(lhs) * require_number(rhs))
+        if op == "**":
+            return Number(require_number(lhs) ** require_number(rhs))
+        if op == "\\":
+            if rhs == Number(0):
+                raise ZeroDivisionError("division by zero")
+            return Number(require_number(lhs) % require_number(rhs))
+        if op == "/":
+            if rhs == Number(0):
+                raise ZeroDivisionError("division by zero")
+            return Number(require_number(lhs) // require_number(rhs))
+
+        if is_operator(op):
             raise AttributeError('unexpected operator')
 
-        return Function(f, [x, y])
+        return Function(op, [lhs, rhs])
 
-    def evaluate_unary(self, f: str, x: Symbol):
+    def evaluate_unary(self, op: str, arg: Symbol):
         '''
         Evaluate unary terms as clingo would.
+
+        Parameters
+        ----------
+        op
+            The operator name.
+        arg
+            The argument of the operator.
+
+        Returns
+        -------
+        The evaluated operator in form of a symbol.
         '''
-        if f == "+":
-            return Number(require_number(x))
-        if f == "-":
-            return invert_symbol(x)
-        if is_operator(f):
+        if op == "+":
+            return Number(require_number(arg))
+        if op == "-":
+            return invert_symbol(arg)
+        if is_operator(op):
             raise AttributeError('unexpected operator')
 
-        return Function(f, [x])
+        return Function(op, [arg])
+
+    def evaluate(self, term: TheoryTerm) -> Symbol:
+        '''
+        Evaluate the given term.
+
+        Parameters
+        ----------
+        term
+            The term to evaluate.
+
+        Returns
+        -------
+        The evaluated term in form of a symbol.
+        '''
+        return self(term)
 
     def __call__(self, term: TheoryTerm):
         '''
-        Evaluate the given term.
+        Shortcut for `evaluate(term)`.
         '''
         # tuples
         if term.type == TheoryTermType.Tuple:
@@ -118,5 +208,14 @@ def evaluate(term: TheoryTerm) -> Symbol:
     '''
     Evaluates the operators in a theory term in the same fashion as clingo
     evaluates its arithmetic functions.
+
+    Parameters
+    ----------
+    term
+        The theory term to evaluate.
+
+    Returns
+    -------
+    The evaluated term in form of a symbol.
     '''
     return TermEvaluator()(term)
