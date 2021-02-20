@@ -1,7 +1,5 @@
 '''
 Test cases for the ground program and observer.
-
-TODO: test remapping
 '''
 from unittest import TestCase
 
