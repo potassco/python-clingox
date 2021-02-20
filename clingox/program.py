@@ -11,7 +11,7 @@ Example
 The following example shows how to:
 
 - use the `ProgramObserver` to construct a `Program`, and
-- add it to another `clingo.control.Control` obeject.
+- add it to another `clingo.control.Control` object.
 
 ```python-repl
 >>> from clingo.control import Control
