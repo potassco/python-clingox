@@ -24,39 +24,72 @@ Statement = TypeVar('Statement', 'Fact', 'Show', 'Rule', 'WeightRule', 'Heuristi
                     'Project')
 
 @singledispatch
-def pretty_str(arg: Statement, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
+def pretty_str(stm: Statement, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
     '''
     Pretty print statements.
+
+    Parameters
+    ----------
+    stm
+        The statement to convert to a string.
+    output_atoms
+        A mapping from program atoms to symbols.
+
+    Returns
+    -------
+    The string representation of the statement.
     '''
     assert False, 'unexpected type'
 
 @singledispatch
-def remap(arg: Statement, mapping: AtomMap) -> Statement: # pylint: disable=unused-argument
+def remap(stm: Statement, mapping: AtomMap) -> Statement: # pylint: disable=unused-argument
     '''
     Remap literals in the given statement with the provided mapping.
+
+    Parameters
+    ----------
+    stm
+        The statement to remap.
+    mapping
+        The mapping function to remap literals.
+
+    Returns
+    -------
+    The updated statement.
+
+    See Also
+    --------
+    Remapping
     '''
     assert False, 'unexpected type'
 
 @singledispatch
-def add_to_backend(arg: Statement, backend: Backend) -> None: # pylint: disable=unused-argument
+def add_to_backend(stm: Statement, backend: Backend) -> None: # pylint: disable=unused-argument
     '''
     Add statements to the backend using the provided mapping to map literals.
+
+    Parameters
+    ----------
+    stm
+        The statement to add to the backend.
+    backend
+        The backend.
     '''
     assert False, 'unexpected type'
 
 # ------------------------------------------------------------------------------
 
-def _pretty_str_lit(arg: Literal, output_atoms: OutputTable) -> str:
+def _pretty_str_lit(stm: Literal, output_atoms: OutputTable) -> str:
     '''
     Pretty print literals and atoms.
     '''
-    atom = abs(arg)
+    atom = abs(stm)
     if atom in output_atoms:
         atom_str = str(output_atoms[atom])
     else:
         atom_str = f'__x{atom}'
 
-    return f'not {atom_str}' if arg < 0 else atom_str
+    return f'not {atom_str}' if stm < 0 else atom_str
 
 def _pretty_str_rule_head(choice: bool, has_body: bool, head: Sequence[Atom], output_atoms: OutputTable) -> str:
     '''
@@ -76,13 +109,13 @@ def _pretty_str_rule_head(choice: bool, has_body: bool, head: Sequence[Atom], ou
 
     return ret
 
-def _pretty_str_truth_value(arg: TruthValue):
+def _pretty_str_truth_value(stm: TruthValue):
     '''
     Pretty print a truth value.
     '''
-    if arg == TruthValue.False_:
+    if stm == TruthValue.False_:
         return 'False'
-    if arg == TruthValue.True_:
+    if stm == TruthValue.True_:
         return 'True'
     return 'Free'
 
@@ -127,21 +160,21 @@ class Fact(NamedTuple):
     symbol: Symbol
 
 @pretty_str.register
-def _pretty_str_fact(arg: Fact, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
+def _pretty_str_fact(stm: Fact, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
     '''
     Pretty print a fact.
     '''
-    return f'{arg.symbol}.'
+    return f'{stm.symbol}.'
 
 @remap.register
-def _remap_fact(arg: Fact, mapping: AtomMap) -> Fact: # pylint: disable=unused-argument
+def _remap_fact(stm: Fact, mapping: AtomMap) -> Fact: # pylint: disable=unused-argument
     '''
     Remap a fact statement.
     '''
-    return arg
+    return stm
 
 @add_to_backend.register
-def _add_to_backend_fact(arg: Fact, backend: Backend) -> None: # pylint: disable=unused-argument
+def _add_to_backend_fact(stm: Fact, backend: Backend) -> None: # pylint: disable=unused-argument
     '''
     Add a fact to the backend.
 
@@ -159,22 +192,22 @@ class Show(NamedTuple):
     condition: Sequence[Literal]
 
 @pretty_str.register
-def _pretty_str_show(arg: Show, output_atoms: OutputTable) -> str:
+def _pretty_str_show(stm: Show, output_atoms: OutputTable) -> str:
     '''
     Pretty print a fact.
     '''
-    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in arg.condition)
-    return f'#show {arg.symbol}{": " if body else ""}{body}.'
+    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in stm.condition)
+    return f'#show {stm.symbol}{": " if body else ""}{body}.'
 
 @remap.register
-def _remap_show(arg: Show, mapping: AtomMap) -> Show:
+def _remap_show(stm: Show, mapping: AtomMap) -> Show:
     '''
     Remap a show statetment.
     '''
-    return Show(arg.symbol, _remap_seq(arg.condition, mapping))
+    return Show(stm.symbol, _remap_seq(stm.condition, mapping))
 
 @add_to_backend.register
-def _add_to_backend_show(arg: Show, backend: Backend) -> None: # pylint: disable=unused-argument
+def _add_to_backend_show(stm: Show, backend: Backend) -> None: # pylint: disable=unused-argument
     '''
     Add a show statement to the backend.
 
@@ -193,28 +226,28 @@ class Rule(NamedTuple):
     body: Sequence[Literal]
 
 @pretty_str.register(Rule)
-def _pretty_str_rule(arg: Rule, output_atoms: OutputTable) -> str:
+def _pretty_str_rule(stm: Rule, output_atoms: OutputTable) -> str:
     '''
     Pretty print a rule.
     '''
-    head = _pretty_str_rule_head(arg.choice, bool(arg.body), arg.head, output_atoms)
-    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in arg.body)
+    head = _pretty_str_rule_head(stm.choice, bool(stm.body), stm.head, output_atoms)
+    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in stm.body)
 
     return f'{head}{body}.'
 
 @remap.register
-def _remap_rule(arg: Rule, mapping: AtomMap) -> Rule:
+def _remap_rule(stm: Rule, mapping: AtomMap) -> Rule:
     '''
     Remap literals in a rule.
     '''
-    return Rule(arg.choice, _remap_seq(arg.head, mapping), _remap_seq(arg.body, mapping))
+    return Rule(stm.choice, _remap_seq(stm.head, mapping), _remap_seq(stm.body, mapping))
 
 @add_to_backend.register
-def _add_to_backend_rule(arg: Rule, backend: Backend) -> None:
+def _add_to_backend_rule(stm: Rule, backend: Backend) -> None:
     '''
     Add a rule to the backend.
     '''
-    backend.add_rule(arg.head, arg.body, arg.choice)
+    backend.add_rule(stm.head, stm.body, stm.choice)
 
 # ------------------------------------------------------------------------------
 
@@ -228,29 +261,29 @@ class WeightRule(NamedTuple):
     body: Sequence[Tuple[Literal, Weight]]
 
 @pretty_str.register(WeightRule)
-def _pretty_str_weight_rule(arg: WeightRule, output_atoms: OutputTable) -> str:
+def _pretty_str_weight_rule(stm: WeightRule, output_atoms: OutputTable) -> str:
     '''
     Pretty print a rule or weight rule.
     '''
-    head = _pretty_str_rule_head(arg.choice, bool(arg.body), arg.head, output_atoms)
+    head = _pretty_str_rule_head(stm.choice, bool(stm.body), stm.head, output_atoms)
     body = ', '.join(f'{weight},{i}: {_pretty_str_lit(literal, output_atoms)}'
-                     for i, (literal, weight) in enumerate(arg.body))
+                     for i, (literal, weight) in enumerate(stm.body))
 
-    return f'{head}{arg.lower_bound}{{{body}}}.'
+    return f'{head}{stm.lower_bound}{{{body}}}.'
 
 @remap.register
-def _remap_weight_rule(arg: WeightRule, mapping: AtomMap) -> WeightRule:
+def _remap_weight_rule(stm: WeightRule, mapping: AtomMap) -> WeightRule:
     '''
     Remap literals in a weight rule.
     '''
-    return WeightRule(arg.choice, _remap_seq(arg.head, mapping), arg.lower_bound, _remap_wseq(arg.body, mapping))
+    return WeightRule(stm.choice, _remap_seq(stm.head, mapping), stm.lower_bound, _remap_wseq(stm.body, mapping))
 
 @add_to_backend.register
-def _add_to_backend_weight_rule(arg: WeightRule, backend: Backend) -> None:
+def _add_to_backend_weight_rule(stm: WeightRule, backend: Backend) -> None:
     '''
     Add a weight rule to the backend.
     '''
-    backend.add_weight_rule(arg.head, arg.lower_bound, arg.body, arg.choice)
+    backend.add_weight_rule(stm.head, stm.lower_bound, stm.body, stm.choice)
 
 # ------------------------------------------------------------------------------
 
@@ -261,25 +294,25 @@ class Project(NamedTuple):
     atom: Atom
 
 @pretty_str.register(Project)
-def _pretty_str_project(arg: Project, output_atoms: OutputTable) -> str:
+def _pretty_str_project(stm: Project, output_atoms: OutputTable) -> str:
     '''
     Pretty print a project statement.
     '''
-    return f'#project {_pretty_str_lit(arg.atom, output_atoms)}.'
+    return f'#project {_pretty_str_lit(stm.atom, output_atoms)}.'
 
 @remap.register
-def _remap_project(arg: Project, mapping: AtomMap):
+def _remap_project(stm: Project, mapping: AtomMap):
     '''
     Remap project statement.
     '''
-    return Project(mapping(arg.atom))
+    return Project(mapping(stm.atom))
 
 @add_to_backend.register
-def _add_to_backend_project(arg: Project, backend: Backend):
+def _add_to_backend_project(stm: Project, backend: Backend):
     '''
     Add a project statement to the backend.
     '''
-    backend.add_project([arg.atom])
+    backend.add_project([stm.atom])
 
 # ------------------------------------------------------------------------------
 
@@ -291,25 +324,25 @@ class External(NamedTuple):
     value: TruthValue
 
 @pretty_str.register(External)
-def _pretty_print_external(arg: External, output_atoms: OutputTable) -> str:
+def _pretty_print_external(stm: External, output_atoms: OutputTable) -> str:
     '''
     Pretty print an external.
     '''
-    return f'#external {_pretty_str_lit(arg.atom, output_atoms)}. [{_pretty_str_truth_value(arg.value)}]'
+    return f'#external {_pretty_str_lit(stm.atom, output_atoms)}. [{_pretty_str_truth_value(stm.value)}]'
 
 @remap.register
-def _remap_external(arg: External, mapping: AtomMap) -> External:
+def _remap_external(stm: External, mapping: AtomMap) -> External:
     '''
     Remap the external.
     '''
-    return External(mapping(arg.atom), arg.value)
+    return External(mapping(stm.atom), stm.value)
 
 @add_to_backend.register
-def _add_to_backend_external(arg: External, backend: Backend):
+def _add_to_backend_external(stm: External, backend: Backend):
     '''
     Add an external statement to the backend remapping its atom.
     '''
-    backend.add_external(arg.atom, arg.value)
+    backend.add_external(stm.atom, stm.value)
 
 # ------------------------------------------------------------------------------
 
@@ -321,27 +354,27 @@ class Minimize(NamedTuple):
     literals: Sequence[Tuple[Literal, Weight]]
 
 @pretty_str.register(Minimize)
-def _pretty_print_minimize(arg, output_atoms) -> str:
+def _pretty_print_minimize(stm, output_atoms) -> str:
     '''
     Pretty print a minimize statement.
     '''
-    body = '; '.join(f'{weight}@{arg.priority},{i}: {_pretty_str_lit(literal, output_atoms)}'
-                     for i, (literal, weight) in enumerate(arg.literals))
+    body = '; '.join(f'{weight}@{stm.priority},{i}: {_pretty_str_lit(literal, output_atoms)}'
+                     for i, (literal, weight) in enumerate(stm.literals))
     return f'#minimize{{{body}}}.'
 
 @remap.register
-def _remap_minimize(arg: Minimize, mapping: AtomMap) -> Minimize:
+def _remap_minimize(stm: Minimize, mapping: AtomMap) -> Minimize:
     '''
     Remap the literals in the minimize statement.
     '''
-    return Minimize(arg.priority, _remap_wseq(arg.literals, mapping))
+    return Minimize(stm.priority, _remap_wseq(stm.literals, mapping))
 
 @add_to_backend.register
-def _add_to_backend_minimize(arg: Minimize, backend: Backend):
+def _add_to_backend_minimize(stm: Minimize, backend: Backend):
     '''
     Add a minimize statement to the backend.
     '''
-    backend.add_minimize(arg.priority, arg.literals)
+    backend.add_minimize(stm.priority, stm.literals)
 
 # ------------------------------------------------------------------------------
 
@@ -359,28 +392,28 @@ def _pretty_str_heuristic_type(type_):
     return str(type_).replace('HeuristicType.', '')
 
 @pretty_str.register(Heuristic)
-def _pretty_str_heuristic(arg: Heuristic, output_atoms: OutputTable) -> str:
+def _pretty_str_heuristic(stm: Heuristic, output_atoms: OutputTable) -> str:
     '''
     Pretty print a heuristic statement.
     '''
-    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in arg.condition)
-    head = _pretty_str_lit(arg.atom, output_atoms)
-    type_ = _pretty_str_heuristic_type(arg.type_)
-    return f'#heuristic {head}{": " if body else ""}{body}. [{arg.bias}@{arg.priority}, {type_}]'
+    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in stm.condition)
+    head = _pretty_str_lit(stm.atom, output_atoms)
+    type_ = _pretty_str_heuristic_type(stm.type_)
+    return f'#heuristic {head}{": " if body else ""}{body}. [{stm.bias}@{stm.priority}, {type_}]'
 
 @remap.register
-def _remap_heuristic(arg: Heuristic, mapping: AtomMap) -> Heuristic:
+def _remap_heuristic(stm: Heuristic, mapping: AtomMap) -> Heuristic:
     '''
     Remap the heuristic statement.
     '''
-    return Heuristic(mapping(arg.atom), arg.type_, arg.bias, arg.priority, _remap_seq(arg.condition, mapping))
+    return Heuristic(mapping(stm.atom), stm.type_, stm.bias, stm.priority, _remap_seq(stm.condition, mapping))
 
 @add_to_backend.register
-def _add_to_backend_heuristic(arg: Heuristic, backend: Backend) -> None:
+def _add_to_backend_heuristic(stm: Heuristic, backend: Backend) -> None:
     '''
     Add a heurisitic statement to the backend.
     '''
-    backend.add_heuristic(arg.atom, arg.type_, arg.bias, arg.priority, arg.condition)
+    backend.add_heuristic(stm.atom, stm.type_, stm.bias, stm.priority, stm.condition)
 
 # ------------------------------------------------------------------------------
 
@@ -393,26 +426,26 @@ class Edge(NamedTuple):
     condition: Sequence[Literal]
 
 @pretty_str.register(Edge)
-def _pretty_str_edge(arg: Edge, output_atoms: OutputTable) -> str:
+def _pretty_str_edge(stm: Edge, output_atoms: OutputTable) -> str:
     '''
     Pretty print a heuristic statement.
     '''
-    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in arg.condition)
-    return f'#edge ({arg.u},{arg.v}){": " if body else ""}{body}.'
+    body = ', '.join(_pretty_str_lit(lit, output_atoms) for lit in stm.condition)
+    return f'#edge ({stm.u},{stm.v}){": " if body else ""}{body}.'
 
 @remap.register
-def _remap_edge(arg: Edge, mapping: AtomMap) -> Edge:
+def _remap_edge(stm: Edge, mapping: AtomMap) -> Edge:
     '''
     Remap an edge statement.
     '''
-    return Edge(arg.u, arg.v, _remap_seq(arg.condition, mapping))
+    return Edge(stm.u, stm.v, _remap_seq(stm.condition, mapping))
 
 @add_to_backend.register
-def _add_to_backend_edge(arg: Edge, backend: Backend) -> None:
+def _add_to_backend_edge(stm: Edge, backend: Backend) -> None:
     '''
     Add an edge statement to the backend remapping its literals.
     '''
-    backend.add_acyc_edge(arg.u, arg.v, arg.condition)
+    backend.add_acyc_edge(stm.u, stm.v, stm.condition)
 
 # ------------------------------------------------------------------------------
 
@@ -425,16 +458,49 @@ class Program: # pylint: disable=too-many-instance-attributes
     by clingo.
     '''
     output_atoms: MutableMapping[Atom, Symbol] = field(default_factory=dict)
+    '''
+    A mapping from program atoms to symbols.
+    '''
     shows: List[Show] = field(default_factory=list)
+    '''
+    A list of show statements.
+    '''
     facts: List[Fact] = field(default_factory=list)
+    '''
+    A list of facts.
+    '''
     rules: List[Rule] = field(default_factory=list)
+    '''
+    A list of rules.
+    '''
     weight_rules: List[WeightRule] = field(default_factory=list)
+    '''
+    A list of weight rules.
+    '''
     heuristics: List[Heuristic] = field(default_factory=list)
+    '''
+    A list of heuristic statements.
+    '''
     edges: List[Edge] = field(default_factory=list)
+    '''
+    A list of edge statements.
+    '''
     minimizes: List[Minimize] = field(default_factory=list)
+    '''
+    A list of minimize statements.
+    '''
     externals: List[External] = field(default_factory=list)
+    '''
+    A list of external statements.
+    '''
     projects: Optional[List[Project]] = None
+    '''
+    A list of project statements.
+    '''
     assumptions: List[Literal] = field(default_factory=list)
+    '''
+    A list of assumptions in form of program literals.
+    '''
 
     def _pretty_stms(self, arg: Iterable[Statement], sort: bool) -> Iterable[str]:
         if sort:
@@ -462,9 +528,9 @@ class Program: # pylint: disable=too-many-instance-attributes
         '''
         Sort the statements in the program inplace.
 
-        Returns a reference to self.
-
-        Note: It might also be nice to sort statement bodies and conditions.
+        Returns
+        -------
+        A reference to self.
         '''
         self.shows.sort()
         self.facts.sort()
@@ -484,9 +550,18 @@ class Program: # pylint: disable=too-many-instance-attributes
         '''
         Remap the literals in the program inplace.
 
-        Returns a reference to self.
+        Parameters
+        ----------
+        mapping
+            A function to remap program atoms.
 
-        Note: It might also be nice to sort statement bodies and conditions.
+        Returns
+        -------
+        A reference to self.
+
+        See Also
+        --------
+        remap
         '''
         _remap_stms(self.shows, mapping)
         _remap_stms(self.facts, mapping)
@@ -512,7 +587,20 @@ class Program: # pylint: disable=too-many-instance-attributes
         reasons. This has to be taken care of by the user. See for example the
         `Remapping` class, which provides functionality for this.
 
-        Returns a reference to self.
+        Parameters
+        ----------
+        backend
+            The backend.
+        mapping
+            A mapping function to remap literals.
+
+        Returns
+        -------
+        A reference to self.
+
+        See Also
+        --------
+        add_to_backend
         '''
 
         _add_stms_to_backend(self.shows, backend, mapping)
@@ -537,6 +625,15 @@ class Program: # pylint: disable=too-many-instance-attributes
     def pretty_str(self, sort: bool = True) -> str:
         '''
         Return a readable string represenation of the program.
+
+        Parameters
+        ----------
+        sort
+            Whether to sort the statements in the program befor printing.
+
+        Returns
+        -------
+        The string representation of the program.
         '''
         return '\n'.join(chain(
             self._pretty_stms(self.shows, sort),
@@ -552,9 +649,11 @@ class Program: # pylint: disable=too-many-instance-attributes
 
     def copy(self) -> 'Program':
         '''
-        Return a shallow copy of the program.
+        Return a shallow copy of the program copying all mutable state.
 
-        This copies all mutable state.
+        Returns
+        -------
+        A shallow copy of the program.
         '''
         return copy(self)
 
@@ -570,16 +669,23 @@ class Remapping:
     '''
     This class maps existing literals to fresh literals as created by the
     backend.
+
+    It provides a call operator to remap a program atoms introducing fresh
+    program atoms if necessary.
+
+    Parameters
+    ----------
+    backend
+        The backend used to introduce fresh atoms.
+    output_atoms
+        The output table to initialize the mapping with.
+    facts
+        A list of facts each of which will receive a fresh program atom.
     '''
     _backend: Backend
     _map: MutableMapping[Atom, Atom]
 
     def __init__(self, backend: Backend, output_atoms: OutputTable, facts: Iterable[Fact] = None):
-        '''
-        Initializes the mapping with the literals in the given output table.
-
-        Furthemore, it associates a fresh literal with each given fact.
-        '''
         self._backend = backend
         self._map = {}
         for atom, sym in output_atoms.items():
