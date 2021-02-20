@@ -36,7 +36,7 @@ Example
 from clingo import Symbol, Function, Tuple_, Number, SymbolType, TheoryTerm, TheoryTermType
 
 __all__ = ['evaluate', 'invert_symbol', 'is_operator', 'require_number', 'TermEvaluator']
-
+__pdoc__ = {}
 
 def require_number(x: Symbol) -> int:
     '''
@@ -86,7 +86,7 @@ def is_operator(op: str):
 
 class TermEvaluator:
     '''
-    This class provides a call operator to evaluates the operators in a theory
+    This class provides a call operator to evaluate the operators in a theory
     term in the same fashion as clingo evaluates its arithmetic functions.
 
     This class can easily be extended for additional binary and unary
@@ -156,7 +156,7 @@ class TermEvaluator:
 
         return Function(op, [arg])
 
-    def evaluate(self, term: TheoryTerm) -> Symbol:
+    def __call__(self, term: TheoryTerm):
         '''
         Evaluate the given term.
 
@@ -168,12 +168,6 @@ class TermEvaluator:
         Returns
         -------
         The evaluated term in form of a symbol.
-        '''
-        return self(term)
-
-    def __call__(self, term: TheoryTerm):
-        '''
-        Shortcut for `evaluate(term)`.
         '''
         # tuples
         if term.type == TheoryTermType.Tuple:
@@ -203,6 +197,7 @@ class TermEvaluator:
 
         raise RuntimeError("cannot evaluate term")
 
+__pdoc__['TermEvaluator.__call__'] = True
 
 def evaluate(term: TheoryTerm) -> Symbol:
     '''
@@ -218,4 +213,4 @@ def evaluate(term: TheoryTerm) -> Symbol:
     -------
     The evaluated term in form of a symbol.
     '''
-    return TermEvaluator().evaluate(term)
+    return TermEvaluator()(term)

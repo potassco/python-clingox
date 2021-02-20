@@ -23,6 +23,8 @@ AtomMap = Callable[[Atom], Atom]
 Statement = TypeVar('Statement', 'Fact', 'Show', 'Rule', 'WeightRule', 'Heuristic', 'Edge', 'Minimize', 'External',
                     'Project')
 
+__pdoc__ = {}
+
 @singledispatch
 def pretty_str(stm: Statement, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
     '''
@@ -670,9 +672,6 @@ class Remapping:
     This class maps existing literals to fresh literals as created by the
     backend.
 
-    It provides a call operator to remap a program atoms introducing fresh
-    program atoms if necessary.
-
     Parameters
     ----------
     backend
@@ -697,15 +696,26 @@ class Remapping:
 
     def __call__(self, atom: Atom) -> Atom:
         '''
-        Map the given literal to the corresponding literal in the backend.
+        Map the given program atom to the corresponding atom in the backend.
 
         If the literal was not mapped during initialization, a new literal is
         associated with it.
+
+        Parameters
+        ----------
+        atom
+            The atom to remap.
+
+        Returns
+        -------
+        The remapped program atom.
         '''
         if atom not in self._map:
             self._map[atom] = self._backend.add_atom()
 
         return self._map[atom]
+
+__pdoc__['Remapping.__call__'] = True
 
 # ------------------------------------------------------------------------------
 
