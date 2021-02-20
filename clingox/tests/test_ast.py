@@ -9,14 +9,14 @@ from clingo import Function
 from clingo.ast import AST, ASTType, Location, Position, Transformer, parse_string
 from .. import ast
 from ..ast import (
-    TheoryTermParser, TheoryParser, TheoryAtomType,
+    Arity, Associativity, TheoryTermParser, TheoryParser, TheoryAtomType,
     ast_to_dict, dict_to_ast, location_to_str, prefix_symbolic_atoms, str_to_location, theory_parser_from_definition)
 
-TERM_TABLE = {"t": {("-", ast.UNARY):  (3, ast.NONE),
-                    ("**", ast.BINARY): (2, ast.RIGHT),
-                    ("*", ast.BINARY): (1, ast.LEFT),
-                    ("+", ast.BINARY): (0, ast.LEFT),
-                    ("-", ast.BINARY): (0, ast.LEFT)}}
+TERM_TABLE = {"t": {("-", Arity.Unary): (3, Associativity.NoAssociativity),
+                    ("**", Arity.Binary): (2, Associativity.Right),
+                    ("*", Arity.Binary): (1, Associativity.Left),
+                    ("+", Arity.Binary): (0, Associativity.Left),
+                    ("-", Arity.Binary): (0, Associativity.Left)}}
 
 ATOM_TABLE = {("p", 0): (TheoryAtomType.Head, "t", None),
               ("q", 1): (TheoryAtomType.Body, "t", None),

@@ -1,14 +1,12 @@
 '''
 This module provides highlevel functions to work with clingo's AST.
-
-TODO:
-- unpooling as in clingcon
 '''
 
 from typing import Any, Callable, cast, List, Mapping, Optional, Set, Tuple, Union
 from functools import singledispatch
 from copy import copy
 from re import fullmatch
+from enum import Enum, auto
 
 import clingo
 from clingo import ast
@@ -19,11 +17,20 @@ from clingo.ast import (
 from .theory import is_operator
 
 
-UNARY: bool = True
-BINARY: bool = not UNARY
-LEFT: bool = True
-RIGHT: bool = not LEFT
-NONE: bool = RIGHT
+class Arity(Enum):
+    '''
+    Enumeration of operator arities.
+    '''
+    Unary = 1
+    Binary = 2
+
+class Associativity(Enum):
+    '''
+    Enumeration of operator associativities.
+    '''
+    Left = auto()
+    Right = auto()
+    NoAssociativity = auto()
 
 def _s(m, a: str, b: str):
     '''
@@ -82,36 +89,41 @@ class TheoryUnparsedTermParser:
     Parser for unparsed theory terms in clingo's AST that works like the
     inbuilt one.
     """
-    _stack: List[Tuple[str, bool]]
+    _stack: List[Tuple[str, Arity]]
     _terms: List[AST]
+    _table: Mapping[Tuple[str, Arity], Tuple[int, Associativity]]
 
-    def __init__(self, table: Mapping[Tuple[str, bool], Tuple[int, bool]]):
+    def __init__(self, table: Mapping[Tuple[str, Arity], Tuple[int, Associativity]]):
         """
         Initializes the parser with the given operators.
 
+        Note that associativity for unary operators is ignored and binary
+        operators must use either `Associativity.Left` or `Associativity.Right`.
+
         Example table
         -------------
-        { ("-",  UNARY):  (3, RIGHT), # associativity is ignored
-          ("**", BINARY): (2, RIGHT),
-          ("*",  BINARY): (1, LEFT),
-          ("+",  BINARY): (0, LEFT),
-          ("-",  BINARY): (0, LEFT) }
+
+            {("-",  Arity.Unary):  (3, Associativity.NoAssociativity),
+             ("**", Arity.Binary): (2, Associativity.Right),
+             ("*",  Arity.Binary): (1, Associativity.Left),
+             ("+",  Arity.Binary): (0, Associativity.Left),
+             ("-",  Arity.Binary): (0, Associativity.Left)}
         """
         self._stack = []
         self._terms = []
         self._table = table
 
-    def _priority_and_associativity(self, operator: str) -> Tuple[int, bool]:
+    def _priority_and_associativity(self, operator: str) -> Tuple[int, Associativity]:
         """
         Get priority and associativity of the given binary operator.
         """
-        return self._table[(operator, BINARY)]
+        return self._table[(operator, Arity.Binary)]
 
-    def _priority(self, operator: str, unary: bool) -> int:
+    def _priority(self, operator: str, arity: Arity) -> int:
         """
         Get priority of the given unary or binary operator.
         """
-        return self._table[(operator, unary)][0]
+        return self._table[(operator, arity)][0]
 
     def _check(self, operator: str) -> bool:
         """
@@ -123,26 +135,27 @@ class TheoryUnparsedTermParser:
             return False
         priority, associativity = self._priority_and_associativity(operator)
         previous_priority = self._priority(*self._stack[-1])
-        return previous_priority > priority or (previous_priority == priority and associativity)
+        return (previous_priority > priority or
+                (previous_priority == priority and associativity == Associativity.Left))
 
     def _reduce(self) -> None:
         """
         Combines the last unary or binary term on the stack.
         """
         b = self._terms.pop()
-        operator, unary = self._stack.pop()
-        if unary:
+        operator, arity = self._stack.pop()
+        if arity == Arity.Unary:
             self._terms.append(TheoryFunction(b.location, operator, [b]))
         else:
             a = self._terms.pop()
             l = Location(a.location.begin, b.location.end)
             self._terms.append(TheoryFunction(l, operator, [a, b]))
 
-    def check_operator(self, operator: str, unary: bool, location: Any):
+    def check_operator(self, operator: str, arity: Arity, location: Any):
         """
         Check if the given operator is in the parse table.
         """
-        if (operator, unary) not in self._table:
+        if (operator, arity) not in self._table:
             raise RuntimeError("cannot parse operator `{}`: {}".format(operator, location_to_str(location)))
 
     def parse(self, x: AST) -> AST:
@@ -153,28 +166,28 @@ class TheoryUnparsedTermParser:
         del self._stack[:]
         del self._terms[:]
 
-        unary = True
+        arity = Arity.Unary
 
         for element in x.elements:
             for operator in element.operators:
-                self.check_operator(operator, unary, x.location)
+                self.check_operator(operator, arity, x.location)
 
-                while not unary and self._check(operator):
+                while arity == Arity.Binary and self._check(operator):
                     self._reduce()
 
-                self._stack.append((operator, unary))
-                unary = True
+                self._stack.append((operator, arity))
+                arity = Arity.Unary
 
             self._terms.append(element.term)
-            unary = False
+            arity = Arity.Binary
 
         while self._stack:
             self._reduce()
 
         return self._terms[0]
 
-TermTable = Mapping[Tuple[str, bool],
-                    Tuple[int, bool]]
+TermTable = Mapping[Tuple[str, Arity],
+                    Tuple[int, Associativity]]
 AtomTable = Mapping[Tuple[str, int],
                     Tuple[TheoryAtomType,
                           str,
@@ -199,10 +212,13 @@ class TheoryTermParser(Transformer):
         """
         Parse the theory function and check if it agrees with the grammar.
         """
-        unary = len(x.arguments) == 1
-        binary = len(x.arguments) == 2
-        if (unary or binary) and is_operator(x.name):
-            self._parser.check_operator(x.name, unary, x.location)
+        arity = None
+        if len(x.arguments) == 1:
+            arity = Arity.Unary
+        if len(x.arguments) == 2:
+            arity = Arity.Binary
+        if arity is not None and is_operator(x.name):
+            self._parser.check_operator(x.name, arity, x.location)
 
         return x.update(**self.visit_children(x))
 
@@ -353,15 +369,16 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         term_table = {}
 
         for op_def in term_def.operators:
+            op_assoc: Associativity
             if op_def.operator_type == TheoryOperatorType.BinaryLeft:
-                op_type = BINARY
-                op_assoc = LEFT
+                op_type = Arity.Binary
+                op_assoc = Associativity.Left
             elif op_def.operator_type == TheoryOperatorType.BinaryRight:
-                op_type = BINARY
-                op_assoc = RIGHT
+                op_type = Arity.Binary
+                op_assoc = Associativity.Right
             else:
-                op_type = UNARY
-                op_assoc = NONE
+                op_type = Arity.Unary
+                op_assoc = Associativity.NoAssociativity
 
             term_table[(op_def.name, op_type)] = (op_def.priority, op_assoc)
 
