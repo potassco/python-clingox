@@ -1,5 +1,108 @@
 '''
 This module provides highlevel functions to work with clingo's AST.
+
+Theory Parsing Examples
+-----------------------
+
+The following examples shows how to construct and use a theory parser:
+
+```python-repl
+>>> from clingo.ast import TheoryAtomType, parse_string
+>>> from clingox.ast import Arity, Associativity, TheoryParser
+>>>
+>>> terms = {"term":
+...     {("-", Arity.Unary): (3, Associativity.NoAssociativity),
+...      ("**", Arity.Binary): (2, Associativity.Right),
+...      ("*", Arity.Binary): (1, Associativity.Left),
+...      ("+", Arity.Binary): (0, Associativity.Left),
+...      ("-", Arity.Binary): (0, Associativity.Left)}}
+>>> atoms = {("eval", 0): (TheoryAtomType.Head, "term", None)}
+>>> parser = TheoryParser(terms, atoms)
+>>>
+>>> parse_string('&eval{ -1 * 2 + 3 }.', print)
+#program base.
+&eval { (- 1 * 2 + 3) }.
+>>> parse_string('&eval{ -1 * 2 + 3 }.', lambda x: print(parser(x)))
+#program base.
+&eval { +(*(-(1),2),3) }.
+```
+
+The same parser can also be constructed from a theory:
+
+```python-repl
+>>> from clingo.ast import parse_string, ASTType
+>>> from clingox.ast import theory_parser_from_definition
+>>>
+>>> theory = """\
+... #theory test {
+...     term {
+...         -  : 3, unary;
+...         ** : 2, binary, right;
+...         *  : 1, binary, left;
+...         +  : 0, binary, left;
+...         -  : 0, binary, left
+...     };
+...     &eval/0 : term, head
+... }.
+... """
+>>>
+>>> parsers = []
+>>> def extract(stm):
+...     if stm.ast_type == ASTType.TheoryDefinition:
+...         parsers.append(theory_parser_from_definition(stm))
+...
+>>> parse_string(theory, extract)
+>>> parse_string('&eval{ -1 * 2 + 3 }.', print)
+#program base.
+&eval { (- 1 * 2 + 3) }.
+>>> parse_string('&eval{ -1 * 2 + 3 }.', lambda x: print(parsers[0](x)))
+#program base.
+&eval { +(*(-(1),2),3) }.
+```
+
+AST to dict Conversion Example
+------------------------------
+
+Another interesting feature is to convert ASTs to YAML:
+
+```python-repl
+>>> from json import dumps
+>>> from clingo.ast import parse_string
+>>> from clingox.ast import ast_to_dict
+>>>
+>>> prg = []
+>>> parse_string('a.', lambda x: prg.append(ast_to_dict(x)))
+>>>
+>>> print(dumps(prg, indent=2))
+[
+  {
+    "ast_type": "Program",
+    "location": "<string>:1:1",
+    "name": "base",
+    "parameters": []
+  },
+  {
+    "ast_type": "Rule",
+    "location": "<string>:1:1-3",
+    "head": {
+      "ast_type": "Literal",
+      "location": "<string>:1:1-2",
+      "sign": 0,
+      "atom": {
+        "ast_type": "SymbolicAtom",
+        "symbol": {
+          "ast_type": "Function",
+          "location": "<string>:1:1-2",
+          "name": "a",
+          "arguments": [],
+          "external": 0
+        }
+      }
+    },
+    "body": []
+  }
+]
+```
 '''
 
 from typing import Any, Callable, cast, List, Mapping, Optional, Set, Tuple, Union
@@ -46,11 +149,19 @@ def _unquote(s: str) -> str:
 
 def location_to_str(loc: Location) -> str:
     """
-    This function takes a location from a clingo AST and transforms it into a
-    readable format.
+    This function transfroms a loctation object into a readable string.
 
-    Colons in the location will be quoted ensuring that the location is
-    parsable.
+    Colons in the location will be quoted ensuring that the resulting is
+    parsable using `str_to_location`.
+
+    Parameters
+    ----------
+    loc
+        The location to transform.
+
+    Returns
+    -------
+    The string representation of the given location.
     """
     begin, end = loc.begin, loc.end
     bf, ef = _quote(begin.filename), _quote(end.filename)
@@ -69,46 +180,57 @@ def location_to_str(loc: Location) -> str:
         dash = False
     return ret
 
-def str_to_location(s: str) -> Location:
+def str_to_location(loc: str) -> Location:
     """
-    This function parses a location string and returns it as a dictionary as
-    accepted by clingo's AST.
+    This function parses a location from its string representation.
+
+    Parameters
+    ----------
+    loc
+        The string to parse.
+
+    Returns
+    -------
+    The parsed location.
+
+    See Also
+    --------
+    location_to_str
     """
     m = fullmatch(
         r'(?P<bf>([^\\:]|\\\\|\\:)*):(?P<bl>[0-9]*):(?P<bc>[0-9]+)'
-        r'(-(((?P<ef>([^\\:]|\\\\|\\:)*):)?(?P<el>[0-9]*):)?(?P<ec>[0-9]+))?', s)
+        r'(-(((?P<ef>([^\\:]|\\\\|\\:)*):)?(?P<el>[0-9]*):)?(?P<ec>[0-9]+))?', loc)
     if not m:
         raise RuntimeError('could not parse location')
     begin = Position(_unquote(m['bf']), int(m['bl']), int(m['bc']))
     end = Position(_unquote(_s(m, 'bf', 'ef')), int(_s(m, 'bl', 'el')), int(_s(m, 'bc', 'ec')))
     return Location(begin, end)
 
+OperatorTable = Mapping[Tuple[str, Arity],
+                    Tuple[int, Associativity]]
+AtomTable = Mapping[Tuple[str, int],
+                    Tuple[TheoryAtomType,
+                          str,
+                          Optional[Tuple[List[str], str]]]]
 
 class TheoryUnparsedTermParser:
     """
     Parser for unparsed theory terms in clingo's AST that works like the
     inbuilt one.
+
+    Note that associativity for unary operators is ignored and binary
+    operators must use either `Associativity.Left` or `Associativity.Right`.
+
+    Parameters
+    ----------
+    table
+        Mapping of operator/arity pairs to priority/associativity pairs.
     """
     _stack: List[Tuple[str, Arity]]
     _terms: List[AST]
-    _table: Mapping[Tuple[str, Arity], Tuple[int, Associativity]]
+    _table: OperatorTable
 
-    def __init__(self, table: Mapping[Tuple[str, Arity], Tuple[int, Associativity]]):
-        """
-        Initializes the parser with the given operators.
-
-        Note that associativity for unary operators is ignored and binary
-        operators must use either `Associativity.Left` or `Associativity.Right`.
-
-        Example table
-        -------------
-
-            {("-",  Arity.Unary):  (3, Associativity.NoAssociativity),
-             ("**", Arity.Binary): (2, Associativity.Right),
-             ("*",  Arity.Binary): (1, Associativity.Left),
-             ("+",  Arity.Binary): (0, Associativity.Left),
-             ("-",  Arity.Binary): (0, Associativity.Left)}
-        """
+    def __init__(self, table: OperatorTable):
         self._stack = []
         self._terms = []
         self._table = table
@@ -151,9 +273,19 @@ class TheoryUnparsedTermParser:
             l = Location(a.location.begin, b.location.end)
             self._terms.append(TheoryFunction(l, operator, [a, b]))
 
-    def check_operator(self, operator: str, arity: Arity, location: Any):
+    def check_operator(self, operator: str, arity: Arity, location: Location) -> None:
         """
-        Check if the given operator is in the parse table.
+        Check if the given operator is in the parse table raising a runtime
+        error if absent.
+
+        Parameters
+        ----------
+        operator
+            The operator name.
+        arity
+            The arity of the operator.
+        location
+            Location of the operator.
         """
         if (operator, arity) not in self._table:
             raise RuntimeError("cannot parse operator `{}`: {}".format(operator, location_to_str(location)))
@@ -162,6 +294,15 @@ class TheoryUnparsedTermParser:
         """
         Parses the given unparsed term, replacing it by nested theory
         functions.
+
+        Parameters
+        ----------
+        x
+            The AST to parse.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         del self._stack[:]
         del self._terms[:]
@@ -186,31 +327,42 @@ class TheoryUnparsedTermParser:
 
         return self._terms[0]
 
-TermTable = Mapping[Tuple[str, Arity],
-                    Tuple[int, Associativity]]
-AtomTable = Mapping[Tuple[str, int],
-                    Tuple[TheoryAtomType,
-                          str,
-                          Optional[Tuple[List[str], str]]]]
-
 class TheoryTermParser(Transformer):
     """
     Parser for theory terms in clingo's AST that works like the inbuilt one.
 
     This is implemented as a transformer that traverses the AST replacing all
     terms found.
+
+    Parameters
+    ----------
+    table
+        This must either be a table of operators or a `TheoryUnparsedTermParser`.
+
+    See Also
+    --------
+    TheoryUnparsedTermParser
     """
     # pylint: disable=invalid-name
 
-    def __init__(self, table: TermTable):
-        """
-        Initializes the parser with the given operators.
-        """
-        self._parser = TheoryUnparsedTermParser(table)
+    def __init__(self, table: Union[OperatorTable, TheoryUnparsedTermParser]):
+        if isinstance(table, TheoryUnparsedTermParser):
+            self._parser = table
+        else:
+            self._parser = TheoryUnparsedTermParser(table)
 
     def visit_TheoryFunction(self, x) -> AST:
         """
         Parse the theory function and check if it agrees with the grammar.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         arity = None
         if len(x.arguments) == 1:
@@ -225,23 +377,42 @@ class TheoryTermParser(Transformer):
     def visit_TheoryUnparsedTerm(self, x: AST) -> AST:
         """
         Parse the given unparsed term.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         return cast(AST, self(self._parser.parse(x)))
 
 class TheoryParser(Transformer):
     """
     This class parses theory atoms in the same way as clingo's internal parser.
+
+    Parameters
+    ----------
+    terms
+        Mapping from term identifiers to `TheoryTermParser`s. If an operator
+        table is given, the `TheoryTermParser` is constructed from this table.
+
+    atoms
+        Mapping from atom name/arity pairs to tuples defining the acceptable
+        structure of the theory atom.
     """
     # pylint: disable=invalid-name
     _table: Mapping[Tuple[str, int],
                     Tuple[TheoryAtomType,
                           TheoryTermParser,
                           Optional[Tuple[Set[str], TheoryTermParser]]]]
-    in_body: bool
-    in_head: bool
-    is_directive: bool
+    _in_body: bool
+    _in_head: bool
+    _is_directive: bool
 
-    def __init__(self, terms: Mapping[str, Union[TermTable, TheoryTermParser]], atoms: AtomTable):
+    def __init__(self, terms: Mapping[str, Union[OperatorTable, TheoryTermParser]], atoms: AtomTable):
         self._reset()
 
         term_parsers = {}
@@ -262,9 +433,9 @@ class TheoryParser(Transformer):
         """
         Set state information about active scope.
         """
-        self.in_head = in_head
-        self.in_body = in_body
-        self.is_directive = is_directive
+        self._in_head = in_head
+        self._in_body = in_body
+        self._is_directive = is_directive
 
     def _visit_body(self, x: AST) -> AST:
         try:
@@ -278,6 +449,15 @@ class TheoryParser(Transformer):
     def visit_Rule(self, x: AST) -> AST:
         """
         Parse theory atoms in body and head.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         ret = self._visit_body(x)
         try:
@@ -295,36 +475,90 @@ class TheoryParser(Transformer):
     def visit_ShowTerm(self, x: AST) -> AST:
         """
         Parse theory atoms in body.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         return self._visit_body(x)
 
     def visit_Minimize(self, x: AST) -> AST:
         """
         Parse theory atoms in body.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         return self._visit_body(x)
 
     def visit_Edge(self, x: AST) -> AST:
         """
         Parse theory atoms in body.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         return self._visit_body(x)
 
     def visit_Heuristic(self, x: AST) -> AST:
         """
         Parse theory atoms in body.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         return self._visit_body(x)
 
     def visit_ProjectAtom(self, x: AST) -> AST:
         """
         Parse theory atoms in body.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         return self._visit_body(x)
 
     def visit_TheoryAtom(self, x: AST) -> AST:
         """
         Parse the given theory atom.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         """
         name = x.term.name
         arity = len(x.term.arguments)
@@ -332,11 +566,11 @@ class TheoryParser(Transformer):
             raise RuntimeError(f"theory atom definiton not found: {location_to_str(x.location)}")
 
         type_, element_parser, guard_table = self._table[(name, arity)]
-        if type_ == TheoryAtomType.Head and not self.in_head:
+        if type_ == TheoryAtomType.Head and not self._in_head:
             raise RuntimeError(f"theory atom only accepted in head: {location_to_str(x.location)}")
-        if type_ == TheoryAtomType.Body and not self.in_body:
+        if type_ == TheoryAtomType.Body and not self._in_body:
             raise RuntimeError(f"theory atom only accepted in body: {location_to_str(x.location)}")
-        if type_ == TheoryAtomType.Directive and not (self.in_head and self.is_directive):
+        if type_ == TheoryAtomType.Directive and not (self._in_head and self._is_directive):
             raise RuntimeError(f"theory atom must be a directive: {location_to_str(x.location)}")
 
         x = copy(x)
@@ -359,6 +593,15 @@ class TheoryParser(Transformer):
 def theory_parser_from_definition(x: AST) -> TheoryParser:
     """
     Turn an AST node of type TheoryDefinition into a TheoryParser.
+
+    Parameters
+    ----------
+    x
+        An AST representing a theory definition.
+
+    Returns
+    -------
+    The corresponding `TheoryParser`.
     """
     assert x.ast_type == ASTType.TheoryDefinition
 
@@ -397,38 +640,78 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
 class SymbolicAtomRenamer(Transformer):
     '''
     A transformer to rename symbolic atoms.
+
+    Parameters
+    ----------
+    rename_function
+        A function for renaming symbols.
+
+    See Also
+    --------
+    rename_symbolic_atoms
     '''
     # pylint: disable=invalid-name
 
     def __init__(self, rename_function: Callable[[str], str]):
-        '''
-        Initialize the transformer with the given function to rename symbolic
-        atoms.
-        '''
-        self.rename_function = rename_function
+        self._rename_function = rename_function
 
     def visit_SymbolicAtom(self, x: AST) -> AST:
         '''
-        Rename the given symbolic atom and the renamed version.
+        Rename the given symbolic atom and return the renamed version.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
         '''
         term = x.symbol
         if term.ast_type == ASTType.SymbolicTerm:
             sym = term.symbol
             term = SymbolicTerm(term.location,
-                                clingo.Function(self.rename_function(sym.name), sym.arguments, sym.positive))
+                                clingo.Function(self._rename_function(sym.name), sym.arguments, sym.positive))
         elif term.ast_type == ASTType.Function:
-            term = Function(term.location, self.rename_function(term.name), term.arguments, term.external)
+            term = Function(term.location, self._rename_function(term.name), term.arguments, term.external)
         return SymbolicAtom(term)
 
 def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
     '''
     Rename all symbolic atoms in the given AST node with the given function.
+
+    Parameters
+    ----------
+    x
+        The ast in which to rename symbolic atoms.
+    rename_function
+        A function for renaming symbols.
+
+    Returns
+    -------
+    The rewritten AST.
     '''
     return cast(AST, SymbolicAtomRenamer(rename_function)(x))
 
 def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
     '''
     Prefix all symbolic atoms in the given AST with the given string.
+
+    Parameters
+    ----------
+    x
+        The ast in which to prefix symbolic atom names.
+    prefix
+        The prefix to add.
+
+    Returns
+    -------
+    The rewritten AST.
+
+    See Also
+    --------
+    rename_symbolic_atoms
     '''
     return rename_symbolic_atoms(x, lambda s: prefix + s)
 
@@ -470,8 +753,21 @@ def ast_to_dict(x: AST) -> dict:
     Convert the given ast node into a dictionary representation whose elements
     only involve the data structures: `dict`, `list`, `int`, and `str`.
 
-    The resulting value can be used with other python modules like the `yaml`
+    The resulting value can be used with other Python modules like the `yaml`
     or `pickle` modules.
+
+    Parameters
+    ----------
+    x
+        The ast to transform.
+
+    Returns
+    -------
+    The corresponding Python representation.
+
+    See Also
+    --------
+    dict_to_ast
     """
     ret = {"ast_type": str(x.ast_type).replace('ASTType.', '')}
     for key, val in x.items():
@@ -521,6 +817,19 @@ def _decode_dict(x: dict, key_: str) -> Any:
 
 def dict_to_ast(x: dict) -> AST:
     """
-    Convert the dictionary representation of an AST node into an AST node.
+    Convert the Python dict representation of an AST node into an AST node.
+
+    Parameters
+    ----------
+    x
+        The Python representation of the AST.
+
+    Returns
+    -------
+    The corresponding AST.
+
+    See Also
+    --------
+    ast_to_dict
     """
     return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
