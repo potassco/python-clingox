@@ -47,7 +47,7 @@ for act in "${@}"; do
                 ../../README.md \
                 ../../LICENSE \
                 $rep/
-            sed -i 's/clingo-cffi/clingo/g' "$rep/setup.py"
+            sed -i 's/clingo-cffi/clingo/g' "${rep}/setup.py"
             ;;
         changes)
             VERSION="1.0.0"
