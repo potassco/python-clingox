@@ -13,7 +13,7 @@ i=1
 rep="${!i}"
 shift
 
-case "$rep" in
+case "${rep}" in
     focal|bionic)
         ;;
     *)
@@ -22,13 +22,13 @@ case "$rep" in
 esac
 
 for act in "${@}"; do
-    echo $act
-    case "$act" in
+    echo "${act}"
+    case "${act}" in
         _ppa)
             apt-get install -y software-properties-common
             add-apt-repository -y ppa:potassco/${rep}-wip
             apt-get update
-            apt-get install -y tree debhelper cmake libclingo-dev libgmp-dev 
+            apt-get install -y tree debhelper python3-clingo
             ;;
         create)
             sudo pbuilder create --basetgz /var/cache/pbuilder/${rep}.tgz --distribution ${rep} --debootstrapopts --variant=buildd
@@ -50,9 +50,8 @@ for act in "${@}"; do
             sed -i 's/clingo-cffi/clingo/g' "$rep/setup.py"
             ;;
         changes)
-            #VERSION=$(sed -n '/#define CLINGCON_VERSION "/s/.*"\([0-9]\+\.[0-9\+]\.[0-9]\+\)".*/\1/p' ../../libclingcon/clingcon.h)
-            VERSION='1.0.0'
-            BUILD=$(curl -sL http://ppa.launchpad.net/potassco/${rep}-wip/ubuntu/pool/main/c/python3-clingox/ | sed -n '/\.dsc/s/.*alpha\([0-9]\+\).*/\1/p' | sort -rn | head -1)
+            VERSION="1.0.0"
+            BUILD=$(curl -sL http://ppa.launchpad.net/potassco/${rep}-wip/ubuntu/pool/main/p/python3-clingox/ | sed -n '/\.dsc/s/.*alpha\([0-9]\+\).*/\1/p' | sort -rn | head -1)
             cat > ${rep}/debian/changelog <<EOF
 python3-clingox (${VERSION}-alpha$[BUILD+1]) ${rep}; urgency=medium
 
@@ -76,18 +75,18 @@ EOF
             ;;
         clean)
             rm -rf \
-                "$rep"/clingox \
-                "$rep"/setup.py \
-                "$rep"/README.md \
-                "$rep"/LICENSE \
-                "$rep"/debian/files \
-                "$rep"/debian/.debhelper \
-                "$rep"/debian/python3-clingox.debhelper.log \
-                "$rep"/debian/python3-clingox.substvars \
-                "$rep"/debian/python3-clingox \
-                "$rep"/debian/debhelper-build-stamp \
-                "$rep"/debian/tmp \
-                "$rep"/obj-x86_64-linux-gnu \
+                "${rep}"/clingox \
+                "${rep}"/setup.py \
+                "${rep}"/README.md \
+                "${rep}"/LICENSE \
+                "${rep}"/debian/files \
+                "${rep}"/debian/.debhelper \
+                "${rep}"/debian/python3-clingox.debhelper.log \
+                "${rep}"/debian/python3-clingox.substvars \
+                "${rep}"/debian/python3-clingox \
+                "${rep}"/debian/debhelper-build-stamp \
+                "${rep}"/debian/tmp \
+                "${rep}"/obj-x86_64-linux-gnu \
                 *.build \
                 *.deb \
                 *.dsc \
