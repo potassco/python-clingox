@@ -27,6 +27,8 @@ case $1 in
     dev)
         # .github/workflows/ppa-dev.yml
         dispatch 5997696
+        # .github/workflows/pipsource.yml
+        dispatch 6065447
         ;;
     release)
         echo "implement me"

@@ -1,4 +1,13 @@
 # do not edit the workflows, they are generated from this file
+pip:
+    package_name:
+        'clingox'
+    pure: True
+    version: |
+        version = '1.0.0'
+    build_depends: |
+        python3 -m pip install --user --extra-index-url https://test.pypi.org/simple/ clingo-cffi
+
 ppa:
     package_name:
         'python3-clingox'
