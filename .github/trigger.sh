@@ -29,6 +29,8 @@ case $1 in
         dispatch 5997696
         # .github/workflows/pipsource.yml
         dispatch 6065447
+        # .github/workflows/conda-dev.yml
+        dispatch 6066933
         ;;
     release)
         echo "implement me"

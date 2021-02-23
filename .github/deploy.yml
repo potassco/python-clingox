@@ -8,6 +8,12 @@ pip:
     build_depends: |
         python3 -m pip install --user --extra-index-url https://test.pypi.org/simple/ clingo-cffi
 
+conda:
+    package_name:
+        'python-clingox'
+    os: 
+        - 'ubuntu-latest'
+
 ppa:
     package_name:
         'python3-clingox'
