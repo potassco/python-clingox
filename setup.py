@@ -17,6 +17,7 @@ setup(
     url='https://github.com/potassco/python-clingox',
     install_requires=['clingo-cffi'],
     packages=['clingox'],
+    package_data={'clingox': ['py.typed']},
     zip_safe=False,
     python_requires=">=3.6"
 )
