@@ -2,6 +2,11 @@ name: Deploy conda packages (wip)
 
 on:
   workflow_dispatch:
+    inputs:
+      wip:
+        description: 'Publish work in progress package.'
+        required: false
+        default: true
 
 jobs:
   build:
@@ -15,10 +20,10 @@ jobs:
         python-version: ['3.8']
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout repo
+      uses: actions/checkout@v2
       with:
-        repository: 'potassco/conda'
-        ref: 'master'
+        submodules: recursive
 
     - name: setup miniconda
       uses: conda-incubator/setup-miniconda@v2
@@ -26,12 +31,12 @@ jobs:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
         activate-environment: build
-        channels: potassco,potassco/label/dev
 
-    - name: install prerequisites
+    - name: Install prerequisites
       shell: pwsh
-      run: conda install conda-build anaconda-client
-
+      run: |
+        conda config --set anaconda_upload yes
+        conda install conda-build anaconda-client
 
     - name: print info
       shell: pwsh
@@ -39,10 +44,18 @@ jobs:
         conda info
         conda list
 
-    - name: publish conda package
+    - name: publish conda package (wip)
+      if: ${{ github.event.inputs.wip }}
       shell: pwsh
       run: |
-        Set-Location "python-clingox"
-        python upload.py
+        python .github/conda.py
+      env:
+        ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+
+    - name: publish conda package (release)
+      if: ${{ !github.event.inputs.wip }}
+      shell: pwsh
+      run: |
+        python .github/conda.py --release
       env:
         ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_TOKEN }}

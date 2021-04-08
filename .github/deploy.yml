@@ -1,11 +1,11 @@
 # do not edit the workflows, they are generated from this file
 pip:
-    package_name:
-        'clingox'
     pure: True
     version: |
         version = '1.0.0'
-    build_depends: |
+    build_depends_release: |
+        python3 -m pip install --user clingo
+    build_depends_dev: |
         python3 -m pip install --user --extra-index-url https://test.pypi.org/simple/ clingo-cffi
 
 conda:
@@ -13,6 +13,41 @@ conda:
         'python-clingox'
     os: 
         - 'ubuntu-latest'
+    channels_release:
+        - 'potassco'
+    channels_dev:
+        - 'potassco'
+        - 'potassco/label/dev'
+    version: |
+        version = None
+        with open('setup.py') as fh:
+            for line in fh:
+                m = match(r'''[ ]*version[ ]*=[ ]*['"]([0-9]+\.[0-9]+\.[0-9]+)(\.post[0-9]+)?['"]''', line)
+                if m is not None:
+                    version = m.group(1)
+        assert version is not None
+    meta:
+      url: https://github.com/potassco/{{ name }}/archive/v{{ version }}.tar.gz
+      git_url: https://github.com/potassco/{{ name }}.git
+      requirements:
+        build:
+          - setuptools
+          - python >=3.5
+          - clingo >=5.5.0
+        run:
+          - python >=3.5
+          - clingo >=5.5.0
+      build:
+        noarch: python
+        script:
+          - python setup.py install --single-version-externally-managed --record record.txt
+      about:
+        home: https://potassco.org/
+        license: MIT
+        summary: Library with auxilary functions to use along with clingo's python module.
+        license_file: LICENSE
+        doc_url: https://potassco.org/
+        dev_url: https://github.com/potassco/{{ name }}
 
 ppa:
     package_name:
@@ -66,8 +101,6 @@ ppa:
             README.md
         py3dist-overrides: |
             clingo python3-clingo
-        install: |
-            debian/python3-clingox/usr/*
         rules: |
             #!/usr/bin/make -f
             
