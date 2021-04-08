@@ -40,7 +40,8 @@ conda:
       build:
         noarch: python
         script:
-          - python setup.py install --single-version-externally-managed --record record.txt
+          - 'ls -al'
+          - 'python setup.py install --single-version-externally-managed --record record.txt'
       about:
         home: https://potassco.org/
         license: MIT
