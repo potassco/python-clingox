@@ -19,7 +19,12 @@ def adjust_version(url):
     package_regex = package_name.replace('-', '[-_]')
 
     pip = check_output(['curl', '-sL', '{}/{}'.format(url, package_name)]).decode()
-    version = '1.0.0'
+    version = None
+    with open('setup.py') as fh:
+        for line in fh:
+            m = match(r'''[ ]*version[ ]*=[ ]*['"]([0-9]+\.[0-9]+\.[0-9]+)(\.post[0-9]+)?['"]''', line)
+            if m is not None:
+                version = m.group(1)
     assert version is not None
 
     post = 0
