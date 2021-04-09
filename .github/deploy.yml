@@ -30,7 +30,6 @@ conda:
                 m = match(r'''[ ]*version[ ]*=[ ]*['"]([0-9]+\.[0-9]+\.[0-9]+)(\.post[0-9]+)?['"]''', line)
                 if m is not None:
                     version = m.group(1)
-        assert version is not None
     meta:
       url: https://github.com/potassco/{{ name }}/archive/v{{ version }}.tar.gz
       git_url: https://github.com/potassco/{{ name }}.git
