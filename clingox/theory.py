@@ -33,7 +33,7 @@ Example
 ```
 '''
 
-from clingo import Symbol, Function, Tuple_, Number, SymbolType, TheoryTerm, TheoryTermType
+from clingo import Symbol, Function, String, Tuple_, Number, SymbolType, TheoryTerm, TheoryTermType
 
 __all__ = ['evaluate', 'invert_symbol', 'is_operator', 'require_number', 'TermEvaluator']
 __pdoc__ = {}
@@ -83,6 +83,28 @@ def is_operator(op: str):
     Whether the string is an operator name.
     '''
     return op and op[0] in "/!<=>+-*\\?&@|:;~^."
+
+def _unquote(s: str) -> str:
+    '''
+    Remove quotes in the same fashion as clingo.
+    '''
+    ret = []
+    slash = False
+    for c in s:
+        if slash:
+            if c == 'n':
+                ret.append('\n')
+            else:
+                assert c in '\\"'
+                ret.append(c)
+            slash = False
+        elif c == '\\':
+            slash = True
+        else:
+            ret.append(c)
+
+    return ''.join(ret)
+
 
 class TermEvaluator:
     '''
@@ -189,6 +211,9 @@ class TermEvaluator:
 
         # constants
         if term.type == TheoryTermType.Symbol:
+            if term.name.startswith('"') and term.name.endswith('"'):
+                return String(_unquote(term.name[1:-1]))
+
             return Function(term.name)
 
         # numbers

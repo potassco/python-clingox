@@ -4,11 +4,12 @@ Simple tests for term evaluation.
 
 from unittest import TestCase
 
-from clingo import Control
+from clingo.symbol import String, Symbol
+from clingo.control import Control
 from ..theory import evaluate
 
 
-def eval_term(s: str) -> str:
+def eval_term_sym(s: str) -> Symbol:
     """
     Evaluate the given theory term and return its string representation.
     """
@@ -33,8 +34,14 @@ def eval_term(s: str) -> str:
 """)
     ctl.ground([("base", [])])
     for x in ctl.theory_atoms:
-        return str(evaluate(x.elements[0].terms[0]))
+        return evaluate(x.elements[0].terms[0])
     assert False
+
+def eval_term(s: str) -> str:
+    """
+    Evaluate the given theory term and return its string representation.
+    """
+    return str(eval_term_sym(s))
 
 
 class TestTheory(TestCase):
@@ -69,6 +76,12 @@ class TestTheory(TestCase):
         '''
         self.assertEqual(eval_term("f(2+3*4,-g(-1))"), "f(14,-g(-1))")
         self.assertEqual(eval_term("f(2+3*4,-g(-1),0)"), "f(14,-g(-1),0)")
+
+    def test_string(self):
+        '''
+        Test evaluation of strings.
+        '''
+        self.assertEqual(eval_term_sym('"a\\\\b\\nc\\"d"'), String('a\\b\nc"d'))
 
     def test_error(self):
         '''

@@ -789,11 +789,11 @@ class TestAST(TestCase):
                                             'arguments': [], 'external': 0}}}]}])
         self.assertEqual(
             test_ast_dict(self, '#script (python) blub! #end.'),
-            [{'ast_type': 'Script', 'location': '<string>:1:1-29', 'script_type': 1,
-              'code': '#script (python) blub! #end\n'}])
+            [{'ast_type': 'Script', 'location': '<string>:1:1-29', 'name': 'python',
+              'code': 'blub!'}])
         self.assertEqual(
             test_ast_dict(self, '#script (lua) blub! #end.'),
-            [{'ast_type': 'Script', 'location': '<string>:1:1-26', 'script_type': 0, 'code': ' blub! '}])
+            [{'ast_type': 'Script', 'location': '<string>:1:1-26', 'code': 'blub!', 'name': 'lua'}])
         self.assertEqual(
             test_ast_dict(self, '#program x(y).'),
             [{'ast_type': 'Program', 'location': '<string>:1:1-15', 'name': 'x',
