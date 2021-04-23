@@ -6,9 +6,7 @@ setup(
     name='clingox',
     description='Support library for clingo.',
     long_description=dedent('''\
-        Preliminary documentation can be found here:
-
-        - https://www.cs.uni-potsdam.de/~kaminski/pyclingo-cffi/
+        Please check the [API documentation](https://potassco.org/clingo/python-api/current/) on how to use this module.
         '''),
     long_description_content_type='text/markdown',
     author='Roland Kaminski',
