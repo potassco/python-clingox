@@ -63,7 +63,7 @@ Statement = TypeVar('Statement', 'Fact', 'Show', 'Rule', 'WeightRule', 'Heuristi
                     'Project')
 
 @singledispatch
-def pretty_str(stm: Statement, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
+def pretty_str(stm, output_atoms: OutputTable) -> str: # pylint: disable=unused-argument
     '''
     Pretty print statements.
 
@@ -81,7 +81,7 @@ def pretty_str(stm: Statement, output_atoms: OutputTable) -> str: # pylint: disa
     assert False, 'unexpected type'
 
 @singledispatch
-def remap(stm: Statement, mapping: AtomMap) -> Statement: # pylint: disable=unused-argument
+def remap(stm, mapping: AtomMap): # pylint: disable=unused-argument
     '''
     Remap literals in the given statement with the provided mapping.
 
@@ -103,7 +103,7 @@ def remap(stm: Statement, mapping: AtomMap) -> Statement: # pylint: disable=unus
     assert False, 'unexpected type'
 
 @singledispatch
-def add_to_backend(stm: Statement, backend: Backend) -> None: # pylint: disable=unused-argument
+def add_to_backend(stm, backend: Backend): # pylint: disable=unused-argument
     '''
     Add statements to the backend using the provided mapping to map literals.
 
