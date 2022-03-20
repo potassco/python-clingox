@@ -138,11 +138,11 @@ class Reifier(Observer):
     _reify_steps: bool
     _step_data: _StepData
 
-    def __init__(self, cb: Callable[[Symbol], None], calculate_sccs: bool = False):
+    def __init__(self, cb: Callable[[Symbol], None], calculate_sccs: bool = False, reify_steps: bool = False):
         self._step = 0
         self._cb = cb
         self._calculate_sccs = calculate_sccs
-        self._reify_steps = False
+        self._reify_steps = reify_steps
         self._step_data = _StepData()
 
     def calculate_sccs(self) -> None:
@@ -193,7 +193,7 @@ class Reifier(Observer):
 
     def init_program(self, incremental: bool) -> None:
         if incremental:
-            self._output("tag", [Function("incremental")])
+            self._cb(Function("tag", [Function("incremental")]))
 
     def begin_step(self) -> None:
         pass
