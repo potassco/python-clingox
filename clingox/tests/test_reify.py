@@ -1,6 +1,7 @@
 '''
 Test cases for the ground program and observer.
 '''
+from subprocess import Popen, PIPE
 from unittest import TestCase
 
 from typing import List, Optional
@@ -8,7 +9,17 @@ from typing import List, Optional
 from clingo.control import Control
 from clingo.symbol import Function, Number, Symbol
 
-from ..reify import Reifier
+from ..reify import Reifier, get_theory_symbols
+
+def _get_command_line_reification(prg):
+    command = ["clingo --output=reify "]
+    with Popen(command,
+                        stdin=PIPE,
+                        stdout=PIPE,
+                        stderr=PIPE,
+                        shell=True) as process:
+        stdout = process.communicate(input=prg.encode())[0]
+        return [s.strip('.') for s in stdout.decode().split('\n') if s !=""]
 
 def _out(name, args, step: Optional[int]):
     return Function(name, args if step is None else args + [Number(step)])
@@ -44,6 +55,13 @@ def _rule(hd, bd, choice=False, step: Optional[int] = None):
 def _output(sym: Symbol, lt: int, step: Optional[int] = None):
     return {_out('output', [sym, Number(lt)], step)}
 
+GRAMMAR = """
+#theory theory{
+    term { <?  : 4, binary, left;
+            >?  : 4, binary, left };
+    &tel/0     : term, any;
+    &tel2/0 : term, {=}, term, head }.
+"""
 class TestReifier(TestCase):
     '''
     Tests for the Reifier.
@@ -52,7 +70,7 @@ class TestReifier(TestCase):
     encoding to ensure that the tested programs are equal.
     '''
 
-    def test_simple(self):
+    def test_simple_with_step(self):
         '''
         Test `a :- b. b :- a.`.
         '''
@@ -66,6 +84,8 @@ class TestReifier(TestCase):
             bck.add_rule([a], [b])
             bck.add_rule([b], [a])
         reifier.calculate_sccs()
+        for e in x:
+            print(str(e))
         self.assertSetEqual(
             _tag(True) |
             _at(0, [1]) | _at(1, [2]) |
@@ -116,3 +136,70 @@ class TestReifier(TestCase):
             _output(Function('d'), 0, 1) |
             _scc(0, [3, 4], 1),
             x)
+
+    def test_simple(self):
+        '''
+        Test simple programs without adding the step
+        '''
+        prgs = [
+            '{a(1);a(2)}2. :-a(1..2).',
+            ':- not b. {b}.'
+        ]
+        for prg in prgs:
+            ctl = Control()
+            x = []
+            reifier = Reifier(x.append, False)
+            ctl.register_observer(reifier)
+            ctl.add("base",[],prg)
+            ctl.ground([('base',[])])
+            out_str = [str(s) for s in x if s.name!="tag"]
+            r = _get_command_line_reification(prg)
+            self.assertListEqual(out_str,r)
+
+    def test_theory(self):
+        """
+        Test programs using theory
+        """
+        prgs = [
+            '&tel{ a("s") <? b({2,3}) }.',
+            '&tel{ a <? b([2,c(1)]) }.',
+            '&tel{ a(s) <? b((2,3)) }.',
+            '&tel2{ a <? b } = c.',
+            '&tel{ a <? b: x}. {x}.'
+        ]
+        for p in prgs:
+            ctl = Control()
+            prg = GRAMMAR + p
+            x = []
+            reifier = Reifier(x.append, False)
+            ctl.register_observer(reifier)
+            ctl.add("base",[],prg)
+            ctl.ground([('base',[])])
+            out_str = [str(s) for s in x if s.name!="tag"]
+            r = _get_command_line_reification(prg)
+
+            self.assertListEqual(out_str,r)
+
+    def test_theory_symbols(self):
+        """
+        Test function to get the theory_symbols
+        """
+        ctl = Control()
+        prg = GRAMMAR + '&tel{ a(s) <? b((2,3)) }.'
+        x = []
+        reifier = Reifier(x.append, False)
+        ctl.register_observer(reifier)
+        ctl.add("base",[],prg)
+        ctl.ground([('base',[])])
+        theory_symbols = get_theory_symbols(x)
+        expected_new_symbols = [
+            "theory_symbol(0,tel)",
+            "theory_symbol(3,s)",
+            "theory_symbol(2,a)",
+            "theory_symbol(4,a(s))",
+            "theory_symbol(8,(2,3))",
+            "theory_symbol(5,b)",
+            "theory_symbol(9,b((2,3)))",
+        ]
+        out_str = [str(s) for s in theory_symbols]
+        self.assertListEqual(out_str,expected_new_symbols)

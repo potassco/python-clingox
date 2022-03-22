@@ -126,21 +126,21 @@ __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
            'TheoryTermParser', 'TheoryUnparsedTermParser',
            'TheoryUnparsedTermParser']
 
-
+#pylint: disable=consider-using-f-string
 class Arity(Enum):
     '''
     Enumeration of operator arities.
     '''
-    Unary = 1
-    Binary = 2
+    Unary = 1 #pylint:disable=invalid-name
+    Binary = 2 #pylint:disable=invalid-name
 
 class Associativity(Enum):
     '''
     Enumeration of operator associativities.
     '''
-    Left = auto()
-    Right = auto()
-    NoAssociativity = auto()
+    Left = auto() #pylint:disable=invalid-name
+    Right = auto() #pylint:disable=invalid-name
+    NoAssociativity = auto() #pylint:disable=invalid-name
 
 def _s(m, a: str, b: str):
     '''
