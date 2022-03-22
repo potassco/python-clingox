@@ -136,15 +136,67 @@ class TestReifier(TestCase):
             _scc(0, [3, 4], 1),
             x)
 
+    def test_external(self):
+        '''
+        Test external directive
+        '''
+        prg = '#external a.'
+        ctl = Control()
+        x = []
+        reifier = Reifier(x.append, reify_steps=True)
+        ctl.register_observer(reifier)
+        ctl.add("base",[],prg)
+        ctl.ground([('base',[])])
+        ctl.solve()
+        ctl.assign_external(Function("a"), True)
+        ctl.solve()
+        ctl.assign_external(Function("a"), False)
+        ctl.solve()
+        ctl.release_external(Function("a"))
+        out_str = [str(s) for s in x if s.name!="tag"]
+        expected =['literal_tuple(0,0)','literal_tuple(0,1,0)','external(0,false,0)',
+                    'external(0,true,1)','external(0,false,2)','external(0,false,3)']
+        self.assertTrue(all(x in out_str for x in expected))
+       
+    def test_assume(self):
+        '''
+        Test assumed 
+        '''
+        prg = 'b:-a.'
+        ctl = Control()
+        x = []
+        reifier = Reifier(x.append, reify_steps=True)
+        ctl.register_observer(reifier)
+        ctl.add("base",[],prg)
+        ctl.ground([('base',[])])
+        ctl.solve(assumptions= [(Function("a"),True)])
+        ctl.solve(assumptions= [(Function("a"),False)])
+        out_str = [str(s) for s in x ]
+        expected = ['literal_tuple(0,0)',
+        'literal_tuple(0,-1,0)',
+        'assume(0,0)',
+        'literal_tuple(0,1)',
+        'literal_tuple(0,1,1)',
+        'assume(0,1)']
+        self.assertTrue(all(x in out_str for x in expected))
+
     def test_simple(self):
         '''
         Test simple programs without adding the step
         '''
         prgs = [
             '{a(1);a(2)}2. :-a(1..2).',
-            ':- not b. {b}.'
+            ':- not b. {b}.',
+            '{a(1..4)}.:- #count{X:a(X)} >2.',
+            'a(1..2). #show b(X):a(X).',
+            '1{a(1..2)}. #minimize{X@2:a(X)}.',
+            '{a(1..2)}. #show c:a(_). #show.',
+            '#heuristic a. [1,true] {a}.',
+            '#project c : a. {a;c;b}. #project b: a.'
         ]
         for prg in prgs:
+            # print("---------")
+            # print(prg)
             ctl = Control()
             x = []
             reifier = Reifier(x.append, False)
@@ -153,6 +205,11 @@ class TestReifier(TestCase):
             ctl.ground([('base',[])])
             out_str = [str(s) for s in x if s.name!="tag"]
             r = _get_command_line_reification(prg)
+
+            # print('\nFROM COMMAND LINE:')
+            # print("\n".join(r))
+            # print('\nFROM CLINGOX: ')
+            # print("\n".join(out_str))
             self.assertListEqual(out_str,r)
 
     def test_theory(self):
@@ -176,6 +233,7 @@ class TestReifier(TestCase):
             ctl.ground([('base',[])])
             out_str = [str(s) for s in x if s.name!="tag"]
             r = _get_command_line_reification(prg)
+
 
             self.assertListEqual(out_str,r)
 
@@ -202,3 +260,34 @@ class TestReifier(TestCase):
         ]
         out_str = [str(s) for s in theory_symbols]
         self.assertListEqual(out_str,expected_new_symbols)
+
+        ctl = Control()
+        prg = GRAMMAR + '&tel{ (a("s") <? c) <? b((2,3)) }.'
+        x = []
+        reifier = Reifier(x.append, False)
+        ctl.register_observer(reifier)
+        ctl.add("base",[],prg)
+        ctl.ground([('base',[])])
+        theory_symbols = get_theory_symbols(x)
+        expected_new_symbols = [
+            'theory_symbol(0,tel)',
+            'theory_symbol(3,"s")',
+            'theory_symbol(2,a)',
+            'theory_symbol(4,a("s"))',
+            'theory_symbol(5,c)',
+            'theory_symbol(10,(2,3))',
+            'theory_symbol(7,b)',
+            'theory_symbol(11,b((2,3)))',
+        ]
+        out_str = [str(s) for s in theory_symbols]
+        self.assertListEqual(out_str,expected_new_symbols)
+
+        ctl = Control()
+        prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
+        x = []
+        reifier = Reifier(x.append, False)
+        ctl.register_observer(reifier)
+        ctl.add("base",[],prg)
+        ctl.ground([('base',[])])
+        self.failUnlessRaises(RuntimeError, get_theory_symbols,x)
+

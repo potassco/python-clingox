@@ -180,15 +180,12 @@ class Reifier(Observer):
                elems: Sequence[U],
                afun: Callable,
                ordered: bool = False) -> Symbol:
-        if ordered:
-            s= tuple(elems)
-        else:
-            s = tuple(sorted(set(elems)))
+        ident = tuple(elems) if ordered else tuple(sorted(set(elems)))
         n = len(snmap)
-        i = Number(snmap.setdefault(s, n))
+        i = Number(snmap.setdefault(ident, n))
         if n == i.number:
             self._output(name, [i])
-            for idx, atm in enumerate(s):
+            for idx, atm in enumerate(elems):
                 if ordered:
                     self._output(name, afun(i, idx, atm))
                 else:
@@ -228,13 +225,17 @@ class Reifier(Observer):
         self._add_edges(head, [l for l, w in  body])
 
     def minimize(self, priority: int, literals: Sequence[Tuple[int, int]]) -> None:
-        RuntimeError("impplement me!!!")
+        self._output("minimize", [Number(priority), self._wlit_tuple(literals)])
+
 
     def project(self, atoms: Sequence[int]) -> None:
-        RuntimeError("impplement me!!!")
+        self._output("project", [Number(atoms[0])])
 
     def output_atom(self, symbol: Symbol, atom: int) -> None:
-        self._output("output", [symbol, self._lit_tuple([atom])])
+        if atom == 0:
+            self._output("output", [symbol, Number(0)])
+        else:
+            self._output("output", [symbol, self._lit_tuple([atom])])
 
     def output_term(self, symbol: Symbol, condition: Sequence[int]) -> None:
         self._output("output", [symbol, self._lit_tuple(condition)])
@@ -244,14 +245,23 @@ class Reifier(Observer):
         self._output("output", [symbol, self._lit_tuple(condition)])
 
     def external(self, atom: int, value: TruthValue) -> None:
-        RuntimeError("impplement me!!!")
+        n = 'true' if value == TruthValue.True_ else 'false' if TruthValue.False_ else 'free'
+        self._output("external", [self._lit_tuple([atom]), Function(n,[])])
+        
 
     def assume(self, literals: Sequence[int]) -> None:
-        RuntimeError("impplement me!!!")
+        self._output("assume", [self._lit_tuple(literals)])
 
     def heuristic(self, atom: int, type_: HeuristicType, bias: int,
                   priority: int, condition: Sequence[int]) -> None:
-        RuntimeError("impplement me!!!")
+        type_name = str(type_).replace('HeuristicType.', '').lower().strip('_')
+        condition_lit = self._lit_tuple(condition)
+        self._output("heuristic", [Number(atom), 
+                                    Function(type_name), 
+                                    Number(bias),
+                                    Number(priority),
+                                    condition_lit])
+        
 
     def acyc_edge(self, node_u: int, node_v: int,
                   condition: Sequence[int]) -> None:
@@ -265,7 +275,6 @@ class Reifier(Observer):
 
     def theory_term_compound(self, term_id: int, name_id_or_type: int,
                              arguments: Sequence[int]) -> None:
-
         names = {-1:"tuple",-2:"set",-3:"list"}
         if name_id_or_type in names:
             n = ("theory_sequence",Function(names[name_id_or_type],[]))
@@ -317,7 +326,8 @@ def get_theory_symbols(reification_symbols : List[Symbol]):
     containing the mapping from the index of a `theory_formula` to the associated symbol
     when the theory formula is not constructed with a theory operator.
     """
-    data = _SymbolData()
+    t_basic: Dict[int, Symbol] = {}
+    t_tuple: Dict[int, List[Symbol]] = {}
     for s in reification_symbols:
         name = s.name
         if not name.startswith('theory_'):
@@ -327,33 +337,33 @@ def get_theory_symbols(reification_symbols : List[Symbol]):
         if name == "theory_string":
             val = s.arguments[1].string
             if not _is_op(val):
-                data.t_basic.setdefault(idx, Function(val,[]))
+                t_basic.setdefault(idx, Function(val,[]))
         elif name == "theory_number":
-            data.t_basic.setdefault(idx,s.arguments[1])
+            t_basic.setdefault(idx,s.arguments[1])
         elif name == "theory_tuple":
             if len(s.arguments)==1:
-                data.t_tuple.setdefault(idx,[])
+                t_tuple.setdefault(idx,[])
             else:
-                if not idx in data.t_tuple:
+                if not idx in t_tuple:
                     continue
-                l = data.t_tuple[idx]
-                if not s.arguments[2].number in data.t_basic:
-                    del data.t_tuple[idx]
+                l = t_tuple[idx]
+                if not s.arguments[2].number in t_basic:
+                    del t_tuple[idx]
                     continue
-                l.append(data.t_basic[s.arguments[2].number])
+                l.append(t_basic[s.arguments[2].number])
         elif name == "theory_function":
-            if not s.arguments[1].number in data.t_basic:
+            if not s.arguments[1].number in t_basic:
                 continue
-            s = Function(data.t_basic[s.arguments[1].number].name,data.t_tuple[s.arguments[2].number])
-            data.t_basic.setdefault(idx,s)
+            s = Function(t_basic[s.arguments[1].number].name,t_tuple[s.arguments[2].number])
+            t_basic.setdefault(idx,s)
         elif name == "theory_sequence":
             if  s.arguments[1].name != 'tuple':
                 raise RuntimeError(f"Not supported {str(s)}")
-            s = Function("",data.t_tuple[s.arguments[2].number])
-            data.t_basic.setdefault(idx,s)
+            s = Function("",t_tuple[s.arguments[2].number])
+            t_basic.setdefault(idx,s)
 
     new_symbols = []
-    for idx, s in data.t_basic.items():
+    for idx, s in t_basic.items():
         if s.type!=clingo.SymbolType.Number:
             new_symbols.append(Function("theory_symbol",[Number(idx),s]))
 
