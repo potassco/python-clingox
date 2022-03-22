@@ -178,7 +178,7 @@ class Reifier(Observer):
     def _tuple(self, name: str,
                snmap: Dict[Sequence[U], int],
                elems: Sequence[U],
-               afun: Callable[[Symbol, U], Sequence[Symbol]],
+               afun: Callable,
                ordered: bool = False) -> Symbol:
         if ordered:
             s= tuple(elems)
@@ -306,7 +306,7 @@ class Reifier(Observer):
 
 class _SymbolData:
     t_basic: Dict[int, Symbol] = {}
-    t_tuple: Dict[int, Symbol] = {}
+    t_tuple: Dict[int, List[Symbol]] = {}
 
 def _is_op(op:str):
     return op[0] in "/!<=>+-*\\?&@|:;~^."
@@ -329,8 +329,7 @@ def get_theory_symbols(reification_symbols : List[Symbol]):
             if not _is_op(val):
                 data.t_basic.setdefault(idx, Function(val,[]))
         elif name == "theory_number":
-            val = s.arguments[1].number
-            data.t_basic.setdefault(idx, Number(val))
+            data.t_basic.setdefault(idx,s.arguments[1])
         elif name == "theory_tuple":
             if len(s.arguments)==1:
                 data.t_tuple.setdefault(idx,[])

@@ -84,8 +84,7 @@ class TestReifier(TestCase):
             bck.add_rule([a], [b])
             bck.add_rule([b], [a])
         reifier.calculate_sccs()
-        for e in x:
-            print(str(e))
+
         self.assertSetEqual(
             _tag(True) |
             _at(0, [1]) | _at(1, [2]) |
