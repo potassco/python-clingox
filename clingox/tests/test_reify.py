@@ -157,10 +157,10 @@ class TestReifier(TestCase):
         expected =['literal_tuple(0,0)','literal_tuple(0,1,0)','external(0,false,0)',
                     'external(0,true,1)','external(0,false,2)','external(0,false,3)']
         self.assertTrue(all(x in out_str for x in expected))
-       
+
     def test_assume(self):
         '''
-        Test assumed 
+        Test assumed
         '''
         prg = 'b:-a.'
         ctl = Control()
@@ -289,5 +289,4 @@ class TestReifier(TestCase):
         ctl.register_observer(reifier)
         ctl.add("base",[],prg)
         ctl.ground([('base',[])])
-        self.failUnlessRaises(RuntimeError, get_theory_symbols,x)
-
+        self.assertRaises(RuntimeError, get_theory_symbols,x)

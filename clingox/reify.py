@@ -247,7 +247,7 @@ class Reifier(Observer):
     def external(self, atom: int, value: TruthValue) -> None:
         n = 'true' if value == TruthValue.True_ else 'false' if TruthValue.False_ else 'free'
         self._output("external", [self._lit_tuple([atom]), Function(n,[])])
-        
+
 
     def assume(self, literals: Sequence[int]) -> None:
         self._output("assume", [self._lit_tuple(literals)])
@@ -256,12 +256,12 @@ class Reifier(Observer):
                   priority: int, condition: Sequence[int]) -> None:
         type_name = str(type_).replace('HeuristicType.', '').lower().strip('_')
         condition_lit = self._lit_tuple(condition)
-        self._output("heuristic", [Number(atom), 
-                                    Function(type_name), 
+        self._output("heuristic", [Number(atom),
+                                    Function(type_name),
                                     Number(bias),
                                     Number(priority),
                                     condition_lit])
-        
+
 
     def acyc_edge(self, node_u: int, node_v: int,
                   condition: Sequence[int]) -> None:
