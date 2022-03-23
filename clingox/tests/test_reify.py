@@ -5,7 +5,7 @@ Test cases for the ground program and observer.
 import os
 from tempfile import NamedTemporaryFile
 from multiprocessing import Process
-from unittest import TestCase, expectedFailure
+from unittest import TestCase
 
 from typing import List, Optional
 
@@ -211,7 +211,6 @@ class TestReifier(TestCase):
         self.assertTrue(all(x in out_str for x in expected))
 
 
-    @expectedFailure
     def test_csp(self):
         '''
         Test csp output
@@ -242,15 +241,13 @@ class TestReifier(TestCase):
             r = _get_command_line_reification(prg)
             self.assertListEqual(out_str, r)
 
-    #@expectedFailure
     def test_theory_element(self):
         '''
         Test theory element order
         '''
-        #Could be just added to test_theory once libreify is fixed for the order
+        # Could be just added to test_theory once libreify is fixed for the order
         prg = GRAMMAR + '&tel{ a <? b: x}. {x}.'
         reify(prg, False)
-        #self.assertTrue(False, "force fail") #pylint: disable=redundant-unittest-assert
 
     def test_theory(self):
         """
