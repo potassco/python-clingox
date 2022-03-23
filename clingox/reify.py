@@ -4,14 +4,15 @@ Document me!!!
 
 from typing import Callable, Dict, Generic, List, Sequence, Tuple, TypeVar
 from dataclasses import dataclass, field
+
 import clingo
 from clingo.backend import HeuristicType, Observer, TruthValue
 from clingo.symbol import Function, Number, Symbol, String
 
-__all__ = ['Reifier','get_theory_symbols']
+__all__ = ['Reifier', 'get_theory_symbols']
 
-T = TypeVar('T') #pylint:disable=invalid-name
-U = TypeVar('U', int, Tuple[int, int]) #pylint:disable=invalid-name
+T = TypeVar('T') # pylint: disable=invalid-name
+U = TypeVar('U', int, Tuple[int, int]) # pylint: disable=invalid-name
 
 
 @dataclass
@@ -227,7 +228,6 @@ class Reifier(Observer):
     def minimize(self, priority: int, literals: Sequence[Tuple[int, int]]) -> None:
         self._output("minimize", [Number(priority), self._wlit_tuple(literals)])
 
-
     def project(self, atoms: Sequence[int]) -> None:
         self._output("project", [Number(atoms[0])])
 
@@ -246,8 +246,7 @@ class Reifier(Observer):
 
     def external(self, atom: int, value: TruthValue) -> None:
         n = 'true' if value == TruthValue.True_ else 'false' if TruthValue.False_ else 'free'
-        self._output("external", [self._lit_tuple([atom]), Function(n,[])])
-
+        self._output("external", [self._lit_tuple([atom]), Function(n, [])])
 
     def assume(self, literals: Sequence[int]) -> None:
         self._output("assume", [self._lit_tuple(literals)])
@@ -257,29 +256,28 @@ class Reifier(Observer):
         type_name = str(type_).replace('HeuristicType.', '').lower().strip('_')
         condition_lit = self._lit_tuple(condition)
         self._output("heuristic", [Number(atom),
-                                    Function(type_name),
-                                    Number(bias),
-                                    Number(priority),
-                                    condition_lit])
-
+                                   Function(type_name),
+                                   Number(bias),
+                                   Number(priority),
+                                   condition_lit])
 
     def acyc_edge(self, node_u: int, node_v: int,
                   condition: Sequence[int]) -> None:
         RuntimeError("impplement me!!!")
 
     def theory_term_number(self, term_id: int, number: int) -> None:
-        self._output("theory_number", [Number(term_id),Number(number)])
+        self._output("theory_number", [Number(term_id), Number(number)])
 
     def theory_term_string(self, term_id: int, name: str) -> None:
-        self._output("theory_string", [Number(term_id),String(name)])
+        self._output("theory_string", [Number(term_id), String(name)])
 
     def theory_term_compound(self, term_id: int, name_id_or_type: int,
                              arguments: Sequence[int]) -> None:
-        names = {-1:"tuple",-2:"set",-3:"list"}
+        names = {-1: "tuple", -2: "set", -3: "list"}
         if name_id_or_type in names:
-            n = ("theory_sequence",Function(names[name_id_or_type],[]))
+            n = ("theory_sequence", Function(names[name_id_or_type], []))
         else:
-            n = ("theory_function",Number(name_id_or_type))
+            n = ("theory_function", Number(name_id_or_type))
         tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, arguments, _theory, True)
         self._output(n[0], [Number(term_id), n[1], tuple_id])
 
@@ -300,11 +298,10 @@ class Reifier(Observer):
                                right_hand_side_id: int) -> None:
         tuple_e_id = self._tuple("theory_element_tuple", self._step_data.theory_element_tuples, elements, _lit)
         self._output("theory_atom", [Number(atom_id_or_zero),
-                                    Number(term_id),
-                                    tuple_e_id,
-                                    Number(operator_id),
-                                    Number(right_hand_side_id)
-                                    ])
+                                     Number(term_id),
+                                     tuple_e_id,
+                                     Number(operator_id),
+                                     Number(right_hand_side_id)])
 
     def end_step(self) -> None:
         if self._reify_steps:
@@ -312,15 +309,16 @@ class Reifier(Observer):
             self._step += 1
             self._step_data = _StepData()
 
-
+# TODO: not used???
 class _SymbolData:
     t_basic: Dict[int, Symbol] = {}
     t_tuple: Dict[int, List[Symbol]] = {}
 
-def _is_op(op:str):
+# TODO: importable librry function
+def _is_op(op: str):
     return op[0] in "/!<=>+-*\\?&@|:;~^."
 
-def get_theory_symbols(reification_symbols : List[Symbol]):
+def get_theory_symbols(reification_symbols: List[Symbol]):
     """
     Gets new predicate for the reification: `theory_symbol`,
     containing the mapping from the index of a `theory_formula` to the associated symbol
@@ -337,12 +335,12 @@ def get_theory_symbols(reification_symbols : List[Symbol]):
         if name == "theory_string":
             val = s.arguments[1].string
             if not _is_op(val):
-                t_basic.setdefault(idx, Function(val,[]))
+                t_basic.setdefault(idx, Function(val, []))
         elif name == "theory_number":
-            t_basic.setdefault(idx,s.arguments[1])
+            t_basic.setdefault(idx, s.arguments[1])
         elif name == "theory_tuple":
-            if len(s.arguments)==1:
-                t_tuple.setdefault(idx,[])
+            if len(s.arguments) == 1:
+                t_tuple.setdefault(idx, [])
             else:
                 if not idx in t_tuple:
                     continue
@@ -354,17 +352,17 @@ def get_theory_symbols(reification_symbols : List[Symbol]):
         elif name == "theory_function":
             if not s.arguments[1].number in t_basic:
                 continue
-            s = Function(t_basic[s.arguments[1].number].name,t_tuple[s.arguments[2].number])
-            t_basic.setdefault(idx,s)
+            s = Function(t_basic[s.arguments[1].number].name, t_tuple[s.arguments[2].number])
+            t_basic.setdefault(idx, s)
         elif name == "theory_sequence":
             if  s.arguments[1].name != 'tuple':
                 raise RuntimeError(f"Not supported {str(s)}")
-            s = Function("",t_tuple[s.arguments[2].number])
-            t_basic.setdefault(idx,s)
+            s = Function("", t_tuple[s.arguments[2].number])
+            t_basic.setdefault(idx, s)
 
     new_symbols = []
     for idx, s in t_basic.items():
-        if s.type!=clingo.SymbolType.Number:
-            new_symbols.append(Function("theory_symbol",[Number(idx),s]))
+        if s.type != clingo.SymbolType.Number:
+            new_symbols.append(Function("theory_symbol", [Number(idx), s]))
 
     return new_symbols

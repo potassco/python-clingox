@@ -1,25 +1,42 @@
 '''
 Test cases for the ground program and observer.
 '''
-from subprocess import Popen, PIPE
+
+import os
+from tempfile import NamedTemporaryFile
+from multiprocessing import Process
 from unittest import TestCase
 
 from typing import List, Optional
 
 from clingo.control import Control
 from clingo.symbol import Function, Number, Symbol
+from clingo.__main__ import PyClingoApplication
+from clingo.application import clingo_main
 
 from ..reify import Reifier, get_theory_symbols
 
 def _get_command_line_reification(prg):
-    command = ["clingo --output=reify "]
-    with Popen(command,
-                        stdin=PIPE,
-                        stdout=PIPE,
-                        stderr=PIPE,
-                        shell=True) as process:
-        stdout = process.communicate(input=prg.encode())[0]
-        return [s.strip('.') for s in stdout.decode().split('\n') if s !=""]
+    with NamedTemporaryFile() as inf, NamedTemporaryFile() as outf:
+        inf.write(prg.encode())
+        inf.flush()
+
+        old_stdout = os.dup(1)
+        devnull = os.open(outf.name, os.O_WRONLY)
+        os.dup2(devnull, 1)
+        os.close(devnull)
+
+        proc = Process(target=clingo_main,
+                       args=(PyClingoApplication(),
+                             ["--output=reify", "-Wnone", inf.name]))
+        proc.start()
+        proc.join()
+
+        os.fsync(1)
+        os.dup2(old_stdout, 1)
+        os.close(old_stdout)
+
+        return [s.strip('.') for s in outf.read().decode().split('\n') if s != ""]
 
 def _out(name, args, step: Optional[int]):
     return Function(name, args if step is None else args + [Number(step)])
@@ -145,17 +162,17 @@ class TestReifier(TestCase):
         x = []
         reifier = Reifier(x.append, reify_steps=True)
         ctl.register_observer(reifier)
-        ctl.add("base",[],prg)
-        ctl.ground([('base',[])])
+        ctl.add("base", [], prg)
+        ctl.ground([('base', [])])
         ctl.solve()
         ctl.assign_external(Function("a"), True)
         ctl.solve()
         ctl.assign_external(Function("a"), False)
         ctl.solve()
         ctl.release_external(Function("a"))
-        out_str = [str(s) for s in x if s.name!="tag"]
-        expected =['literal_tuple(0,0)','literal_tuple(0,1,0)','external(0,false,0)',
-                    'external(0,true,1)','external(0,false,2)','external(0,false,3)']
+        out_str = [str(s) for s in x]
+        expected = ['literal_tuple(0,0)', 'literal_tuple(0,1,0)', 'external(0,false,0)',
+                    'external(0,true,1)', 'external(0,false,2)', 'external(0,false,3)']
         self.assertTrue(all(x in out_str for x in expected))
 
     def test_assume(self):
@@ -167,17 +184,17 @@ class TestReifier(TestCase):
         x = []
         reifier = Reifier(x.append, reify_steps=True)
         ctl.register_observer(reifier)
-        ctl.add("base",[],prg)
-        ctl.ground([('base',[])])
-        ctl.solve(assumptions= [(Function("a"),True)])
-        ctl.solve(assumptions= [(Function("a"),False)])
-        out_str = [str(s) for s in x ]
+        ctl.add("base", [], prg)
+        ctl.ground([('base', [])])
+        ctl.solve(assumptions=[(Function("a"), True)])
+        ctl.solve(assumptions=[(Function("a"), False)])
+        out_str = [str(s) for s in x]
         expected = ['literal_tuple(0,0)',
-        'literal_tuple(0,-1,0)',
-        'assume(0,0)',
-        'literal_tuple(0,1)',
-        'literal_tuple(0,1,1)',
-        'assume(0,1)']
+                    'literal_tuple(0,-1,0)',
+                    'assume(0,0)',
+                    'literal_tuple(0,1)',
+                    'literal_tuple(0,1,1)',
+                    'assume(0,1)']
         self.assertTrue(all(x in out_str for x in expected))
 
     def test_simple(self):
@@ -201,16 +218,16 @@ class TestReifier(TestCase):
             x = []
             reifier = Reifier(x.append, False)
             ctl.register_observer(reifier)
-            ctl.add("base",[],prg)
-            ctl.ground([('base',[])])
-            out_str = [str(s) for s in x if s.name!="tag"]
+            ctl.add("base", [], prg)
+            ctl.ground([('base', [])])
+            out_str = [str(s) for s in x]
             r = _get_command_line_reification(prg)
 
             # print('\nFROM COMMAND LINE:')
             # print("\n".join(r))
             # print('\nFROM CLINGOX: ')
             # print("\n".join(out_str))
-            self.assertListEqual(out_str,r)
+            self.assertListEqual(out_str, r)
 
     def test_theory(self):
         """
@@ -229,13 +246,12 @@ class TestReifier(TestCase):
             x = []
             reifier = Reifier(x.append, False)
             ctl.register_observer(reifier)
-            ctl.add("base",[],prg)
-            ctl.ground([('base',[])])
-            out_str = [str(s) for s in x if s.name!="tag"]
+            ctl.add("base", [], prg)
+            ctl.ground([('base', [])])
+            out_str = [str(s) for s in x]
             r = _get_command_line_reification(prg)
 
-
-            self.assertListEqual(out_str,r)
+            self.assertListEqual(out_str, r)
 
     def test_theory_symbols(self):
         """
@@ -246,8 +262,8 @@ class TestReifier(TestCase):
         x = []
         reifier = Reifier(x.append, False)
         ctl.register_observer(reifier)
-        ctl.add("base",[],prg)
-        ctl.ground([('base',[])])
+        ctl.add("base", [], prg)
+        ctl.ground([('base', [])])
         theory_symbols = get_theory_symbols(x)
         expected_new_symbols = [
             "theory_symbol(0,tel)",
@@ -259,15 +275,15 @@ class TestReifier(TestCase):
             "theory_symbol(9,b((2,3)))",
         ]
         out_str = [str(s) for s in theory_symbols]
-        self.assertListEqual(out_str,expected_new_symbols)
+        self.assertListEqual(out_str, expected_new_symbols)
 
         ctl = Control()
         prg = GRAMMAR + '&tel{ (a("s") <? c) <? b((2,3)) }.'
         x = []
         reifier = Reifier(x.append, False)
         ctl.register_observer(reifier)
-        ctl.add("base",[],prg)
-        ctl.ground([('base',[])])
+        ctl.add("base", [], prg)
+        ctl.ground([('base', [])])
         theory_symbols = get_theory_symbols(x)
         expected_new_symbols = [
             'theory_symbol(0,tel)',
@@ -280,13 +296,13 @@ class TestReifier(TestCase):
             'theory_symbol(11,b((2,3)))',
         ]
         out_str = [str(s) for s in theory_symbols]
-        self.assertListEqual(out_str,expected_new_symbols)
+        self.assertListEqual(out_str, expected_new_symbols)
 
         ctl = Control()
         prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
         x = []
         reifier = Reifier(x.append, False)
         ctl.register_observer(reifier)
-        ctl.add("base",[],prg)
-        ctl.ground([('base',[])])
-        self.assertRaises(RuntimeError, get_theory_symbols,x)
+        ctl.add("base", [], prg)
+        ctl.ground([('base', [])])
+        self.assertRaises(RuntimeError, get_theory_symbols, x)
