@@ -242,15 +242,15 @@ class TestReifier(TestCase):
             r = _get_command_line_reification(prg)
             self.assertListEqual(out_str, r)
 
-    @expectedFailure
+    #@expectedFailure
     def test_theory_element(self):
         '''
         Test theory element order
         '''
         #Could be just added to test_theory once libreify is fixed for the order
-        prg = GRAMMAR+ '&tel{ a <? b: x}. {x}.'
+        prg = GRAMMAR + '&tel{ a <? b: x}. {x}.'
         reify(prg, False)
-        self.assertTrue(False, "force fail") #pylint: disable=redundant-unittest-assert
+        #self.assertTrue(False, "force fail") #pylint: disable=redundant-unittest-assert
 
     def test_theory(self):
         """
