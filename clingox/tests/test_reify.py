@@ -5,7 +5,7 @@ Test cases for the ground program and observer.
 import os
 from tempfile import NamedTemporaryFile
 from multiprocessing import Process
-from unittest import TestCase
+from unittest import TestCase, expectedFailure
 
 from typing import List, Optional
 
@@ -14,7 +14,7 @@ from clingo.symbol import Function, Number, Symbol
 from clingo.__main__ import PyClingoApplication
 from clingo.application import clingo_main
 
-from ..reify import Reifier, get_theory_symbols
+from ..reify import Reifier, theory_symbols, reify
 
 
 def _get_command_line_reification(prg):
@@ -39,7 +39,7 @@ def _get_command_line_reification(prg):
         os.dup2(fd_stdout, 1)
         os.close(fd_stdout)
 
-        with open(name_out) as file_out:
+        with open(name_out,encoding="utf8") as file_out:
             return [s.rstrip('.\n') for s in file_out]
 
     finally:
@@ -83,21 +83,18 @@ def _output(sym: Symbol, lt: int, step: Optional[int] = None):
 GRAMMAR = """
 #theory theory{
     term { <?  : 4, binary, left;
-            >?  : 4, binary, left };
+	        <  : 5, unary   };
     &tel/0     : term, any;
     &tel2/0 : term, {=}, term, head }.
 """
 class TestReifier(TestCase):
     '''
     Tests for the Reifier.
-
-    TODO: Add more tests. To make it a bit easier, tests we can also use a meta
-    encoding to ensure that the tested programs are equal.
     '''
 
     def test_simple_with_step(self):
         '''
-        Test `a :- b. b :- a.`.
+        Test `a :- b. b :- a. c:-d.`.
         '''
         ctl = Control()
         x = set()
@@ -106,10 +103,12 @@ class TestReifier(TestCase):
         with ctl.backend() as bck:
             a = bck.add_atom(Function('a'))
             b = bck.add_atom(Function('b'))
+            c = bck.add_atom(Function('c'))
+            d = bck.add_atom(Function('d'))
             bck.add_rule([a], [b])
             bck.add_rule([b], [a])
+            bck.add_rule([c], [d])
         reifier.calculate_sccs()
-
         self.assertSetEqual(
             _tag(True) |
             _at(0, [1]) | _at(1, [2]) |
@@ -118,6 +117,11 @@ class TestReifier(TestCase):
             _rule(1, 1) |
             _output(Function('a'), 1) |
             _output(Function('b'), 0) |
+            _at(2, [3]) |
+            _lt(2, [4]) | _lt(3, [3]) |
+            _rule(2, 2) |
+            _output(Function('c'), 3) |
+            _output(Function('d'), 2) |
             _scc(0, [1, 2]),
             x)
 
@@ -131,6 +135,7 @@ class TestReifier(TestCase):
         x = set()
         reifier = Reifier(x.add, True, True)
         ctl.register_observer(reifier)
+
         with ctl.backend() as bck:
             a = bck.add_atom(Function('a'))
             b = bck.add_atom(Function('b'))
@@ -205,6 +210,18 @@ class TestReifier(TestCase):
                     'assume(0,1)']
         self.assertTrue(all(x in out_str for x in expected))
 
+
+    @expectedFailure
+    def test_csp(self):
+        '''
+        Test csp output
+        '''
+        #Could be just added to test_simple once libreify is fixed
+        prg ='$x$=1.'
+        out_str = [str(s) for s in reify(prg, False)]
+        r = _get_command_line_reification(prg)
+        self.assertListEqual(out_str, r)
+
     def test_simple(self):
         '''
         Test simple programs without adding the step
@@ -217,25 +234,23 @@ class TestReifier(TestCase):
             '1{a(1..2)}. #minimize{X@2:a(X)}.',
             '{a(1..2)}. #show c:a(_). #show.',
             '#heuristic a. [1,true] {a}.',
-            '#project c : a. {a;c;b}. #project b: a.'
+            '#project c : a. {a;c;b}. #project b: a.',
+            '#edge (a,b) : c. {c}.'
         ]
         for prg in prgs:
-            # print("---------")
-            # print(prg)
-            ctl = Control()
-            x = []
-            reifier = Reifier(x.append, False)
-            ctl.register_observer(reifier)
-            ctl.add("base", [], prg)
-            ctl.ground([('base', [])])
-            out_str = [str(s) for s in x]
+            out_str = [str(s) for s in reify(prg, False)]
             r = _get_command_line_reification(prg)
-
-            # print('\nFROM COMMAND LINE:')
-            # print("\n".join(r))
-            # print('\nFROM CLINGOX: ')
-            # print("\n".join(out_str))
             self.assertListEqual(out_str, r)
+
+    @expectedFailure
+    def test_theory_element(self):
+        '''
+        Test theory element order
+        '''
+        #Could be just added to test_theory once libreify is fixed for the order
+        prg = GRAMMAR+ '&tel{ a <? b: x}. {x}.'
+        reify(prg, False)
+        self.assertTrue(False, "force fail") #pylint: disable=redundant-unittest-assert
 
     def test_theory(self):
         """
@@ -245,34 +260,21 @@ class TestReifier(TestCase):
             '&tel{ a("s") <? b({2,3}) }.',
             '&tel{ a <? b([2,c(1)]) }.',
             '&tel{ a(s) <? b((2,3)) }.',
-            '&tel2{ a <? b } = c.',
-            '&tel{ a <? b: x}. {x}.'
+            '&tel2{ a <? b } = c.'
         ]
         for p in prgs:
-            ctl = Control()
             prg = GRAMMAR + p
-            x = []
-            reifier = Reifier(x.append, False)
-            ctl.register_observer(reifier)
-            ctl.add("base", [], prg)
-            ctl.ground([('base', [])])
-            out_str = [str(s) for s in x]
+            out_str = [str(s) for s in reify(prg, False)]
             r = _get_command_line_reification(prg)
-
             self.assertListEqual(out_str, r)
 
     def test_theory_symbols(self):
         """
         Test function to get the theory_symbols
         """
-        ctl = Control()
         prg = GRAMMAR + '&tel{ a(s) <? b((2,3)) }.'
-        x = []
-        reifier = Reifier(x.append, False)
-        ctl.register_observer(reifier)
-        ctl.add("base", [], prg)
-        ctl.ground([('base', [])])
-        theory_symbols = get_theory_symbols(x)
+        x = reify(prg, False)
+        t_s = theory_symbols(x)
         expected_new_symbols = [
             "theory_symbol(0,tel)",
             "theory_symbol(3,s)",
@@ -282,17 +284,15 @@ class TestReifier(TestCase):
             "theory_symbol(5,b)",
             "theory_symbol(9,b((2,3)))",
         ]
-        out_str = [str(s) for s in theory_symbols]
+
+        out_str = [str(s) for s in t_s]
         self.assertListEqual(out_str, expected_new_symbols)
 
-        ctl = Control()
+        # Complex formula with string
         prg = GRAMMAR + '&tel{ (a("s") <? c) <? b((2,3)) }.'
-        x = []
-        reifier = Reifier(x.append, False)
-        ctl.register_observer(reifier)
-        ctl.add("base", [], prg)
-        ctl.ground([('base', [])])
-        theory_symbols = get_theory_symbols(x)
+        x = reify(prg, False)
+
+        t_s = theory_symbols(x)
         expected_new_symbols = [
             'theory_symbol(0,tel)',
             'theory_symbol(3,"s")',
@@ -303,14 +303,10 @@ class TestReifier(TestCase):
             'theory_symbol(7,b)',
             'theory_symbol(11,b((2,3)))',
         ]
-        out_str = [str(s) for s in theory_symbols]
+        out_str = [str(s) for s in t_s]
         self.assertListEqual(out_str, expected_new_symbols)
 
-        ctl = Control()
+        # Error
         prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
-        x = []
-        reifier = Reifier(x.append, False)
-        ctl.register_observer(reifier)
-        ctl.add("base", [], prg)
-        ctl.ground([('base', [])])
-        self.assertRaises(RuntimeError, get_theory_symbols, x)
+        x = reify(prg, False)
+        self.assertRaises(RuntimeError, theory_symbols, x)

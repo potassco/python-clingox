@@ -1,15 +1,71 @@
 '''
-Document me!!!
+This module provides functions to work with reification.
+
+This includes an observer `Reifier` that will gather the reification symbols for the
+program, and the additional helper function `reify` to directly obtain the such list
+for a given program
+
+Additionally, the function `theory_symbols` extracts the symbols used in theory
+atoms into the predicate `theory_symbol/2` to simplify meta-programming encodings.
+
+Example
+-------
+
+The following example shows how to
+
+- use the `Reifier` observer or the reify function
+- obtain additional `theory_symbol` symbols.
+
+```python-repl
+>>> from clingox.reify import Reifier
+>>> from clingo.control import Control
+>>> prg = 'b:-a.{a}.'
+>>> ctl = Control()
+>>> reification_symbols = []
+>>> reifier = Reifier(reification_symbols.append, reify_steps=False)
+>>> ctl.register_observer(reifier)
+>>> ctl.add("base", [], prg)
+>>> ctl.ground([('base', [])])
+>>> print([str(s) for s in reification_symbols])
+['tag(incremental)', 'atom_tuple(0)', 'atom_tuple(0,1)', 'literal_tuple(0)',
+'rule(choice(0),normal(0))', 'atom_tuple(1)', 'atom_tuple(1,2)', 'literal_tuple(1)',
+'literal_tuple(1,1)', 'rule(disjunction(1),normal(1))', 'output(a,1)', 'literal_tuple(2)',
+'literal_tuple(2,2)', 'output(b,2)']
+```
+
+Alternatively:
+
+```python-repl
+>>> from clingox.reify import reify
+>>> prg = 'b:-a.{a}.'
+>>> reification_symbols = reify(prg, reify_steps=False)
+```
+
+Obtain the theory symbols:
+
+```python-repl
+>>> from clingox.reify import reify, theory_symbols
+>>> grammar = '#theory theory{ term { <  : 5, unary   }; &tel/0     : term, any}.'
+>>> prg = grammar + '&tel{< a(1)}.'
+>>> reification_symbols = reify(prg, reify_steps=False)
+>>> theory_symbols = theory_symbols(reification_symbols)
+>>> print([str(s) for s in theory_symbols])
+['theory_symbol(0,tel)', 'theory_symbol(2,a)', 'theory_symbol(4,a(1))']
+```
+
+For theory symbols:
 '''
 
 from typing import Callable, Dict, Generic, List, Sequence, Tuple, TypeVar
 from dataclasses import dataclass, field
 
 import clingo
+from clingo.control import Control
 from clingo.backend import HeuristicType, Observer, TruthValue
 from clingo.symbol import Function, Number, Symbol, String
 
-__all__ = ['Reifier', 'get_theory_symbols']
+from .theory import is_operator
+__all__ = ['Reifier', 'theory_symbols', 'reify']
 
 T = TypeVar('T') # pylint: disable=invalid-name
 U = TypeVar('U', int, Tuple[int, int]) # pylint: disable=invalid-name
@@ -62,7 +118,7 @@ class _Graph(Generic[T]):
 
     def tarjan(self) -> List[List[T]]:
         '''
-        Returns the stringly connected components of the graph.
+        Returns the strictly connected components of the graph.
         '''
         sccs: List[List[T]] = []
         stack = []
@@ -135,7 +191,17 @@ def _wlit(i: Symbol, wlit: Tuple[int, int]) -> Sequence[Symbol]:
 
 class Reifier(Observer):
     '''
-    Document me!!!
+    An observer that will gather the symbols of the reification, in the same way as `clingo --output=reify`.
+
+    Parameters
+    ----------
+    cb
+        A callback function that will be called with each symbol of the reification
+    calculate_sccs
+        Flag to calculate the SCCs
+    reify_steps
+        Flag to add a number as the last argument of all reification symbols for the corresponding step
+
     '''
     #pylint:disable=too-many-public-methods
     _step: int
@@ -242,7 +308,7 @@ class Reifier(Observer):
 
     def output_csp(self, symbol: Symbol, value: int,
                    condition: Sequence[int]) -> None:
-        self._output("output", [symbol, self._lit_tuple(condition)])
+        self._output("output_csp", [symbol, Number(value), self._lit_tuple(condition)])
 
     def external(self, atom: int, value: TruthValue) -> None:
         n = 'true' if value == TruthValue.True_ else 'false' if TruthValue.False_ else 'free'
@@ -263,7 +329,8 @@ class Reifier(Observer):
 
     def acyc_edge(self, node_u: int, node_v: int,
                   condition: Sequence[int]) -> None:
-        RuntimeError("impplement me!!!")
+        self._output("edge", [Number(node_u),Number(node_v),self._lit_tuple(condition)])
+
 
     def theory_term_number(self, term_id: int, number: int) -> None:
         self._output("theory_number", [Number(term_id), Number(number)])
@@ -283,8 +350,8 @@ class Reifier(Observer):
 
     def theory_element(self, element_id: int, terms: Sequence[int],
                        condition: Sequence[int]) -> None:
-        tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, terms, _theory, True)
         lit_con_id = self._tuple("literal_tuple", self._step_data.lit_tuples, condition, _lit)
+        tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, terms, _theory, True)
         self._output("theory_element", [Number(element_id), tuple_id, lit_con_id])
 
     def theory_atom(self, atom_id_or_zero: int, term_id: int,
@@ -309,21 +376,48 @@ class Reifier(Observer):
             self._step += 1
             self._step_data = _StepData()
 
-# TODO: not used???
-class _SymbolData:
-    t_basic: Dict[int, Symbol] = {}
-    t_tuple: Dict[int, List[Symbol]] = {}
+def theory_symbols(reification_symbols: List[Symbol]):
+    '''
+    Gets new symbols using predicate `theory_symbol` for the given reification symbols.
+    These new symbols contain as first argument the number to identify a `theory_function`,
+    and as a second argument, the corresponding symbol (Only for functions) that do not use
+    any theory operator.
 
-# TODO: importable librry function
-def _is_op(op: str):
-    return op[0] in "/!<=>+-*\\?&@|:;~^."
 
-def get_theory_symbols(reification_symbols: List[Symbol]):
-    """
-    Gets new predicate for the reification: `theory_symbol`,
-    containing the mapping from the index of a `theory_formula` to the associated symbol
-    when the theory formula is not constructed with a theory operator.
-    """
+    Example
+    -------
+    For the theory symbols corresponding to `&tel{ < a }.`:
+
+    ```
+    theory_string(0,"tel")
+    theory_string(2,"a")
+    theory_string(1,"<")
+    theory_tuple(0)
+    theory_tuple(0,0,2)
+    theory_function(3,1,0)
+    theory_tuple(1)
+    theory_tuple(1,0,3)
+    theory_element(0,1,0)
+    theory_element_tuple(0)
+    theory_element_tuple(0,0)
+    theory_atom(1,0,0)
+    ```
+
+    The output of `theory_symbols` would be:
+    ```
+    [theory_symbol(0,tel), theory_symbol(2,a)]
+    ```
+
+    Parameters
+    ----------
+    reification_symbols
+        A list of clingo  `clingo.symbol.Symbol` representing the reification.
+        Can be obtained using the `Reifier` observer.
+
+    Returns
+    -------
+    A list of symbols containing the new `theory_symbol` predicate
+    '''
     t_basic: Dict[int, Symbol] = {}
     t_tuple: Dict[int, List[Symbol]] = {}
     for s in reification_symbols:
@@ -334,7 +428,7 @@ def get_theory_symbols(reification_symbols: List[Symbol]):
         idx = s.arguments[0].number
         if name == "theory_string":
             val = s.arguments[1].string
-            if not _is_op(val):
+            if not is_operator(val):
                 t_basic.setdefault(idx, Function(val, []))
         elif name == "theory_number":
             t_basic.setdefault(idx, s.arguments[1])
@@ -366,3 +460,26 @@ def get_theory_symbols(reification_symbols: List[Symbol]):
             new_symbols.append(Function("theory_symbol", [Number(idx), s]))
 
     return new_symbols
+
+def reify(prg: str, reify_steps: bool=True) -> List[Symbol]:
+    '''
+    Gets list of reification symbols for the given program
+
+    Parameters
+    ----------
+    prg
+        Program string.
+    reify_steps
+        If a step number is added at the end of each reification predicate
+
+    Returns
+    -------
+    A list of symbols containing the reified output
+    '''
+    ctl = Control()
+    x: List[Symbol] = []
+    reifier = Reifier(x.append, reify_steps)
+    ctl.register_observer(reifier)
+    ctl.add("base", [], prg)
+    ctl.ground([('base', [])])
+    return x
