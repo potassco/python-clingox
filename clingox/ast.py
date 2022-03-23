@@ -126,21 +126,22 @@ __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
            'TheoryTermParser', 'TheoryUnparsedTermParser',
            'TheoryUnparsedTermParser']
 
-#pylint: disable=consider-using-f-string
 class Arity(Enum):
     '''
     Enumeration of operator arities.
     '''
-    Unary = 1 #pylint:disable=invalid-name
-    Binary = 2 #pylint:disable=invalid-name
+    # pylint:disable=invalid-name
+    Unary = 1
+    Binary = 2
 
 class Associativity(Enum):
     '''
     Enumeration of operator associativities.
     '''
-    Left = auto() #pylint:disable=invalid-name
-    Right = auto() #pylint:disable=invalid-name
-    NoAssociativity = auto() #pylint:disable=invalid-name
+    # pylint: disable=invalid-name
+    Left = auto()
+    Right = auto()
+    NoAssociativity = auto()
 
 def _s(m, a: str, b: str):
     '''
@@ -172,18 +173,18 @@ def location_to_str(loc: Location) -> str:
     """
     begin, end = loc.begin, loc.end
     bf, ef = _quote(begin.filename), _quote(end.filename)
-    ret = "{}:{}:{}".format(bf, begin.line, begin.column)
+    ret = f"{bf}:{begin.line}:{begin.column}"
     dash, eq = True, bf == ef
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", ef)
+        ret += f"{'-' if dash else ':'}{ef}"
         dash = False
     eq = eq and begin.line == end.line
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end.line)
+        ret += f"{'-' if dash else ':'}{end.line}"
         dash = False
     eq = eq and begin.column == end.column
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end.column)
+        ret += f"{'-' if dash else ':'}{end.column}"
         dash = False
     return ret
 
@@ -214,7 +215,7 @@ def str_to_location(loc: str) -> Location:
     return Location(begin, end)
 
 OperatorTable = Mapping[Tuple[str, Arity],
-                    Tuple[int, Associativity]]
+                        Tuple[int, Associativity]]
 AtomTable = Mapping[Tuple[str, int],
                     Tuple[TheoryAtomType,
                           str,
@@ -295,7 +296,7 @@ class TheoryUnparsedTermParser:
             Location of the operator for error reporting.
         """
         if (operator, arity) not in self._table:
-            raise RuntimeError("cannot parse operator `{}`: {}".format(operator, location_to_str(location)))
+            raise RuntimeError(f"cannot parse operator `{operator}`: {location_to_str(location)}")
 
     def parse(self, x: AST) -> AST:
         """

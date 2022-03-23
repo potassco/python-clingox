@@ -39,7 +39,7 @@ def _get_command_line_reification(prg):
         os.dup2(fd_stdout, 1)
         os.close(fd_stdout)
 
-        with open(name_out,encoding="utf8") as file_out:
+        with open(name_out, encoding="utf8") as file_out:
             return [s.rstrip('.\n') for s in file_out]
 
     finally:
@@ -216,7 +216,7 @@ class TestReifier(TestCase):
         Test csp output
         '''
         #Could be just added to test_simple once libreify is fixed
-        prg ='$x$=1.'
+        prg = '$x$=1.'
         out_str = [str(s) for s in reify(prg, False)]
         r = _get_command_line_reification(prg)
         self.assertListEqual(out_str, r)

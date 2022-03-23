@@ -329,7 +329,7 @@ class Reifier(Observer):
 
     def acyc_edge(self, node_u: int, node_v: int,
                   condition: Sequence[int]) -> None:
-        self._output("edge", [Number(node_u),Number(node_v),self._lit_tuple(condition)])
+        self._output("edge", [Number(node_u), Number(node_v), self._lit_tuple(condition)])
 
 
     def theory_term_number(self, term_id: int, number: int) -> None:
@@ -376,7 +376,7 @@ class Reifier(Observer):
             self._step += 1
             self._step_data = _StepData()
 
-def theory_symbols(reification_symbols: List[Symbol]):
+def theory_symbols(reification_symbols: Sequence[Symbol]):
     '''
     Gets new symbols using predicate `theory_symbol` for the given reification symbols.
     These new symbols contain as first argument the number to identify a `theory_function`,
@@ -461,7 +461,7 @@ def theory_symbols(reification_symbols: List[Symbol]):
 
     return new_symbols
 
-def reify(prg: str, reify_steps: bool=True) -> List[Symbol]:
+def reify(prg: str, reify_steps: bool = True) -> List[Symbol]:
     '''
     Gets list of reification symbols for the given program
 
