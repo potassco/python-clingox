@@ -16,27 +16,35 @@ from clingo.application import clingo_main
 
 from ..reify import Reifier, get_theory_symbols
 
-def _get_command_line_reification(prg):
-    with NamedTemporaryFile() as inf, NamedTemporaryFile() as outf:
-        inf.write(prg.encode())
-        inf.flush()
 
-        old_stdout = os.dup(1)
-        devnull = os.open(outf.name, os.O_WRONLY)
-        os.dup2(devnull, 1)
-        os.close(devnull)
+def _get_command_line_reification(prg):
+    with NamedTemporaryFile(delete=False) as temp_in, NamedTemporaryFile(delete=False) as temp_out:
+        temp_in.write(prg.encode())
+        name_in = temp_in.name
+        name_out = temp_out.name
+
+    try:
+        fd_stdout = os.dup(1)
+        fd_out = os.open(name_out, os.O_WRONLY)
+        os.dup2(fd_out, 1)
+        os.close(fd_out)
 
         proc = Process(target=clingo_main,
                        args=(PyClingoApplication(),
-                             ["--output=reify", "-Wnone", inf.name]))
+                             ["--output=reify", "-Wnone", name_in]))
         proc.start()
         proc.join()
 
         os.fsync(1)
-        os.dup2(old_stdout, 1)
-        os.close(old_stdout)
+        os.dup2(fd_stdout, 1)
+        os.close(fd_stdout)
 
-        return [s.strip('.') for s in outf.read().decode().split('\n') if s != ""]
+        with open(name_out) as file_out:
+            return [s.rstrip('.\n') for s in file_out]
+
+    finally:
+        os.unlink(name_in)
+        os.unlink(name_out)
 
 def _out(name, args, step: Optional[int]):
     return Function(name, args if step is None else args + [Number(step)])
