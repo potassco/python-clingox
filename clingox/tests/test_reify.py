@@ -105,6 +105,8 @@ class TestReifier(TestCase):
     def test_simple_with_step(self):
         '''
         Test `a :- b. b :- a. c:-d.`.
+
+        TODO: we can use _get_command_line_reification to do this instead.
         '''
         ctl = Control()
         x = set()
@@ -139,7 +141,7 @@ class TestReifier(TestCase):
         '''
         Test `#step 0. a :- b. b :- a. #step 1. c :- d. d :- c. `.
 
-        TODO: verify that this is relly what clingo is doing!!!!
+        TODO: we can use _get_command_line_reification to do this instead.
         '''
         ctl = Control()
         x = set()

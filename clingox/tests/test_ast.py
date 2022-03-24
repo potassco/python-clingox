@@ -229,8 +229,8 @@ class TestAST(TestCase):
         Test creating parsers from theory definitions.
         """
         parser = parse_theory(TEST_THEORY)
-        pa = lambda s: parse_atom(s, parser)
-        pr = lambda s: parse_stm(s, parser)
+        pa = lambda s: parse_atom(s, parser)  # noqa: E731
+        pr = lambda s: parse_stm(s, parser)  # noqa: E731
 
         self.assertEqual(parse_atom("&p {1+2}", pa), "&p { +(1,2) }")
         self.assertEqual(parse_atom("&p {1+2+3}", pa), "&p { +(+(1,2),3) }")
