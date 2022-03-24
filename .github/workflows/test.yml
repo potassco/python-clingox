@@ -40,11 +40,11 @@ jobs:
       run: coverage run -m unittest discover -v
 
     - name: type check
-      if: ${{ matrix.python-version != '3.6' }}
       shell: pwsh
       run: mypy -p clingox
 
     - name: lint (pylint)
+      if: ${{ matrix.python-version != '3.6' }}
       shell: pwsh
       run: pylint clingox
 
