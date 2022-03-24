@@ -740,37 +740,37 @@ def _encode(x: Any) -> Any:
     assert False, f"unknown value to encode: {x}"
 
 
-@_encode.register
+@_encode.register(str)
 def _encode_str(x: str) -> str:
     return x
 
 
-@_encode.register
+@_encode.register(clingo.Symbol)
 def _encode_symbol(x: clingo.Symbol) -> str:
     return str(x)
 
 
-@_encode.register
+@_encode.register(int)
 def _encode_int(x: int) -> int:
     return x
 
 
-@_encode.register
+@_encode.register(ASTSequence)
 def _encode_ast_seq(x: ASTSequence) -> List[Any]:
     return [_encode(y) for y in x]
 
 
-@_encode.register
+@_encode.register(StrSequence)
 def _encode_str_seq(x: StrSequence) -> List[Any]:
     return [_encode(y) for y in x]
 
 
-@_encode.register
+@_encode.register(type(None))
 def _encode_none(x: None) -> None:
     return x
 
 
-@_encode.register
+@_encode.register(AST)
 def _encode_ast(x: AST) -> Any:
     return ast_to_dict(x)
 
@@ -812,7 +812,7 @@ def _decode(x: Any, key: str) -> Any:
     raise RuntimeError(f"unknown key/value to decode: {key}: {x}")
 
 
-@_decode.register
+@_decode.register(str)
 def _decode_str(x: str, key: str) -> Any:
     if key == "location":
         return str_to_location(x)
@@ -824,25 +824,25 @@ def _decode_str(x: str, key: str) -> Any:
     return x
 
 
-@_decode.register
+@_decode.register(int)
 def _decode_int(x: int, key: str) -> Any:
     # pylint: disable=unused-argument
     return x
 
 
-@_decode.register
+@_decode.register(type(None))
 def _decode_none(x: None, key: str) -> Any:
     # pylint: disable=unused-argument
     return x
 
 
-@_decode.register
+@_decode.register(list)
 def _decode_list(x: list, key_: str) -> Any:
     # pylint: disable=unused-argument
     return [_decode(y, "list") for y in x]
 
 
-@_decode.register
+@_decode.register(dict)
 def _decode_dict(x: dict, key_: str) -> Any:
     # pylint: disable=unused-argument
     return dict_to_ast(x)

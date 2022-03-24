@@ -207,7 +207,7 @@ class Fact(NamedTuple):
     symbol: Symbol
 
 
-@pretty_str.register
+@pretty_str.register(Fact)
 def _pretty_str_fact(stm: Fact, output_atoms: OutputTable) -> str:  # pylint: disable=unused-argument
     '''
     Pretty print a fact.
@@ -215,7 +215,7 @@ def _pretty_str_fact(stm: Fact, output_atoms: OutputTable) -> str:  # pylint: di
     return f'{stm.symbol}.'
 
 
-@remap.register
+@remap.register(Fact)
 def _remap_fact(stm: Fact, mapping: AtomMap) -> Fact:  # pylint: disable=unused-argument
     '''
     Remap a fact statement.
@@ -223,7 +223,7 @@ def _remap_fact(stm: Fact, mapping: AtomMap) -> Fact:  # pylint: disable=unused-
     return stm
 
 
-@add_to_backend.register
+@add_to_backend.register(Fact)
 def _add_to_backend_fact(stm: Fact, backend: Backend) -> None:  # pylint: disable=unused-argument
     '''
     Add a fact to the backend.
@@ -241,7 +241,7 @@ class Show(NamedTuple):
     condition: Sequence[Literal]
 
 
-@pretty_str.register
+@pretty_str.register(Show)
 def _pretty_str_show(stm: Show, output_atoms: OutputTable) -> str:
     '''
     Pretty print a fact.
@@ -250,7 +250,7 @@ def _pretty_str_show(stm: Show, output_atoms: OutputTable) -> str:
     return f'#show {stm.symbol}{": " if body else ""}{body}.'
 
 
-@remap.register
+@remap.register(Show)
 def _remap_show(stm: Show, mapping: AtomMap) -> Show:
     '''
     Remap a show statetment.
@@ -258,7 +258,7 @@ def _remap_show(stm: Show, mapping: AtomMap) -> Show:
     return Show(stm.symbol, _remap_seq(stm.condition, mapping))
 
 
-@add_to_backend.register
+@add_to_backend.register(Show)
 def _add_to_backend_show(stm: Show, backend: Backend) -> None:  # pylint: disable=unused-argument
     '''
     Add a show statement to the backend.
@@ -288,7 +288,7 @@ def _pretty_str_rule(stm: Rule, output_atoms: OutputTable) -> str:
     return f'{head}{body}.'
 
 
-@remap.register
+@remap.register(Rule)
 def _remap_rule(stm: Rule, mapping: AtomMap) -> Rule:
     '''
     Remap literals in a rule.
@@ -296,7 +296,7 @@ def _remap_rule(stm: Rule, mapping: AtomMap) -> Rule:
     return Rule(stm.choice, _remap_seq(stm.head, mapping), _remap_seq(stm.body, mapping))
 
 
-@add_to_backend.register
+@add_to_backend.register(Rule)
 def _add_to_backend_rule(stm: Rule, backend: Backend) -> None:
     '''
     Add a rule to the backend.
@@ -326,7 +326,7 @@ def _pretty_str_weight_rule(stm: WeightRule, output_atoms: OutputTable) -> str:
     return f'{head}{stm.lower_bound}{{{body}}}.'
 
 
-@remap.register
+@remap.register(WeightRule)
 def _remap_weight_rule(stm: WeightRule, mapping: AtomMap) -> WeightRule:
     '''
     Remap literals in a weight rule.
@@ -334,7 +334,7 @@ def _remap_weight_rule(stm: WeightRule, mapping: AtomMap) -> WeightRule:
     return WeightRule(stm.choice, _remap_seq(stm.head, mapping), stm.lower_bound, _remap_wseq(stm.body, mapping))
 
 
-@add_to_backend.register
+@add_to_backend.register(WeightRule)
 def _add_to_backend_weight_rule(stm: WeightRule, backend: Backend) -> None:
     '''
     Add a weight rule to the backend.
@@ -357,7 +357,7 @@ def _pretty_str_project(stm: Project, output_atoms: OutputTable) -> str:
     return f'#project {_pretty_str_lit(stm.atom, output_atoms)}.'
 
 
-@remap.register
+@remap.register(Project)
 def _remap_project(stm: Project, mapping: AtomMap):
     '''
     Remap project statement.
@@ -365,7 +365,7 @@ def _remap_project(stm: Project, mapping: AtomMap):
     return Project(mapping(stm.atom))
 
 
-@add_to_backend.register
+@add_to_backend.register(Project)
 def _add_to_backend_project(stm: Project, backend: Backend):
     '''
     Add a project statement to the backend.
@@ -389,7 +389,7 @@ def _pretty_print_external(stm: External, output_atoms: OutputTable) -> str:
     return f'#external {_pretty_str_lit(stm.atom, output_atoms)}. [{_pretty_str_truth_value(stm.value)}]'
 
 
-@remap.register
+@remap.register(External)
 def _remap_external(stm: External, mapping: AtomMap) -> External:
     '''
     Remap the external.
@@ -397,7 +397,7 @@ def _remap_external(stm: External, mapping: AtomMap) -> External:
     return External(mapping(stm.atom), stm.value)
 
 
-@add_to_backend.register
+@add_to_backend.register(External)
 def _add_to_backend_external(stm: External, backend: Backend):
     '''
     Add an external statement to the backend remapping its atom.
@@ -423,7 +423,7 @@ def _pretty_print_minimize(stm, output_atoms) -> str:
     return f'#minimize{{{body}}}.'
 
 
-@remap.register
+@remap.register(Minimize)
 def _remap_minimize(stm: Minimize, mapping: AtomMap) -> Minimize:
     '''
     Remap the literals in the minimize statement.
@@ -431,7 +431,7 @@ def _remap_minimize(stm: Minimize, mapping: AtomMap) -> Minimize:
     return Minimize(stm.priority, _remap_wseq(stm.literals, mapping))
 
 
-@add_to_backend.register
+@add_to_backend.register(Minimize)
 def _add_to_backend_minimize(stm: Minimize, backend: Backend):
     '''
     Add a minimize statement to the backend.
@@ -465,7 +465,7 @@ def _pretty_str_heuristic(stm: Heuristic, output_atoms: OutputTable) -> str:
     return f'#heuristic {head}{": " if body else ""}{body}. [{stm.bias}@{stm.priority}, {type_}]'
 
 
-@remap.register
+@remap.register(Heuristic)
 def _remap_heuristic(stm: Heuristic, mapping: AtomMap) -> Heuristic:
     '''
     Remap the heuristic statement.
@@ -473,7 +473,7 @@ def _remap_heuristic(stm: Heuristic, mapping: AtomMap) -> Heuristic:
     return Heuristic(mapping(stm.atom), stm.type_, stm.bias, stm.priority, _remap_seq(stm.condition, mapping))
 
 
-@add_to_backend.register
+@add_to_backend.register(Heuristic)
 def _add_to_backend_heuristic(stm: Heuristic, backend: Backend) -> None:
     '''
     Add a heurisitic statement to the backend.
@@ -499,7 +499,7 @@ def _pretty_str_edge(stm: Edge, output_atoms: OutputTable) -> str:
     return f'#edge ({stm.u},{stm.v}){": " if body else ""}{body}.'
 
 
-@remap.register
+@remap.register(Edge)
 def _remap_edge(stm: Edge, mapping: AtomMap) -> Edge:
     '''
     Remap an edge statement.
@@ -507,7 +507,7 @@ def _remap_edge(stm: Edge, mapping: AtomMap) -> Edge:
     return Edge(stm.u, stm.v, _remap_seq(stm.condition, mapping))
 
 
-@add_to_backend.register
+@add_to_backend.register(Edge)
 def _add_to_backend_edge(stm: Edge, backend: Backend) -> None:
     '''
     Add an edge statement to the backend remapping its literals.
