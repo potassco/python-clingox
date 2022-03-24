@@ -29,7 +29,7 @@ jobs:
     - name: install dataclases
       shell: pwsh
       if: ${{ matrix.python-version == '3.6' }}
-      run: pip install dataclasses
+      run: pip install dataclasses types-dataclasses
 
     - name: info
       shell: pwsh
