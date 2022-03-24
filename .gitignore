@@ -6,3 +6,6 @@ __pycache__
 .coverage
 .coverage.*
 *,cover
+dist
+.eggs
+test.sh

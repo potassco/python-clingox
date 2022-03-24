@@ -58,6 +58,7 @@ def _add_sign(lit: int, sign: bool):
     '''
     return lit if sign else -lit
 
+
 class SymbolicBackend:
     '''
     Backend wrapper providing an interface to extend a logic program. It

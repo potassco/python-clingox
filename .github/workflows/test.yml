@@ -17,23 +17,13 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: setup miniconda
-      uses: conda-incubator/setup-miniconda@v2
-      with:
-        auto-update-conda: true
-        python-version: ${{ matrix.python-version }}
-        activate-environment: clingox
-        channels: potassco/label/dev,conda-forge
-
     - name: install prerequisites
       shell: pwsh
-      run: conda install clingo clingo-dl clingcon mypy pylint coverage
+      run: pip install --extra-index-url https://test.pypi.org/simple/ clingo clingo-dl clingcon flake8 mypy pylint coverage --upgrade
 
     - name: info
       shell: pwsh
       run: |
-        conda info
-        conda list
         python -VV
 
     - name: test
@@ -42,4 +32,5 @@ jobs:
         coverage run -m unittest discover -v
         mypy -p clingox
         pylint clingox
+        flake8
         coverage report --fail-under=100

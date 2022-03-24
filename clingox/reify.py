@@ -67,8 +67,8 @@ from clingo.symbol import Function, Number, Symbol, String
 from .theory import is_operator
 __all__ = ['Reifier', 'theory_symbols', 'reify']
 
-T = TypeVar('T') # pylint: disable=invalid-name
-U = TypeVar('U', int, Tuple[int, int]) # pylint: disable=invalid-name
+T = TypeVar('T')  # pylint: disable=invalid-name
+U = TypeVar('U', int, Tuple[int, int])  # pylint: disable=invalid-name
 
 
 @dataclass
@@ -80,6 +80,7 @@ class _Vertex(Generic[T]):
     visited: int
     index: int = 0
     edges: List[int] = field(default_factory=list)
+
 
 class _Graph(Generic[T]):
     '''
@@ -124,6 +125,7 @@ class _Graph(Generic[T]):
         stack = []
         trail = []
         index = 1
+
         def push(key_u: int):
             nonlocal index
             index += 1
@@ -171,6 +173,7 @@ class _Graph(Generic[T]):
         self._phase = not self._phase
         return sccs
 
+
 @dataclass
 class _StepData:
     atom_tuples: Dict[Sequence[int], int] = field(default_factory=dict)
@@ -180,14 +183,18 @@ class _StepData:
     theory_element_tuples: Dict[Sequence[int], int] = field(default_factory=dict)
     graph: _Graph = field(default_factory=_Graph)
 
+
 def _theory(i: Symbol, pos: int, lit: int) -> Sequence[Symbol]:
     return [i, Number(pos), Number(lit)]
+
 
 def _lit(i: Symbol, lit: int) -> Sequence[Symbol]:
     return [i, Number(lit)]
 
+
 def _wlit(i: Symbol, wlit: Tuple[int, int]) -> Sequence[Symbol]:
     return [i, Number(wlit[0]), Number(wlit[1])]
+
 
 class Reifier(Observer):
     '''
@@ -203,10 +210,10 @@ class Reifier(Observer):
         Flag to add a number as the last argument of all reification symbols for the corresponding step
 
     '''
-    #pylint:disable=too-many-public-methods
+    # pylint:disable=too-many-public-methods
     _step: int
     # Bug in mypy???
-    #_cb: Callable[[Symbol], None]
+    # _cb: Callable[[Symbol], None]
     _calculate_sccs: bool
     _reify_steps: bool
     _step_data: _StepData
@@ -259,7 +266,6 @@ class Reifier(Observer):
                     self._output(name, afun(i, atm))
         return i
 
-
     def _atom_tuple(self, atoms: Sequence[int]):
         return self._tuple("atom_tuple", self._step_data.atom_tuples, atoms, _lit)
 
@@ -289,7 +295,7 @@ class Reifier(Observer):
         hd = Function(hn, [self._atom_tuple(head)])
         bd = Function("sum", [self._wlit_tuple(body), Number(lower_bound)])
         self._output("rule", [hd, bd])
-        self._add_edges(head, [l for l, w in  body])
+        self._add_edges(head, [lit for lit, w in body])
 
     def minimize(self, priority: int, literals: Sequence[Tuple[int, int]]) -> None:
         self._output("minimize", [Number(priority), self._wlit_tuple(literals)])
@@ -331,7 +337,6 @@ class Reifier(Observer):
                   condition: Sequence[int]) -> None:
         self._output("edge", [Number(node_u), Number(node_v), self._lit_tuple(condition)])
 
-
     def theory_term_number(self, term_id: int, number: int) -> None:
         self._output("theory_number", [Number(term_id), Number(number)])
 
@@ -359,7 +364,6 @@ class Reifier(Observer):
         tuple_e_id = self._tuple("theory_element_tuple", self._step_data.theory_element_tuples, elements, _lit)
         self._output("theory_atom", [Number(atom_id_or_zero), Number(term_id), tuple_e_id])
 
-
     def theory_atom_with_guard(self, atom_id_or_zero: int, term_id: int,
                                elements: Sequence[int], operator_id: int,
                                right_hand_side_id: int) -> None:
@@ -375,6 +379,7 @@ class Reifier(Observer):
             self.calculate_sccs()
             self._step += 1
             self._step_data = _StepData()
+
 
 def theory_symbols(reification_symbols: Sequence[Symbol]):
     '''
@@ -436,20 +441,20 @@ def theory_symbols(reification_symbols: Sequence[Symbol]):
             if len(s.arguments) == 1:
                 t_tuple.setdefault(idx, [])
             else:
-                if not idx in t_tuple:
+                if idx not in t_tuple:
                     continue
-                l = t_tuple[idx]
+                tup = t_tuple[idx]
                 if not s.arguments[2].number in t_basic:
                     del t_tuple[idx]
                     continue
-                l.append(t_basic[s.arguments[2].number])
+                tup.append(t_basic[s.arguments[2].number])
         elif name == "theory_function":
             if not s.arguments[1].number in t_basic:
                 continue
             s = Function(t_basic[s.arguments[1].number].name, t_tuple[s.arguments[2].number])
             t_basic.setdefault(idx, s)
         elif name == "theory_sequence":
-            if  s.arguments[1].name != 'tuple':
+            if s.arguments[1].name != 'tuple':
                 raise RuntimeError(f"Not supported {str(s)}")
             s = Function("", t_tuple[s.arguments[2].number])
             t_basic.setdefault(idx, s)
@@ -460,6 +465,7 @@ def theory_symbols(reification_symbols: Sequence[Symbol]):
             new_symbols.append(Function("theory_symbol", [Number(idx), s]))
 
     return new_symbols
+
 
 def reify(prg: str, reify_steps: bool = True) -> List[Symbol]:
     '''

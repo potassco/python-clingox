@@ -40,6 +40,7 @@ TEST_THEORY = """\
 LOC = Location(Position("a", 1, 2),
                Position("a", 1, 2))
 
+
 class Extractor(Transformer):
     '''
     Simple visitor returning the first theory term in a program.
@@ -57,15 +58,19 @@ class Extractor(Transformer):
         self.atom = x
         return x
 
+
 def theory_atom(s: str) -> AST:
     """
     Convert string to theory term.
     """
     v = Extractor()
+
     def visit(stm):
         v(stm)
+
     parse_string(f"{s}.", visit)
     return cast(AST, v.atom)
+
 
 def last_stm(s: str) -> AST:
     """
@@ -73,6 +78,7 @@ def last_stm(s: str) -> AST:
     """
     v = Extractor()
     stm = None
+
     def set_stm(x):
         nonlocal stm
         stm = x
@@ -82,11 +88,13 @@ def last_stm(s: str) -> AST:
 
     return cast(AST, stm)
 
+
 def parse_term(s: str) -> str:
     """
     Parse the given theory term using a simple parse table for testing.
     """
     return str(TheoryTermParser(TERM_TABLE["t"])(theory_atom(f"&p {{{s}}}").elements[0].terms[0]))
+
 
 def parse_atom(s: str, parser: Optional[TheoryParser] = None) -> str:
     """
@@ -96,6 +104,7 @@ def parse_atom(s: str, parser: Optional[TheoryParser] = None) -> str:
         parser = TheoryParser(TERM_TABLE, ATOM_TABLE)
 
     return str(parser(theory_atom(s)))
+
 
 def parse_stm(s: str, parser: Optional[TheoryParser] = None) -> str:
     """
@@ -112,12 +121,15 @@ def parse_theory(s: str) -> TheoryParser:
     Turn the given theory into a parser.
     """
     parser = None
+
     def extract(stm):
         nonlocal parser
         if stm.ast_type == ASTType.TheoryDefinition:
             parser = theory_parser_from_definition(stm)
+
     parse_string(f"{s}.", extract)
     return cast(TheoryParser, parser)
+
 
 def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
     '''
@@ -125,13 +137,16 @@ def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
     '''
     prg: List[str]
     prg = []
+
     def append(stm):
         nonlocal prg
         ret = f(stm)
         if ret is not None:
             prg.append(str(ret))
+
     parse_string(s, append)
     return prg
+
 
 def test_ast_dict(tc: TestCase, s: str):
     '''

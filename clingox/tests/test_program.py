@@ -38,6 +38,7 @@ def _remap(prg: Program, mapping=None):
 
     return chk
 
+
 def _plus10(atom):
     '''
     Simple mapping adding +10 to every atom.
@@ -124,7 +125,6 @@ class TestProgram(TestCase):
                 output_atoms=out10,
                 rules=[Rule(choice=False, head=[11], body=[12, -13])]),
             'a :- b, not c.')
-
 
     def test_aux_lit(self):
         '''

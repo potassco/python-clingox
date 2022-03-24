@@ -38,6 +38,7 @@ from clingo import Symbol, Function, String, Tuple_, Number, SymbolType, TheoryT
 __all__ = ['evaluate', 'invert_symbol', 'is_operator', 'require_number', 'TermEvaluator']
 __pdoc__ = {}
 
+
 def require_number(x: Symbol) -> int:
     '''
     Requires the argument to be a number returning the given number or throwing
@@ -47,6 +48,7 @@ def require_number(x: Symbol) -> int:
         return x.number
 
     raise TypeError('number exepected')
+
 
 def invert_symbol(sym: Symbol) -> Symbol:
     '''
@@ -69,6 +71,7 @@ def invert_symbol(sym: Symbol) -> Symbol:
 
     raise TypeError('cannot invert symbol')
 
+
 def is_operator(op: str):
     '''
     Return true if the given string is an operator.
@@ -83,6 +86,7 @@ def is_operator(op: str):
     Whether the string is an operator name.
     '''
     return op and op[0] in "/!<=>+-*\\?&@|:;~^."
+
 
 def _unquote(s: str) -> str:
     '''
@@ -222,7 +226,9 @@ class TermEvaluator:
 
         raise RuntimeError("cannot evaluate term")
 
+
 __pdoc__['TermEvaluator.__call__'] = True
+
 
 def evaluate(term: TheoryTerm) -> Symbol:
     '''

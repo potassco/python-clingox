@@ -46,8 +46,10 @@ def _get_command_line_reification(prg):
         os.unlink(name_in)
         os.unlink(name_out)
 
+
 def _out(name, args, step: Optional[int]):
     return Function(name, args if step is None else args + [Number(step)])
+
 
 def _at(idx: int, atoms: List[int], step: Optional[int] = None):
     ret = set()
@@ -56,6 +58,7 @@ def _at(idx: int, atoms: List[int], step: Optional[int] = None):
         ret.add(_out('atom_tuple', [Number(idx), Number(atm)], step))
     return ret
 
+
 def _lt(idx: int, lits: List[int], step: Optional[int] = None):
     ret = set()
     ret.add(_out('literal_tuple', [Number(idx)], step))
@@ -63,8 +66,10 @@ def _lt(idx: int, lits: List[int], step: Optional[int] = None):
         ret.add(_out('literal_tuple', [Number(idx), Number(lit)], step))
     return ret
 
+
 def _tag(inc: bool):
     return {_out('tag', [Function('incremental')], None)} if inc else set()
+
 
 def _scc(idx: int, scc: List[int], step: Optional[int] = None):
     ret = set()
@@ -72,21 +77,26 @@ def _scc(idx: int, scc: List[int], step: Optional[int] = None):
         ret.add(_out('scc', [Number(idx), Number(atm)], step))
     return ret
 
+
 def _rule(hd, bd, choice=False, step: Optional[int] = None):
     t = 'choice' if choice else 'disjunction'
     return {_out('rule', [Function(t, [Number(hd)]),
                           Function('normal', [Number(bd)])], step)}
 
+
 def _output(sym: Symbol, lt: int, step: Optional[int] = None):
     return {_out('output', [sym, Number(lt)], step)}
+
 
 GRAMMAR = """
 #theory theory{
     term { <?  : 4, binary, left;
-	        <  : 5, unary   };
+            <  : 5, unary   };
     &tel/0     : term, any;
     &tel2/0 : term, {=}, term, head }.
 """
+
+
 class TestReifier(TestCase):
     '''
     Tests for the Reifier.
@@ -210,12 +220,10 @@ class TestReifier(TestCase):
                     'assume(0,1)']
         self.assertTrue(all(x in out_str for x in expected))
 
-
     def test_csp(self):
         '''
         Test csp output
         '''
-        #Could be just added to test_simple once libreify is fixed
         prg = '$x$=1.'
         out_str = [str(s) for s in reify(prg, False)]
         r = _get_command_line_reification(prg)

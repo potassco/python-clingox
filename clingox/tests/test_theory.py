@@ -37,6 +37,7 @@ def eval_term_sym(s: str) -> Symbol:
         return evaluate(x.elements[0].terms[0])
     assert False
 
+
 def eval_term(s: str) -> str:
     """
     Evaluate the given theory term and return its string representation.
