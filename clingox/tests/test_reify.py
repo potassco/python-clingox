@@ -10,6 +10,7 @@ from unittest import TestCase
 from typing import Any, Callable, Union, cast
 
 from clingo.control import Control
+from clingo.symbolic_atoms import SymbolicAtom
 from clingo.symbol import Function
 from clingo.application import Application, clingo_main
 
@@ -138,7 +139,18 @@ class TestReifier(TestCase):
         '''
         Test reification of different language elements.
         '''
+
+        def assume(ctl: Control):
+            ctl.add("base", [], '{a;b}.')
+            ctl.ground([('base', [])])
+
+            lit_a = cast(SymbolicAtom, ctl.symbolic_atoms[Function("a")]).literal
+            lit_b = cast(SymbolicAtom, ctl.symbolic_atoms[Function("b")]).literal
+            ctl.solve(assumptions=[lit_a, lit_b])
+            ctl.solve(assumptions=[-lit_a, -lit_b])
+
         prgs = [
+            assume,
             GRAMMAR + '&tel { a <? b: x}. { x }.',
             GRAMMAR + '&tel { a("s") <? b({2,3}) }.',
             GRAMMAR + '&tel { a <? b([2,c(1)]) }.',
