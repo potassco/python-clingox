@@ -178,19 +178,12 @@ class TestReifier(TestCase):
         for sym in expected:
             self.assertIn(sym, symbols)
 
-    def test_fail(self):
-        '''
-        Test reification of different language elements.
-        '''
-        prg = GRAMMAR + '&tel { a <? b: x}. { x }.'
-        self.assertListEqual(_reify(prg), _reify_check(prg), prg)
-
     def test_reify(self):
         '''
         Test reification of different language elements.
         '''
         prgs = [
-            # GRAMMAR + '&tel { a <? b: x}. { x }.',
+            GRAMMAR + '&tel { a <? b: x}. { x }.',
             GRAMMAR + '&tel { a("s") <? b({2,3}) }.',
             GRAMMAR + '&tel { a <? b([2,c(1)]) }.',
             GRAMMAR + '&tel { a(s) <? b((2,3)) }.',

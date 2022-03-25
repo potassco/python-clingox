@@ -367,8 +367,8 @@ class Reifier(Observer):
 
     def theory_element(self, element_id: int, terms: Sequence[int],
                        condition: Sequence[int]) -> None:
-        condition_id = self._tuple("literal_tuple", self._step_data.lit_tuples, condition, _lit)
         tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, terms, _theory, True)
+        condition_id = self._tuple("literal_tuple", self._step_data.lit_tuples, condition, _lit)
         self._output("theory_element", [Number(element_id), tuple_id, condition_id])
 
     def theory_atom(self, atom_id_or_zero: int, term_id: int,
