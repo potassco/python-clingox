@@ -7,24 +7,38 @@ from tempfile import NamedTemporaryFile
 from multiprocessing import Process
 from unittest import TestCase
 
-from typing import List, Optional
+from typing import Any, Callable, Union, cast
 
 from clingo.control import Control
-from clingo.symbol import Function, Number, Symbol
-from clingo.__main__ import PyClingoApplication
-from clingo.application import clingo_main
+from clingo.symbol import Function
+from clingo.application import Application, clingo_main
 
-from ..reify import Reifier, theory_symbols, reify_program
+from ..reify import Reifier, reify_program, theory_symbols
+
+
+class _Application(Application):
+    def __init__(self, main):
+        self._main = main
+
+    def main(self, control, files):
+        self._main(control)  # nocoverage
 
 
 def _reify(prg, calculate_sccs: bool = False, reify_steps: bool = False):
-    return [str(sym) for sym in reify_program(prg, calculate_sccs, reify_steps)]
+    if isinstance(prg, str):
+        symbols = reify_program(prg, calculate_sccs, reify_steps)
+    else:
+        ctl = Control()
+        symbols = []
+        reifier = Reifier(symbols.append, calculate_sccs, reify_steps)
+        ctl.register_observer(reifier)
+        prg(ctl)
+
+    return [str(sym) for sym in symbols]
 
 
-def _reify_check(prg, calculate_sccs: bool = False, reify_steps: bool = False):
-    with NamedTemporaryFile(delete=False) as temp_in, NamedTemporaryFile(delete=False) as temp_out:
-        temp_in.write(prg.encode())
-        name_in = temp_in.name
+def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: bool = False, reify_steps: bool = False):
+    with NamedTemporaryFile(delete=False) as temp_out:
         name_out = temp_out.name
 
     try:
@@ -38,9 +52,16 @@ def _reify_check(prg, calculate_sccs: bool = False, reify_steps: bool = False):
             args.append('--reify-sccs')
         if reify_steps:
             args.append('--reify-steps')
-        args.append(name_in)
 
-        proc = Process(target=clingo_main, args=(PyClingoApplication(), args))
+        if isinstance(prg, str):
+            def app_main(ctl: Control):
+                ctl.add('base', [], cast(str, prg))  # nocoverage
+                ctl.ground([('base', [])])  # nocoverage
+                ctl.solve()  # nocoverage
+        else:
+            app_main = cast(Any, prg)
+
+        proc = Process(target=clingo_main, args=(_Application(app_main), args))
         proc.start()
         proc.join()
 
@@ -52,49 +73,7 @@ def _reify_check(prg, calculate_sccs: bool = False, reify_steps: bool = False):
             return [s.rstrip('.\n') for s in file_out]
 
     finally:
-        os.unlink(name_in)
         os.unlink(name_out)
-
-
-def _out(name, args, step: Optional[int]):
-    return Function(name, args if step is None else args + [Number(step)])
-
-
-def _at(idx: int, atoms: List[int], step: Optional[int] = None):
-    ret = set()
-    ret.add(_out('atom_tuple', [Number(idx)], step))
-    for atm in atoms:
-        ret.add(_out('atom_tuple', [Number(idx), Number(atm)], step))
-    return ret
-
-
-def _lt(idx: int, lits: List[int], step: Optional[int] = None):
-    ret = set()
-    ret.add(_out('literal_tuple', [Number(idx)], step))
-    for lit in lits:
-        ret.add(_out('literal_tuple', [Number(idx), Number(lit)], step))
-    return ret
-
-
-def _tag(inc: bool):
-    return {_out('tag', [Function('incremental')], None)} if inc else set()
-
-
-def _scc(idx: int, scc: List[int], step: Optional[int] = None):
-    ret = set()
-    for atm in scc:
-        ret.add(_out('scc', [Number(idx), Number(atm)], step))
-    return ret
-
-
-def _rule(hd, bd, choice=False, step: Optional[int] = None):
-    t = 'choice' if choice else 'disjunction'
-    return {_out('rule', [Function(t, [Number(hd)]),
-                          Function('normal', [Number(bd)])], step)}
-
-
-def _output(sym: Symbol, lt: int, step: Optional[int] = None):
-    return {_out('output', [sym, Number(lt)], step)}
 
 
 GRAMMAR = """
@@ -113,45 +92,19 @@ class TestReifier(TestCase):
 
     def test_incremental(self):
         '''
-        Test `#step 0. a :- b. b :- a. #step 1. c :- d. d :- c. `.
-
-        TODO: By passing a custom main function to reify_check, we can simplify
-        this and get rid of all the helper functions.
+        Test incremental reification.
         '''
-        ctl = Control()
-        x = set()
-        reifier = Reifier(x.add, True, True)
-        ctl.register_observer(reifier)
 
-        with ctl.backend() as bck:
-            a = bck.add_atom(Function('a'))
-            b = bck.add_atom(Function('b'))
-            bck.add_rule([a], [b])
-            bck.add_rule([b], [a])
-        ctl.solve()
-        with ctl.backend() as bck:
-            c = bck.add_atom(Function('c'))
-            d = bck.add_atom(Function('d'))
-            bck.add_rule([c], [d])
-            bck.add_rule([d], [c])
-        ctl.solve()
-        self.assertSetEqual(
-            _tag(True) |
-            _at(0, [1], 0) | _at(1, [2], 0) |
-            _lt(0, [2], 0) | _lt(1, [1], 0) |
-            _rule(0, 0, step=0) |
-            _rule(1, 1, step=0) |
-            _output(Function('a'), 1, 0) |
-            _output(Function('b'), 0, 0) |
-            _scc(0, [1, 2], 0) |
-            _at(0, [3], 1) | _at(1, [4], 1) |
-            _lt(0, [4], 1) | _lt(1, [3], 1) |
-            _rule(0, 0, step=1) |
-            _rule(1, 1, step=1) |
-            _output(Function('c'), 1, 1) |
-            _output(Function('d'), 0, 1) |
-            _scc(0, [3, 4], 1),
-            x)
+        def test_main(ctl: Control):
+            ctl.add('step0', [], 'a :- b. b :- a. {a;b}.')
+            ctl.ground([('step0', [])])
+            ctl.solve()
+            ctl.add('step1', [], 'c :- d. d :- c. {c;d}.')
+            ctl.ground([('step1', [])])
+            ctl.solve()
+
+        self.assertSetEqual(set(_reify(test_main, True, True)),
+                            set(_reify_check(test_main, True, True)))
 
     def test_assume(self):
         '''
