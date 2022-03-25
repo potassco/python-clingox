@@ -103,6 +103,9 @@ class TestReifier(TestCase):
             ctl.ground([('step1', [])])
             ctl.solve()
 
+        # Note: we use sets here because the reification of sccs does not
+        # exactly follow what clingo does. In priniciple, it would be possible
+        # to implement this in the same fashion clingo does.
         self.assertSetEqual(set(_reify(test_main, True, True)),
                             set(_reify_check(test_main, True, True)))
 
