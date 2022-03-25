@@ -103,6 +103,15 @@ def _assume(ctl: Control):
     ctl.solve(assumptions=[-lit_a, -lit_b])
 
 
+def _incremental(ctl: Control):
+    ctl.add('step0', [], 'a :- b. b :- a. {a;b}.')
+    ctl.ground([('step0', [])])
+    ctl.solve()
+    ctl.add('step1', [], 'c :- d. d :- c. {c;d}.')
+    ctl.ground([('step1', [])])
+    ctl.solve()
+
+
 class TestReifier(TestCase):
     '''
     Tests for the Reifier.
@@ -113,19 +122,11 @@ class TestReifier(TestCase):
         Test incremental reification.
         '''
 
-        def test_main(ctl: Control):
-            ctl.add('step0', [], 'a :- b. b :- a. {a;b}.')
-            ctl.ground([('step0', [])])
-            ctl.solve()
-            ctl.add('step1', [], 'c :- d. d :- c. {c;d}.')
-            ctl.ground([('step1', [])])
-            ctl.solve()
-
         # Note: we use sets here because the reification of sccs does not
         # exactly follow what clingo does. In priniciple, it would be possible
         # to implement this in the same fashion clingo does.
-        self.assertSetEqual(set(_reify(test_main, True, True)),
-                            set(_reify_check(test_main, True, True)))
+        self.assertSetEqual(set(_reify(_incremental, True, True)),
+                            set(_reify_check(_incremental, True, True)))
 
     def test_reify(self):
         '''
