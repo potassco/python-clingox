@@ -14,10 +14,14 @@ from clingo.symbol import Function, Number, Symbol
 from clingo.__main__ import PyClingoApplication
 from clingo.application import clingo_main
 
-from ..reify import Reifier, theory_symbols, reify
+from ..reify import Reifier, theory_symbols, reify_program
 
 
-def _get_command_line_reification(prg):
+def _reify(prg, calculate_sccs: bool = False, reify_steps: bool = False):
+    return [str(sym) for sym in reify_program(prg, calculate_sccs, reify_steps)]
+
+
+def _reify_check(prg, calculate_sccs: bool = False, reify_steps: bool = False):
     with NamedTemporaryFile(delete=False) as temp_in, NamedTemporaryFile(delete=False) as temp_out:
         temp_in.write(prg.encode())
         name_in = temp_in.name
@@ -29,9 +33,14 @@ def _get_command_line_reification(prg):
         os.dup2(fd_out, 1)
         os.close(fd_out)
 
-        proc = Process(target=clingo_main,
-                       args=(PyClingoApplication(),
-                             ["--output=reify", "-Wnone", name_in]))
+        args = ["--output=reify", "-Wnone"]
+        if calculate_sccs:
+            args.append('--reify-sccs')
+        if reify_steps:
+            args.append('--reify-steps')
+        args.append(name_in)
+
+        proc = Process(target=clingo_main, args=(PyClingoApplication(), args))
         proc.start()
         proc.join()
 
@@ -90,9 +99,9 @@ def _output(sym: Symbol, lt: int, step: Optional[int] = None):
 
 GRAMMAR = """
 #theory theory{
-    term { <?  : 4, binary, left;
-            <  : 5, unary   };
-    &tel/0     : term, any;
+    term { <? : 4, binary, left;
+           <  : 5, unary };
+    &tel/0 : term, any;
     &tel2/0 : term, {=}, term, head }.
 """
 
@@ -102,46 +111,12 @@ class TestReifier(TestCase):
     Tests for the Reifier.
     '''
 
-    def test_simple_with_step(self):
-        '''
-        Test `a :- b. b :- a. c:-d.`.
-
-        TODO: we can use _get_command_line_reification to do this instead.
-        '''
-        ctl = Control()
-        x = set()
-        reifier = Reifier(x.add, True)
-        ctl.register_observer(reifier)
-        with ctl.backend() as bck:
-            a = bck.add_atom(Function('a'))
-            b = bck.add_atom(Function('b'))
-            c = bck.add_atom(Function('c'))
-            d = bck.add_atom(Function('d'))
-            bck.add_rule([a], [b])
-            bck.add_rule([b], [a])
-            bck.add_rule([c], [d])
-        reifier.calculate_sccs()
-        self.assertSetEqual(
-            _tag(True) |
-            _at(0, [1]) | _at(1, [2]) |
-            _lt(0, [2]) | _lt(1, [1]) |
-            _rule(0, 0) |
-            _rule(1, 1) |
-            _output(Function('a'), 1) |
-            _output(Function('b'), 0) |
-            _at(2, [3]) |
-            _lt(2, [4]) | _lt(3, [3]) |
-            _rule(2, 2) |
-            _output(Function('c'), 3) |
-            _output(Function('d'), 2) |
-            _scc(0, [1, 2]),
-            x)
-
     def test_incremental(self):
         '''
         Test `#step 0. a :- b. b :- a. #step 1. c :- d. d :- c. `.
 
-        TODO: we can use _get_command_line_reification to do this instead.
+        TODO: By passing a custom main function to reify_check, we can simplify
+        this and get rid of all the helper functions.
         '''
         ctl = Control()
         x = set()
@@ -178,109 +153,74 @@ class TestReifier(TestCase):
             _scc(0, [3, 4], 1),
             x)
 
-    def test_external(self):
-        '''
-        Test external directive
-        '''
-        prg = '#external a.'
-        ctl = Control()
-        x = []
-        reifier = Reifier(x.append, reify_steps=True)
-        ctl.register_observer(reifier)
-        ctl.add("base", [], prg)
-        ctl.ground([('base', [])])
-        ctl.solve()
-        ctl.assign_external(Function("a"), True)
-        ctl.solve()
-        ctl.assign_external(Function("a"), False)
-        ctl.solve()
-        ctl.release_external(Function("a"))
-        out_str = [str(s) for s in x]
-        expected = ['literal_tuple(0,0)', 'literal_tuple(0,1,0)', 'external(0,false,0)',
-                    'external(0,true,1)', 'external(0,false,2)', 'external(0,false,3)']
-        self.assertTrue(all(x in out_str for x in expected))
-
     def test_assume(self):
         '''
-        Test assumed
+        Test reification of assumptions.
         '''
-        prg = 'b:-a.'
+        symbols = []
+        reifier = Reifier(lambda sym: symbols.append(str(sym)), reify_steps=True)
+
         ctl = Control()
-        x = []
-        reifier = Reifier(x.append, reify_steps=True)
         ctl.register_observer(reifier)
-        ctl.add("base", [], prg)
+
+        ctl.add("base", [], '{a;b}.')
         ctl.ground([('base', [])])
-        ctl.solve(assumptions=[(Function("a"), True)])
-        ctl.solve(assumptions=[(Function("a"), False)])
-        out_str = [str(s) for s in x]
-        expected = ['literal_tuple(0,0)',
-                    'literal_tuple(0,-1,0)',
-                    'assume(0,0)',
-                    'literal_tuple(0,1)',
-                    'literal_tuple(0,1,1)',
-                    'assume(0,1)']
-        self.assertTrue(all(x in out_str for x in expected))
 
-    def test_csp(self):
-        '''
-        Test csp output
-        '''
-        prg = '$x$=1.'
-        out_str = [str(s) for s in reify(prg, False)]
-        r = _get_command_line_reification(prg)
-        self.assertListEqual(out_str, r)
+        lit_a = ctl.symbolic_atoms[Function("a")].literal
+        lit_b = ctl.symbolic_atoms[Function("b")].literal
+        ctl.solve(assumptions=[lit_a, lit_b])
+        ctl.solve(assumptions=[-lit_a, -lit_b])
 
-    def test_simple(self):
+        expected = [f'assume({lit_a},0)',
+                    f'assume({lit_b},0)',
+                    f'assume({-lit_a},1)',
+                    f'assume({-lit_b},1)']
+        for sym in expected:
+            self.assertIn(sym, symbols)
+
+    def test_fail(self):
         '''
-        Test simple programs without adding the step
+        Test reification of different language elements.
+        '''
+        prg = GRAMMAR + '&tel { a <? b: x}. { x }.'
+        self.assertListEqual(_reify(prg), _reify_check(prg), prg)
+
+    def test_reify(self):
+        '''
+        Test reification of different language elements.
         '''
         prgs = [
-            '{a(1);a(2)}2. :-a(1..2).',
+            # GRAMMAR + '&tel { a <? b: x}. { x }.',
+            GRAMMAR + '&tel { a("s") <? b({2,3}) }.',
+            GRAMMAR + '&tel { a <? b([2,c(1)]) }.',
+            GRAMMAR + '&tel { a(s) <? b((2,3)) }.',
+            GRAMMAR + '&tel2 { a <? b } = c.',
+            'a :- b. b :- a. c :- d. {a; d}.',
+            '$x$=1.',
+            '{ a(1); a(2) } 2. :- a(1..2).',
             ':- not b. {b}.',
-            '{a(1..4)}.:- #count{X:a(X)} >2.',
-            'a(1..2). #show b(X):a(X).',
-            '1{a(1..2)}. #minimize{X@2:a(X)}.',
-            '{a(1..2)}. #show c:a(_). #show.',
+            '{ a(1..4) }. :- #count{ X: a(X) } > 2.',
+            'a(1..2). #show b(X): a(X).',
+            '1{ a(1..2) }. #minimize { X@2: a(X) }.',
+            '{ a(1..2)}. #show c: a(_). #show.',
+            '#external a. [true]',
+            '#external a. [false]',
+            '#external a. [free]',
             '#heuristic a. [1,true] {a}.',
-            '#project c : a. {a;c;b}. #project b: a.',
-            '#edge (a,b) : c. {c}.'
+            '#project c: a. { a; b; c }. #project b: a.',
+            '#edge (a,b): c. {c}.'
         ]
         for prg in prgs:
-            out_str = [str(s) for s in reify(prg, False)]
-            r = _get_command_line_reification(prg)
-            self.assertListEqual(out_str, r)
-
-    def test_theory_element(self):
-        '''
-        Test theory element order
-        '''
-        # Could be just added to test_theory once libreify is fixed for the order
-        prg = GRAMMAR + '&tel{ a <? b: x}. {x}.'
-        reify(prg, False)
-
-    def test_theory(self):
-        """
-        Test programs using theory
-        """
-        prgs = [
-            '&tel{ a("s") <? b({2,3}) }.',
-            '&tel{ a <? b([2,c(1)]) }.',
-            '&tel{ a(s) <? b((2,3)) }.',
-            '&tel2{ a <? b } = c.'
-        ]
-        for p in prgs:
-            prg = GRAMMAR + p
-            out_str = [str(s) for s in reify(prg, False)]
-            r = _get_command_line_reification(prg)
-            self.assertListEqual(out_str, r)
+            self.assertListEqual(_reify(prg), _reify_check(prg))
+            self.assertListEqual(_reify(prg, reify_steps=True), _reify_check(prg, reify_steps=True))
+            self.assertListEqual(_reify(prg, calculate_sccs=True), _reify_check(prg, calculate_sccs=True))
 
     def test_theory_symbols(self):
         """
-        Test function to get the theory_symbols
+        Test function to get symbols in a theory.
         """
-        prg = GRAMMAR + '&tel{ a(s) <? b((2,3)) }.'
-        x = reify(prg, False)
+        prg = GRAMMAR + '&tel { a(s) <? b((2,3)) }.'
+        x = reify_program(prg)
         t_s = theory_symbols(x)
         expected_new_symbols = [
             "theory_symbol(0,tel)",
@@ -297,7 +237,7 @@ class TestReifier(TestCase):
 
         # Complex formula with string
         prg = GRAMMAR + '&tel{ (a("s") <? c) <? b((2,3)) }.'
-        x = reify(prg, False)
+        x = reify_program(prg)
 
         t_s = theory_symbols(x)
         expected_new_symbols = [
@@ -315,5 +255,5 @@ class TestReifier(TestCase):
 
         # Error
         prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
-        x = reify(prg, False)
+        x = reify_program(prg)
         self.assertRaises(RuntimeError, theory_symbols, x)

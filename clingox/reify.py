@@ -1,71 +1,71 @@
 '''
-This module provides functions to work with reification.
+This module provides functions to reify programs.
 
-This includes an observer `Reifier` that will gather the reification symbols for the
-program, and the additional helper function `reify` to directly obtain the such list
-for a given program
+This includes a `Reifier` that implements clingo's `clingo.Observer` interface
+that can be registered with a `clingo.Control` object.
 
 Additionally, the function `theory_symbols` extracts the symbols used in theory
 atoms into the predicate `theory_symbol/2` to simplify meta-programming encodings.
 
-Example
--------
+Examples
+--------
 
-The following example shows how to
-
-- use the `Reifier` observer or the reify function
-- obtain additional `theory_symbol` symbols.
+The following example uses the `reify_program` function to reify a program:
 
 ```python-repl
->>> from clingox.reify import Reifier
+>>> from clingox.reify import reify_program
+>>> prg = 'b:-a. {a}.'
+>>> symbols = reify_program(prg)
+>>> print([str(sym) for sym in symbols])
+['tag(incremental)', 'atom_tuple(0)', 'atom_tuple(0,1)', 'literal_tuple(0)',
+'rule(choice(0),normal(0))', 'atom_tuple(1)', 'atom_tuple(1,2)',
+'literal_tuple(1)', 'literal_tuple(1,1)', 'rule(disjunction(1),normal(1))',
+'output(a,1)', 'literal_tuple(2)', 'literal_tuple(2,2)', 'output(b,2)']
+```
+
+The next example show how the `Reifier` class is used internally by the
+`reify_program` function:
+
+```python-repl
 >>> from clingo.control import Control
->>> prg = 'b:-a.{a}.'
+>>> from clingox.reify import Reifier
+>>> prg = 'b:-a. {a}.'
 >>> ctl = Control()
->>> reification_symbols = []
->>> reifier = Reifier(reification_symbols.append, reify_steps=False)
+>>> symbols = []
+>>> reifier = Reifier(symbols.append)
 >>> ctl.register_observer(reifier)
 >>> ctl.add("base", [], prg)
 >>> ctl.ground([('base', [])])
->>> print([str(s) for s in reification_symbols])
+>>> print([str(sym) for sym in symbols])
 ['tag(incremental)', 'atom_tuple(0)', 'atom_tuple(0,1)', 'literal_tuple(0)',
-'rule(choice(0),normal(0))', 'atom_tuple(1)', 'atom_tuple(1,2)', 'literal_tuple(1)',
-'literal_tuple(1,1)', 'rule(disjunction(1),normal(1))', 'output(a,1)', 'literal_tuple(2)',
-'literal_tuple(2,2)', 'output(b,2)']
+'rule(choice(0),normal(0))', 'atom_tuple(1)', 'atom_tuple(1,2)',
+'literal_tuple(1)', 'literal_tuple(1,1)', 'rule(disjunction(1),normal(1))',
+'output(a,1)', 'literal_tuple(2)', 'literal_tuple(2,2)', 'output(b,2)']
 ```
 
-Alternatively:
+The last example shows how to use `theory_symbols` function:
 
 ```python-repl
->>> from clingox.reify import reify
->>> prg = 'b:-a.{a}.'
->>> reification_symbols = reify(prg, reify_steps=False)
-```
-
-Obtain the theory symbols:
-
-```python-repl
->>> from clingox.reify import reify, theory_symbols
->>> grammar = '#theory theory{ term { <  : 5, unary   }; &tel/0     : term, any}.'
+>>> from clingox.reify import reify_program, theory_symbols
+>>> grammar = '#theory theory{ term { < : 5, unary }; &tel/0: term, any}.'
 >>> prg = grammar + '&tel{< a(1)}.'
->>> reification_symbols = reify(prg, reify_steps=False)
->>> theory_symbols = theory_symbols(reification_symbols)
+>>> symbols = reify_program(prg)
+>>> theory_symbols = theory_symbols(symbols)
 >>> print([str(s) for s in theory_symbols])
 ['theory_symbol(0,tel)', 'theory_symbol(2,a)', 'theory_symbol(4,a(1))']
 ```
-
-For theory symbols:
 '''
 
 from typing import Callable, Dict, Generic, List, Sequence, Tuple, TypeVar
 from dataclasses import dataclass, field
 
-import clingo
 from clingo.control import Control
 from clingo.backend import HeuristicType, Observer, TruthValue
-from clingo.symbol import Function, Number, Symbol, String
+from clingo.symbol import Function, Number, String, Symbol, SymbolType
 
 from .theory import is_operator
-__all__ = ['Reifier', 'theory_symbols', 'reify']
+
+__all__ = ['Reifier', 'theory_symbols', 'reify_program']
 
 T = TypeVar('T')  # pylint: disable=invalid-name
 U = TypeVar('U', int, Tuple[int, int])  # pylint: disable=invalid-name
@@ -188,11 +188,13 @@ def _theory(i: Symbol, pos: int, lit: int) -> Sequence[Symbol]:
     return [i, Number(pos), Number(lit)]
 
 
-def _lit(i: Symbol, lit: int) -> Sequence[Symbol]:
+def _lit(i: Symbol, pos: int, lit: int) -> Sequence[Symbol]:
+    # pylint: disable=unused-argument
     return [i, Number(lit)]
 
 
-def _wlit(i: Symbol, wlit: Tuple[int, int]) -> Sequence[Symbol]:
+def _wlit(i: Symbol, pos: int, wlit: Tuple[int, int]) -> Sequence[Symbol]:
+    # pylint: disable=unused-argument
     return [i, Number(wlit[0]), Number(wlit[1])]
 
 
@@ -252,18 +254,27 @@ class Reifier(Observer):
     def _tuple(self, name: str,
                snmap: Dict[Sequence[U], int],
                elems: Sequence[U],
-               afun: Callable,
+               afun: Callable[[Symbol, int, U], Sequence[Symbol]],
                ordered: bool = False) -> Symbol:
-        ident = tuple(elems) if ordered else tuple(sorted(set(elems)))
+        pruned: Sequence[U]
+        if ordered:
+            pruned = elems
+            ident = tuple(elems)
+        else:
+            seen = set()
+            pruned = []
+            for elem in elems:
+                if elem not in seen:
+                    seen.add(elem)
+                    pruned.append(elem)
+            ident = tuple(sorted(pruned))
+
         n = len(snmap)
         i = Number(snmap.setdefault(ident, n))
         if n == i.number:
             self._output(name, [i])
-            for idx, atm in enumerate(elems):
-                if ordered:
-                    self._output(name, afun(i, idx, atm))
-                else:
-                    self._output(name, afun(i, atm))
+            for idx, atm in enumerate(pruned):
+                self._output(name, afun(i, idx, atm))
         return i
 
     def _atom_tuple(self, atoms: Sequence[int]):
@@ -301,13 +312,11 @@ class Reifier(Observer):
         self._output("minimize", [Number(priority), self._wlit_tuple(literals)])
 
     def project(self, atoms: Sequence[int]) -> None:
-        self._output("project", [Number(atoms[0])])
+        for atom in atoms:
+            self._output("project", [Number(atom)])
 
     def output_atom(self, symbol: Symbol, atom: int) -> None:
-        if atom == 0:
-            self._output("output", [symbol, Number(0)])
-        else:
-            self._output("output", [symbol, self._lit_tuple([atom])])
+        self._output("output", [symbol, self._lit_tuple([] if atom == 0 else [atom])])
 
     def output_term(self, symbol: Symbol, condition: Sequence[int]) -> None:
         self._output("output", [symbol, self._lit_tuple(condition)])
@@ -317,15 +326,16 @@ class Reifier(Observer):
         self._output("output_csp", [symbol, Number(value), self._lit_tuple(condition)])
 
     def external(self, atom: int, value: TruthValue) -> None:
-        n = 'true' if value == TruthValue.True_ else 'false' if TruthValue.False_ else 'free'
-        self._output("external", [self._lit_tuple([atom]), Function(n, [])])
+        value_name = str(value).replace('TruthValue.', '').lower().rstrip('_')
+        self._output("external", [Number(atom), Function(value_name)])
 
     def assume(self, literals: Sequence[int]) -> None:
-        self._output("assume", [self._lit_tuple(literals)])
+        for lit in literals:
+            self._output("assume", [Number(lit)])
 
     def heuristic(self, atom: int, type_: HeuristicType, bias: int,
                   priority: int, condition: Sequence[int]) -> None:
-        type_name = str(type_).replace('HeuristicType.', '').lower().strip('_')
+        type_name = str(type_).replace('HeuristicType.', '').lower().rstrip('_')
         condition_lit = self._lit_tuple(condition)
         self._output("heuristic", [Number(atom),
                                    Function(type_name),
@@ -347,17 +357,19 @@ class Reifier(Observer):
                              arguments: Sequence[int]) -> None:
         names = {-1: "tuple", -2: "set", -3: "list"}
         if name_id_or_type in names:
-            n = ("theory_sequence", Function(names[name_id_or_type], []))
+            name = "theory_sequence"
+            value = Function(names[name_id_or_type])
         else:
-            n = ("theory_function", Number(name_id_or_type))
+            name = "theory_function"
+            value = Number(name_id_or_type)
         tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, arguments, _theory, True)
-        self._output(n[0], [Number(term_id), n[1], tuple_id])
+        self._output(name, [Number(term_id), value, tuple_id])
 
     def theory_element(self, element_id: int, terms: Sequence[int],
                        condition: Sequence[int]) -> None:
-        lit_con_id = self._tuple("literal_tuple", self._step_data.lit_tuples, condition, _lit)
+        condition_id = self._tuple("literal_tuple", self._step_data.lit_tuples, condition, _lit)
         tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, terms, _theory, True)
-        self._output("theory_element", [Number(element_id), tuple_id, lit_con_id])
+        self._output("theory_element", [Number(element_id), tuple_id, condition_id])
 
     def theory_atom(self, atom_id_or_zero: int, term_id: int,
                     elements: Sequence[int]) -> None:
@@ -367,10 +379,10 @@ class Reifier(Observer):
     def theory_atom_with_guard(self, atom_id_or_zero: int, term_id: int,
                                elements: Sequence[int], operator_id: int,
                                right_hand_side_id: int) -> None:
-        tuple_e_id = self._tuple("theory_element_tuple", self._step_data.theory_element_tuples, elements, _lit)
+        tuple_id = self._tuple("theory_element_tuple", self._step_data.theory_element_tuples, elements, _lit)
         self._output("theory_atom", [Number(atom_id_or_zero),
                                      Number(term_id),
-                                     tuple_e_id,
+                                     tuple_id,
                                      Number(operator_id),
                                      Number(right_hand_side_id)])
 
@@ -434,7 +446,7 @@ def theory_symbols(reification_symbols: Sequence[Symbol]):
         if name == "theory_string":
             val = s.arguments[1].string
             if not is_operator(val):
-                t_basic.setdefault(idx, Function(val, []))
+                t_basic.setdefault(idx, Function(val))
         elif name == "theory_number":
             t_basic.setdefault(idx, s.arguments[1])
         elif name == "theory_tuple":
@@ -461,31 +473,36 @@ def theory_symbols(reification_symbols: Sequence[Symbol]):
 
     new_symbols = []
     for idx, s in t_basic.items():
-        if s.type != clingo.SymbolType.Number:
+        if s.type != SymbolType.Number:
             new_symbols.append(Function("theory_symbol", [Number(idx), s]))
 
     return new_symbols
 
 
-def reify(prg: str, reify_steps: bool = True) -> List[Symbol]:
+def reify_program(prg: str, calculate_sccs: bool = False, reify_steps: bool = False) -> List[Symbol]:
     '''
-    Gets list of reification symbols for the given program
+    Reify the given program and return the reified symbols.
 
     Parameters
     ----------
     prg
-        Program string.
+        The program to reify in form of a string.
+    calculate_sccs
+        Whether to calculate SCCs of the reified program.
     reify_steps
-        If a step number is added at the end of each reification predicate
+        Whether to add a step number to the reified facts.
 
     Returns
     -------
-    A list of symbols containing the reified output
+    A list of symbols containing the reified facts.
     '''
+    ret: List[Symbol] = []
     ctl = Control()
-    x: List[Symbol] = []
-    reifier = Reifier(x.append, reify_steps)
+    reifier = Reifier(ret.append, calculate_sccs, reify_steps)
     ctl.register_observer(reifier)
     ctl.add("base", [], prg)
     ctl.ground([('base', [])])
-    return x
+    if calculate_sccs and not reify_steps:
+        reifier.calculate_sccs()
+
+    return ret
