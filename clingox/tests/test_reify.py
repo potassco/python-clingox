@@ -25,6 +25,16 @@ class _Application(Application):
         self._main(control)  # nocoverage
 
 
+class _AppMain:
+    def __init__(self, prg: str):
+        self._prg = prg
+
+    def __call__(self, ctl: Control):
+        ctl.add('base', [], self._prg)  # nocoverage
+        ctl.ground([('base', [])])  # nocoverage
+        ctl.solve()  # nocoverage
+
+
 def _reify(prg, calculate_sccs: bool = False, reify_steps: bool = False):
     if isinstance(prg, str):
         symbols = reify_program(prg, calculate_sccs, reify_steps)
@@ -55,10 +65,7 @@ def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: boo
             args.append('--reify-steps')
 
         if isinstance(prg, str):
-            def app_main(ctl: Control):
-                ctl.add('base', [], cast(str, prg))  # nocoverage
-                ctl.ground([('base', [])])  # nocoverage
-                ctl.solve()  # nocoverage
+            app_main = _AppMain(prg)
         else:
             app_main = cast(Any, prg)
 
@@ -86,6 +93,16 @@ GRAMMAR = """
 """
 
 
+def _assume(ctl: Control):
+    ctl.add("base", [], '{a;b}.')
+    ctl.ground([('base', [])])
+
+    lit_a = cast(SymbolicAtom, ctl.symbolic_atoms[Function("a")]).literal
+    lit_b = cast(SymbolicAtom, ctl.symbolic_atoms[Function("b")]).literal
+    ctl.solve(assumptions=[lit_a, lit_b])
+    ctl.solve(assumptions=[-lit_a, -lit_b])
+
+
 class TestReifier(TestCase):
     '''
     Tests for the Reifier.
@@ -110,47 +127,13 @@ class TestReifier(TestCase):
         self.assertSetEqual(set(_reify(test_main, True, True)),
                             set(_reify_check(test_main, True, True)))
 
-    def test_assume(self):
-        '''
-        Test reification of assumptions.
-        '''
-        symbols = []
-        reifier = Reifier(lambda sym: symbols.append(str(sym)), reify_steps=True)
-
-        ctl = Control()
-        ctl.register_observer(reifier)
-
-        ctl.add("base", [], '{a;b}.')
-        ctl.ground([('base', [])])
-
-        lit_a = ctl.symbolic_atoms[Function("a")].literal
-        lit_b = ctl.symbolic_atoms[Function("b")].literal
-        ctl.solve(assumptions=[lit_a, lit_b])
-        ctl.solve(assumptions=[-lit_a, -lit_b])
-
-        expected = [f'assume({lit_a},0)',
-                    f'assume({lit_b},0)',
-                    f'assume({-lit_a},1)',
-                    f'assume({-lit_b},1)']
-        for sym in expected:
-            self.assertIn(sym, symbols)
-
     def test_reify(self):
         '''
         Test reification of different language elements.
         '''
 
-        def assume(ctl: Control):
-            ctl.add("base", [], '{a;b}.')
-            ctl.ground([('base', [])])
-
-            lit_a = cast(SymbolicAtom, ctl.symbolic_atoms[Function("a")]).literal
-            lit_b = cast(SymbolicAtom, ctl.symbolic_atoms[Function("b")]).literal
-            ctl.solve(assumptions=[lit_a, lit_b])
-            ctl.solve(assumptions=[-lit_a, -lit_b])
-
         prgs = [
-            assume,
+            _assume,
             GRAMMAR + '&tel { a <? b: x}. { x }.',
             GRAMMAR + '&tel { a("s") <? b({2,3}) }.',
             GRAMMAR + '&tel { a <? b([2,c(1)]) }.',
