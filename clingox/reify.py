@@ -62,6 +62,7 @@ from dataclasses import dataclass, field
 from clingo.control import Control
 from clingo.backend import HeuristicType, Observer, TruthValue
 from clingo.symbol import Function, Number, String, Symbol, SymbolType
+from clingo.theory_atoms import TheoryTermType
 
 from .theory import is_operator
 
@@ -393,17 +394,18 @@ class Reifier(Observer):
             self._step_data = _StepData()
 
 
-class Theory:
+class ReifiedTheory:
     '''
     Class indexing the symbols related to a theory.
 
-    The `TheoryTerm`, `TheoryElement`, and `TheoryElement` classes provide
-    views on this data that behave as the corresponding classes in clingo's
-    `clingo.theory_atoms` module.
+    The `ReifiedTheoryTerm`, `ReifiedTheoryElement`, and `ReifiedTheoryElement`
+    classes provide views on this data that behave as the corresponding classes
+    in clingo's `clingo.theory_atoms` module.
     '''
     terms: List[Symbol]
     elements: List[Symbol]
     atoms: List[Symbol]
+    lit_tuples: List[List[int]]
     term_tuples: List[List[int]]
     element_tuples: List[List[int]]
 
@@ -411,45 +413,131 @@ class Theory:
         self.terms = []
         self.elements = []
         self.atoms = []
+        self.lit_tuples = []
         self.term_tuples = []
         self.element_tuples = []
 
-    def __iter__(self) -> Iterator['TheoryAtom']:
+    def __iter__(self) -> Iterator['ReifiedTheoryAtom']:
         for idx in range(len(self.atoms)):
-            yield TheoryAtom(idx, self)
+            yield ReifiedTheoryAtom(idx, self)
 
 
-class TheoryTerm:
+class ReifiedTheoryTerm:
     '''
     Class to represent theory terms.
 
-    Theory terms have a readable string representation, implement Python's rich
+    ReifiedTheory terms have a readable string representation, implement Python's rich
     comparison operators, and can be used as dictionary keys.
     '''
     _idx: int
-    _theory: Theory
+    _theory: ReifiedTheory
 
     def __init__(self, idx, theory):
         self._idx = idx
         self._theory = theory
 
+    @property
+    def index(self):
+        '''
+        The index of the corresponding reified fact.
+        '''
+        return self._idx
 
-class TheoryElement:
+    @property
+    def arguments(self) -> List['ReifiedTheoryTerm']:
+        '''
+        The arguments of the term (for functions, tuples, list, and sets).
+        '''
+        # TODO
+
+    @property
+    def name(self) -> str:
+        '''
+        The name of the term (for symbols and functions).
+        '''
+        # TODO
+
+    @property
+    def number(self) -> int:
+        '''
+        The numeric representation of the term (for numbers).
+        '''
+        # TODO
+
+    @property
+    def type(self) -> TheoryTermType:
+        '''
+        The type of the theory term.
+        '''
+        # TODO
+
+    def __hash__(self):
+        return self._idx
+
+    def __eq__(self, other):
+        return self._idx == other._idx
+
+    def __lt__(self, other):
+        return self._idx < other._idx
+
+    def __str__(self):
+        raise RuntimeError('implement me!!!')
+
+
+class ReifiedTheoryElement:
     '''
     Class to represent theory elements.
 
-    Theory elements have a readable string representation, implement Python's
+    ReifiedTheory elements have a readable string representation, implement Python's
     rich comparison operators, and can be used as dictionary keys.
     '''
     _idx: int
-    _theory: Theory
+    _theory: ReifiedTheory
 
     def __init__(self, idx, theory):
         self._idx = idx
         self._theory = theory
 
+    @property
+    def index(self):
+        '''
+        The index of the corresponding reified fact.
+        '''
+        return self._idx
 
-class TheoryAtom:
+    @property
+    def _args(self) -> Sequence[Symbol]:
+        return self._theory.atoms[self._idx].arguments
+
+    @property
+    def condition(self) -> List[int]:
+        '''
+        The condition of the element in form of a list of reified literals.
+        '''
+        return self._theory.lit_tuples[self._args[2].number]
+
+    @property
+    def terms(self) -> List[ReifiedTheoryTerm]:
+        '''
+        The tuple of the element.
+        '''
+        term_ids = self._theory.term_tuples[self._args[1].number]
+        return [ReifiedTheoryTerm(term_id, self._theory) for term_id in term_ids]
+
+    def __hash__(self):
+        return self._idx
+
+    def __eq__(self, other):
+        return self._idx == other._idx
+
+    def __lt__(self, other):
+        return self._idx < other._idx
+
+    def __str__(self):
+        raise RuntimeError('implement me!!!')
+
+
+class ReifiedTheoryAtom:
     '''
     Class to represent theory atoms.
 
@@ -457,27 +545,34 @@ class TheoryAtom:
     comparison operators, and can be used as dictionary keys.
     '''
     _idx: int
-    _theory: Theory
+    _theory: ReifiedTheory
 
-    def __init__(self, idx: int, theory: Theory):
+    def __init__(self, idx: int, theory: ReifiedTheory):
         self._idx = idx
         self._theory = theory
+
+    @property
+    def index(self):
+        '''
+        The index of the corresponding reified fact.
+        '''
+        return self._idx
 
     @property
     def _args(self) -> Sequence[Symbol]:
         return self._theory.atoms[self._idx].arguments
 
     @property
-    def elements(self) -> List[TheoryElement]:
+    def elements(self) -> List[ReifiedTheoryElement]:
         '''
         The elements of the atom.
         '''
         tuple_id = self._args[2].number
-        return [TheoryElement(elem_id, self._theory)
+        return [ReifiedTheoryElement(elem_id, self._theory)
                 for elem_id in self._theory.element_tuples[tuple_id]]
 
     @property
-    def guard(self) -> Optional[Tuple[str, TheoryTerm]]:
+    def guard(self) -> Optional[Tuple[str, ReifiedTheoryTerm]]:
         '''
         The guard of the atom or None if the atom has no guard.
         '''
@@ -486,21 +581,21 @@ class TheoryAtom:
             return None
 
         op = self._theory.terms[args[3].number].arguments[1].string
-        return (op, TheoryTerm(op, TheoryTerm(args[4].number, self._theory)))
+        return (op, ReifiedTheoryTerm(op, ReifiedTheoryTerm(args[4].number, self._theory)))
 
     @property
     def literal(self) -> int:
         '''
-        The program literal associated with the atom.
+        The reified literal associated with the atom.
         '''
         return self._args[0].number
 
     @property
-    def term(self) -> TheoryTerm:
+    def term(self) -> ReifiedTheoryTerm:
         '''
         The term of the atom.
         '''
-        return TheoryTerm(self._args[1].number, self._theory)
+        return ReifiedTheoryTerm(self._args[1].number, self._theory)
 
     def __hash__(self):
         return self._idx
