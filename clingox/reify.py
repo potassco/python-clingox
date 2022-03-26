@@ -56,7 +56,7 @@ The last example shows how to use `theory_symbols` function:
 ```
 '''
 
-from typing import Callable, Dict, Generic, List, Sequence, Tuple, TypeVar
+from typing import Callable, Dict, Generic, Iterator, List, Optional, Sequence, Tuple, TypeVar
 from dataclasses import dataclass, field
 
 from clingo.control import Control
@@ -391,6 +391,128 @@ class Reifier(Observer):
             self.calculate_sccs()
             self._step += 1
             self._step_data = _StepData()
+
+
+class Theory:
+    '''
+    Class indexing the symbols related to a theory.
+
+    The `TheoryTerm`, `TheoryElement`, and `TheoryElement` classes provide
+    views on this data that behave as the corresponding classes in clingo's
+    `clingo.theory_atoms` module.
+    '''
+    terms: List[Symbol]
+    elements: List[Symbol]
+    atoms: List[Symbol]
+    term_tuples: List[List[int]]
+    element_tuples: List[List[int]]
+
+    def __init__(self):
+        self.terms = []
+        self.elements = []
+        self.atoms = []
+        self.term_tuples = []
+        self.element_tuples = []
+
+    def __iter__(self) -> Iterator['TheoryAtom']:
+        for idx in range(len(self.atoms)):
+            yield TheoryAtom(idx, self)
+
+
+class TheoryTerm:
+    '''
+    Class to represent theory terms.
+
+    Theory terms have a readable string representation, implement Python's rich
+    comparison operators, and can be used as dictionary keys.
+    '''
+    _idx: int
+    _theory: Theory
+
+    def __init__(self, idx, theory):
+        self._idx = idx
+        self._theory = theory
+
+
+class TheoryElement:
+    '''
+    Class to represent theory elements.
+
+    Theory elements have a readable string representation, implement Python's
+    rich comparison operators, and can be used as dictionary keys.
+    '''
+    _idx: int
+    _theory: Theory
+
+    def __init__(self, idx, theory):
+        self._idx = idx
+        self._theory = theory
+
+
+class TheoryAtom:
+    '''
+    Class to represent theory atoms.
+
+    Theory atoms have a readable string representation, implement Python's rich
+    comparison operators, and can be used as dictionary keys.
+    '''
+    _idx: int
+    _theory: Theory
+
+    def __init__(self, idx: int, theory: Theory):
+        self._idx = idx
+        self._theory = theory
+
+    @property
+    def _args(self) -> Sequence[Symbol]:
+        return self._theory.atoms[self._idx].arguments
+
+    @property
+    def elements(self) -> List[TheoryElement]:
+        '''
+        The elements of the atom.
+        '''
+        tuple_id = self._args[2].number
+        return [TheoryElement(elem_id, self._theory)
+                for elem_id in self._theory.element_tuples[tuple_id]]
+
+    @property
+    def guard(self) -> Optional[Tuple[str, TheoryTerm]]:
+        '''
+        The guard of the atom or None if the atom has no guard.
+        '''
+        args = self._args
+        if len(args) <= 3:
+            return None
+
+        op = self._theory.terms[args[3].number].arguments[1].string
+        return (op, TheoryTerm(op, TheoryTerm(args[4].number, self._theory)))
+
+    @property
+    def literal(self) -> int:
+        '''
+        The program literal associated with the atom.
+        '''
+        return self._args[0].number
+
+    @property
+    def term(self) -> TheoryTerm:
+        '''
+        The term of the atom.
+        '''
+        return TheoryTerm(self._args[1].number, self._theory)
+
+    def __hash__(self):
+        return self._idx
+
+    def __eq__(self, other):
+        return self._idx == other._idx
+
+    def __lt__(self, other):
+        return self._idx < other._idx
+
+    def __str__(self):
+        raise RuntimeError('implement me!!!')
 
 
 def theory_symbols(reification_symbols: Sequence[Symbol]):
