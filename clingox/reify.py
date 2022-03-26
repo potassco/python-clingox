@@ -394,6 +394,30 @@ class Reifier(Observer):
             self._step_data = _StepData()
 
 
+def _set(matches, lst, sym, default=Number(0)):
+    for match in matches:
+        if not sym.match(*match):
+            continue
+        idx = sym.arguments[0].number
+        while len(lst) <= idx:
+            lst.append(default)
+        lst[idx] = sym
+        return True
+    return False
+
+
+def _ensure(name, lst, sym):
+    empty = sym.name.match(name, 1)
+    if empty or sym.name.match(name, 2):
+        idx = sym.arguments[0].number
+        while len(lst) <= idx:
+            lst.append([])
+        if not empty:
+            lst[idx].append(sym.arguments[1].number)
+        return True
+    return False
+
+
 class ReifiedTheory:
     '''
     Class indexing the symbols related to a theory.
@@ -409,13 +433,22 @@ class ReifiedTheory:
     term_tuples: List[List[int]]
     element_tuples: List[List[int]]
 
-    def __init__(self):
+    def __init__(self, symbols: Sequence[Symbol]):
         self.terms = []
         self.elements = []
         self.atoms = []
         self.lit_tuples = []
         self.term_tuples = []
         self.element_tuples = []
+
+        for sym in symbols:
+            _ = (_set((('theory_atom', 3), ('theory_atom', 5)), self.atoms, sym) or
+                 _set((('theory_element', 3),), self.elements, sym) or
+                 _set((('theory_sequence', 3), ('theory_string', 2),
+                       ('theory_number', 2), ('theory_function', 3)), self.elements, sym) or
+                 _ensure('literal_tuple', self.lit_tuples, sym) or
+                 _ensure('theory_tuples', self.term_tuples, sym) or
+                 _ensure('theory_element_tuple', self.element_tuples, sym))
 
     def __iter__(self) -> Iterator['ReifiedTheoryAtom']:
         for idx in range(len(self.atoms)):
@@ -433,6 +466,7 @@ class ReifiedTheoryTerm:
     _theory: ReifiedTheory
 
     def __init__(self, idx, theory):
+        assert idx < len(theory.terms)
         self._idx = idx
         self._theory = theory
 
@@ -444,32 +478,57 @@ class ReifiedTheoryTerm:
         return self._idx
 
     @property
+    def _args(self) -> Sequence[Symbol]:
+        return self._theory.terms[self._idx].arguments
+
+    @property
     def arguments(self) -> List['ReifiedTheoryTerm']:
         '''
         The arguments of the term (for functions, tuples, list, and sets).
         '''
-        # TODO
+        assert self.type in (TheoryTermType.List, TheoryTermType.Set,
+                             TheoryTermType.Tuple, TheoryTermType.Function)
+        term_ids = self._theory.term_tuples[self._args[1].number]
+        return [ReifiedTheoryTerm(term_id, self._theory) for term_id in term_ids]
 
     @property
     def name(self) -> str:
         '''
         The name of the term (for symbols and functions).
         '''
-        # TODO
+        assert self.type in (TheoryTermType.Symbol, TheoryTermType.Function)
+        return self._args[1].name
 
     @property
     def number(self) -> int:
         '''
         The numeric representation of the term (for numbers).
         '''
-        # TODO
+        assert self.type == TheoryTermType.Number
+        return self._args[1].number
 
     @property
     def type(self) -> TheoryTermType:
         '''
         The type of the theory term.
         '''
-        # TODO
+        name = self._theory.terms[self._idx].name
+        if name == "theory_number":
+            return TheoryTermType.Number
+        if name == "theory_string":
+            return TheoryTermType.Symbol
+        if name == "theory_function":
+            return TheoryTermType.Function
+        if name == "theory_tuple":
+            return TheoryTermType.Tuple
+        assert name == "theory_sequence"
+        type_ = self._args[0].name
+        if type_ == "tuple":
+            return TheoryTermType.Tuple
+        if type_ == "set":
+            return TheoryTermType.Set
+        assert type_ == "list"
+        return TheoryTermType.List
 
     def __hash__(self):
         return self._idx
@@ -495,6 +554,7 @@ class ReifiedTheoryElement:
     _theory: ReifiedTheory
 
     def __init__(self, idx, theory):
+        assert idx < len(theory.elements)
         self._idx = idx
         self._theory = theory
 
@@ -507,7 +567,7 @@ class ReifiedTheoryElement:
 
     @property
     def _args(self) -> Sequence[Symbol]:
-        return self._theory.atoms[self._idx].arguments
+        return self._theory.elements[self._idx].arguments
 
     @property
     def condition(self) -> List[int]:
@@ -548,6 +608,7 @@ class ReifiedTheoryAtom:
     _theory: ReifiedTheory
 
     def __init__(self, idx: int, theory: ReifiedTheory):
+        assert idx < len(theory.atoms)
         self._idx = idx
         self._theory = theory
 
