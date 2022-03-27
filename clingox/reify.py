@@ -1,11 +1,11 @@
 '''
 This module provides functions to reify programs.
 
-This includes a `Reifier` that implements clingo's `clingo.Observer` interface
+This includes a `Reifier` implementing clingo's `clingo.Observer` interface
 that can be registered with a `clingo.Control` object.
 
-Additionally, the function `theory_symbols` extracts the symbols used in theory
-atoms into the predicate `theory_symbol/2` to simplify meta-programming encodings.
+Additionally, the module provides a `ReifiedTheory` class that provides a
+similar interface as clingo's theory atoms but uses the reified symbols.
 
 Examples
 --------
@@ -14,7 +14,7 @@ The following example uses the `reify_program` function to reify a program:
 
 ```python-repl
 >>> from clingox.reify import reify_program
->>> prg = 'b:-a. {a}.'
+>>> prg = 'b :- a. {a}.'
 >>> symbols = reify_program(prg)
 >>> print([str(sym) for sym in symbols])
 ['tag(incremental)', 'atom_tuple(0)', 'atom_tuple(0,1)', 'literal_tuple(0)',
@@ -23,36 +23,17 @@ The following example uses the `reify_program` function to reify a program:
 'output(a,1)', 'literal_tuple(2)', 'literal_tuple(2,2)', 'output(b,2)']
 ```
 
-The next example show how the `Reifier` class is used internally by the
-`reify_program` function:
+The last example shows how to use the `ReifiedTheory` class.
 
 ```python-repl
->>> from clingo.control import Control
->>> from clingox.reify import Reifier
->>> prg = 'b:-a. {a}.'
->>> ctl = Control()
->>> symbols = []
->>> reifier = Reifier(symbols.append)
->>> ctl.register_observer(reifier)
->>> ctl.add("base", [], prg)
->>> ctl.ground([('base', [])])
->>> print([str(sym) for sym in symbols])
-['tag(incremental)', 'atom_tuple(0)', 'atom_tuple(0,1)', 'literal_tuple(0)',
-'rule(choice(0),normal(0))', 'atom_tuple(1)', 'atom_tuple(1,2)',
-'literal_tuple(1)', 'literal_tuple(1,1)', 'rule(disjunction(1),normal(1))',
-'output(a,1)', 'literal_tuple(2)', 'literal_tuple(2,2)', 'output(b,2)']
-```
-
-The last example shows how to use `theory_symbols` function:
-
-```python-repl
->>> from clingox.reify import reify_program, theory_symbols
->>> grammar = '#theory theory{ term { < : 5, unary }; &tel/0: term, any}.'
->>> prg = grammar + '&tel{< a(1)}.'
->>> symbols = reify_program(prg)
->>> theory_symbols = theory_symbols(symbols)
->>> print([str(s) for s in theory_symbols])
-['theory_symbol(0,tel)', 'theory_symbol(2,a)', 'theory_symbol(4,a(1))']
+>>> from clingox.reify import ReifiedTheory, reify_program
+>>> prg = '#theory theory { t { }; &p/0 : t, any }. &p { t }.'
+>>> thy = ReifiedTheory(reify_program(prg))
+>>> print([str(atm) for atm in thy])
+['&p { t: literal_tuple(0) }']
+>>> from clingox.theory import evaluate
+>>> evaluate(next(iter(thy)).term)
+Function('p', [], True)
 ```
 '''
 
