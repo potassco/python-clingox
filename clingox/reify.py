@@ -437,7 +437,6 @@ class ReifiedTheory:
     terms: List[Symbol]
     elements: List[Symbol]
     atoms: List[Symbol]
-    lit_tuples: List[List[int]]
     term_tuples: List[List[int]]
     element_tuples: List[List[int]]
 
@@ -445,7 +444,6 @@ class ReifiedTheory:
         self.terms = []
         self.elements = []
         self.atoms = []
-        self.lit_tuples = []
         self.term_tuples = []
         self.element_tuples = []
 
@@ -454,7 +452,6 @@ class ReifiedTheory:
                  _set((('theory_element', 3),), self.elements, sym) or
                  _set((('theory_sequence', 3), ('theory_string', 2),
                        ('theory_number', 2), ('theory_function', 3)), self.terms, sym) or
-                 _ensure('literal_tuple', self.lit_tuples, sym) or
                  _ensure('theory_tuple', self.term_tuples, sym, True) or
                  _ensure('theory_element_tuple', self.element_tuples, sym))
 
@@ -603,11 +600,11 @@ class ReifiedTheoryElement:
         return self._theory.elements[self._idx].arguments
 
     @property
-    def condition(self) -> List[int]:
+    def condition_id(self) -> int:
         '''
-        The condition of the element in form of a list of reified literals.
+        The id of the literal tuple of the condition.
         '''
-        return self._theory.lit_tuples[self._args[2].number]
+        return self._args[2].number
 
     @property
     def terms(self) -> List[ReifiedTheoryTerm]:
@@ -627,17 +624,7 @@ class ReifiedTheoryElement:
         return self._idx < other._idx
 
     def __str__(self):
-        tup = self.terms
-        cond = self.condition
-        if not tup and not cond:
-            return ': '
-        tstr = ','.join(str(term) for term in tup)
-        if cond:
-            x = ','.join(f'l{lit}' for lit in cond)
-            cstr = f': {x}'
-        else:
-            cstr = ''
-        return f'{tstr}{cstr}'
+        return f'{",".join(str(term) for term in self.terms)}: literal_tuple({self.condition_id})'
 
 
 class ReifiedTheoryAtom:

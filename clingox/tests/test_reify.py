@@ -177,7 +177,7 @@ class TestReifier(TestCase):
         symbols = reify_program(prg)
         thy = ReifiedTheory(symbols)
         atm = next(iter(thy))
-        self.assertEqual(str(atm), '&a { f((1)+(2)): l1 }')
+        self.assertEqual(str(atm), '&a { f((1)+(2)): literal_tuple(1) }')
         self.assertEqual(evaluate(atm.elements[0].terms[0]), Function('f', [Number(3)]))
 
     def test_theory_symbols(self):
