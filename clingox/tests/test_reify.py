@@ -87,8 +87,9 @@ def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: boo
 
 GRAMMAR = """
 #theory theory {
-    term { <? : 4, binary, left;
-           <  : 5, unary };
+    term { +  : 6, binary, left;
+           <? : 5, binary, left;
+           <  : 4, unary };
     &tel/0 : term, any;
     &tel2/0 : term, {=}, term, head
 }.
@@ -224,10 +225,10 @@ class TestReifier(TestCase):
         self.assertSetEqual(set(str(sym) for sym in ret.values()),
                             set(['a(s)', 'b((2,3))', 'tel']))
 
-        prg = GRAMMAR + '&tel2 { (a("s") <? c) <? b((2,3)) } = z.'
+        prg = GRAMMAR + '&tel2 { (a("s") <? 2+3) <? b((2,3)) } = z.'
         ret = theory_symbols(ReifiedTheory(reify_program(prg)))
         self.assertSetEqual(set(str(sym) for sym in ret.values()),
-                            set(['c', 'a("s")', 'z', 'tel2', 'b((2,3))']))
+                            set(['5', 'a("s")', 'z', 'tel2', 'b((2,3))']))
 
         prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
         self.assertRaises(RuntimeError, theory_symbols, ReifiedTheory(reify_program(prg)))
