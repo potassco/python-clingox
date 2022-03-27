@@ -64,9 +64,10 @@ from clingo.backend import HeuristicType, Observer, TruthValue
 from clingo.symbol import Function, Number, String, Symbol
 from clingo.theory_atoms import TheoryTermType
 
-from .theory import is_clingo_operator, is_operator, evaluate
+from .theory import is_operator
 
-__all__ = ['Reifier', 'theory_symbols', 'reify_program']
+__all__ = ['Reifier', 'ReifiedTheory', 'ReifiedTheoryAtom', 'ReifiedTheoryElement', 'ReifiedTheoryTerm',
+           'ReifiedTheory', 'reify_program']
 
 T = TypeVar('T')  # pylint: disable=invalid-name
 U = TypeVar('U', int, Tuple[int, int])  # pylint: disable=invalid-name
@@ -711,49 +712,6 @@ class ReifiedTheoryAtom:
             gstr = ''
 
         return f'{name}{estr}{gstr}'
-
-
-def term_symbols(term: ReifiedTheoryTerm, ret: Dict[int, Symbol]) -> None:
-    '''
-    Represent arguments to theory operators using clingo's `clingo.Symbol`
-    class.
-
-    Theory terms are evaluated using `clingox.theory.evaluate_unary` and added
-    to the given dictionary using the index of the theory term as key.
-    '''
-    if term.type == TheoryTermType.Function and is_operator(term.name) and not is_clingo_operator(term.name):
-        term_symbols(term.arguments[0], ret)
-        term_symbols(term.arguments[1], ret)
-    elif term.index not in ret:
-        ret[term.index] = evaluate(term)
-
-
-def theory_symbols(thy: ReifiedTheory) -> Dict[int, Symbol]:
-    '''
-    Represent arguments to theory operators in terms occurring in theory atoms
-    using clingo's theory class.
-
-    Theory terms are evaluated using `clingox.theory.evaluate_unary` and
-    returned in form of a dictionary using the index of the theory term as key.
-
-    Example
-    -------
-    For the theory atom `&tel{ < a }`, the output of `theory_symbols` could be:
-    ```
-    {0: Function('tel'), 2: Function('a')}
-    ```
-    '''
-    ret: Dict[int, Symbol] = {}
-    for atm in thy:
-        for elem in atm.elements:
-            for term in elem.terms:
-                term_symbols(term, ret)
-        term_symbols(atm.term, ret)
-        guard = atm.guard
-        if guard:
-            term_symbols(guard[1], ret)
-
-    return ret
 
 
 def reify_program(prg: str, calculate_sccs: bool = False, reify_steps: bool = False) -> List[Symbol]:

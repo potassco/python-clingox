@@ -7,15 +7,35 @@ from tempfile import NamedTemporaryFile
 from multiprocessing import Process
 from unittest import TestCase
 
-from typing import Any, Callable, Union, cast
+from typing import Any, Callable, Dict, Set, Union, cast
 
 from clingo.control import Control
 from clingo.symbolic_atoms import SymbolicAtom
-from clingo.symbol import Function, Number
+from clingo.symbol import Function, Number, Symbol
 from clingo.application import Application, clingo_main
+from clingo.theory_atoms import TheoryTermType
 
-from ..reify import Reifier, ReifiedTheory, reify_program, theory_symbols
-from ..theory import evaluate
+from ..reify import Reifier, ReifiedTheory, ReifiedTheoryTerm, reify_program
+from ..theory import evaluate, is_clingo_operator, is_operator
+
+GRAMMAR = """
+#theory theory {
+    term { +  : 6, binary, left;
+           <? : 5, binary, left;
+           <  : 4, unary };
+    &tel/0 : term, any;
+    &tel2/0 : term, {=}, term, head
+}.
+"""
+
+THEORY = """
+#theory theory {
+    t { + : 0, binary, left;
+        - : 0, unary };
+    &a/0 : t, {=}, t, head;
+    &b/0 : t, directive
+}.
+"""
 
 
 class _Application(Application):
@@ -85,24 +105,35 @@ def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: boo
         os.unlink(name_out)
 
 
-GRAMMAR = """
-#theory theory {
-    term { +  : 6, binary, left;
-           <? : 5, binary, left;
-           <  : 4, unary };
-    &tel/0 : term, any;
-    &tel2/0 : term, {=}, term, head
-}.
-"""
+def term_symbols(term: ReifiedTheoryTerm, ret: Dict[int, Symbol]) -> None:
+    '''
+    Represent arguments to theory operators using clingo's `clingo.Symbol`
+    class.
 
-THEORY = """
-#theory theory {
-    t { + : 0, binary, left;
-        - : 0, unary };
-    &a/0 : t, {=}, t, head;
-    &b/0 : t, directive
-}.
-"""
+    Theory terms are evaluated using `clingox.theory.evaluate_unary` and added
+    to the given dictionary using the index of the theory term as key.
+    '''
+    if term.type == TheoryTermType.Function and is_operator(term.name) and not is_clingo_operator(term.name):
+        term_symbols(term.arguments[0], ret)
+        term_symbols(term.arguments[1], ret)
+    elif term.index not in ret:
+        ret[term.index] = evaluate(term)
+
+
+def visit_terms(thy: ReifiedTheory, cb: Callable[[ReifiedTheoryTerm], None]):
+    '''
+    Visit the terms occuring in the theory atoms of the given theory.
+
+    This function does not recurse into terms.
+    '''
+    for atm in thy:
+        for elem in atm.elements:
+            for term in elem.terms:
+                cb(term)
+        cb(atm.term)
+        guard = atm.guard
+        if guard:
+            cb(guard[1])
 
 
 def _assume(ctl: Control):
@@ -220,15 +251,19 @@ class TestReifier(TestCase):
         """
         Test function to get symbols in a theory.
         """
+        def theory_symbols(prg: str) -> Set[str]:
+            ret: Dict[int, Symbol] = {}
+            visit_terms(ReifiedTheory(reify_program(prg)),
+                        lambda term: term_symbols(term, ret))
+            return set(str(x) for x in ret.values())
+
         prg = GRAMMAR + '&tel { a(s) <? b((2,3)) }.'
-        ret = theory_symbols(ReifiedTheory(reify_program(prg)))
-        self.assertSetEqual(set(str(sym) for sym in ret.values()),
+        self.assertSetEqual(theory_symbols(prg),
                             set(['a(s)', 'b((2,3))', 'tel']))
 
         prg = GRAMMAR + '&tel2 { (a("s") <? 2+3) <? b((2,3)) } = z.'
-        ret = theory_symbols(ReifiedTheory(reify_program(prg)))
-        self.assertSetEqual(set(str(sym) for sym in ret.values()),
+        self.assertSetEqual(theory_symbols(prg),
                             set(['5', 'a("s")', 'z', 'tel2', 'b((2,3))']))
 
         prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
-        self.assertRaises(RuntimeError, theory_symbols, ReifiedTheory(reify_program(prg)))
+        self.assertRaises(RuntimeError, theory_symbols, prg)
