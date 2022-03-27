@@ -394,11 +394,12 @@ class Reifier(Observer):
             self._step_data = _StepData()
 
 
-def _set(matches, lst, sym, default=Number(0)):
+def _set(matches: Sequence[Tuple[str, int]], lst: List[Symbol], sym,
+         append: bool = False, default: Symbol = Number(0)) -> bool:
     for match in matches:
         if not sym.match(*match):
             continue
-        idx = sym.arguments[0].number
+        idx = len(lst) if append else sym.arguments[0].number
         while len(lst) <= idx:
             lst.append(default)
         lst[idx] = sym
@@ -406,14 +407,21 @@ def _set(matches, lst, sym, default=Number(0)):
     return False
 
 
-def _ensure(name, lst, sym):
-    empty = sym.name.match(name, 1)
-    if empty or sym.name.match(name, 2):
+def _ensure(name: str, lst: List[List[int]], sym: Symbol, ordered=False) -> bool:
+    empty = sym.match(name, 1)
+    if empty or sym.match(name, 3 if ordered else 2):
         idx = sym.arguments[0].number
         while len(lst) <= idx:
             lst.append([])
         if not empty:
-            lst[idx].append(sym.arguments[1].number)
+            if ordered:
+                tup = lst[idx]
+                jdx = sym.arguments[1].number
+                while len(tup) <= jdx:
+                    tup.append(0)
+                tup[jdx] = sym.arguments[2].number
+            else:
+                lst[idx].append(sym.arguments[1].number)
         return True
     return False
 
@@ -442,12 +450,12 @@ class ReifiedTheory:
         self.element_tuples = []
 
         for sym in symbols:
-            _ = (_set((('theory_atom', 3), ('theory_atom', 5)), self.atoms, sym) or
+            _ = (_set((('theory_atom', 3), ('theory_atom', 5)), self.atoms, sym, True) or
                  _set((('theory_element', 3),), self.elements, sym) or
                  _set((('theory_sequence', 3), ('theory_string', 2),
-                       ('theory_number', 2), ('theory_function', 3)), self.elements, sym) or
+                       ('theory_number', 2), ('theory_function', 3)), self.terms, sym) or
                  _ensure('literal_tuple', self.lit_tuples, sym) or
-                 _ensure('theory_tuples', self.term_tuples, sym) or
+                 _ensure('theory_tuple', self.term_tuples, sym, True) or
                  _ensure('theory_element_tuple', self.element_tuples, sym))
 
     def __iter__(self) -> Iterator['ReifiedTheoryAtom']:
@@ -488,7 +496,7 @@ class ReifiedTheoryTerm:
         '''
         assert self.type in (TheoryTermType.List, TheoryTermType.Set,
                              TheoryTermType.Tuple, TheoryTermType.Function)
-        term_ids = self._theory.term_tuples[self._args[1].number]
+        term_ids = self._theory.term_tuples[self._args[2].number]
         return [ReifiedTheoryTerm(term_id, self._theory) for term_id in term_ids]
 
     @property
@@ -497,7 +505,9 @@ class ReifiedTheoryTerm:
         The name of the term (for symbols and functions).
         '''
         assert self.type in (TheoryTermType.Symbol, TheoryTermType.Function)
-        return self._args[1].name
+        if self.type == TheoryTermType.Function:
+            return self._theory.terms[self._args[1].number].arguments[1].string
+        return self._args[1].string
 
     @property
     def number(self) -> int:
@@ -540,7 +550,28 @@ class ReifiedTheoryTerm:
         return self._idx < other._idx
 
     def __str__(self):
-        raise RuntimeError('implement me!!!')
+        type_ = self.type
+
+        if type_ == TheoryTermType.Number:
+            return f'{self.number}'
+
+        if type_ == TheoryTermType.Symbol:
+            return f'{self.name}'
+
+        if type_ == TheoryTermType.Function:
+            args = self.arguments
+            name = self.name
+            if len(args) == 2 and is_operator(name):
+                return f'({args[0]}){name}({args[1]})'
+            return f'{name}({",".join(str(arg) for arg in args)})'
+
+        if type_ == TheoryTermType.Tuple:
+            lhs, rhs = '(', ')'
+        elif type_ == TheoryTermType.List:
+            lhs, rhs = '[', ']'
+        else:
+            lhs, rhs = '{', '}'
+        return f'{lhs}{",".join(self.arguments)}{rhs}'
 
 
 class ReifiedTheoryElement:
@@ -594,7 +625,17 @@ class ReifiedTheoryElement:
         return self._idx < other._idx
 
     def __str__(self):
-        raise RuntimeError('implement me!!!')
+        tup = self.terms
+        cond = self.condition
+        if not tup and not cond:
+            return ': '
+        tstr = ','.join(str(term) for term in tup)
+        if cond:
+            x = ','.join(f'l{lit}' for lit in cond)
+            cstr = f': {x}'
+        else:
+            cstr = ''
+        return f'{tstr}{cstr}'
 
 
 class ReifiedTheoryAtom:
@@ -668,7 +709,21 @@ class ReifiedTheoryAtom:
         return self._idx < other._idx
 
     def __str__(self):
-        raise RuntimeError('implement me!!!')
+        name = f'&{self.term}'
+
+        elems = self.elements
+        if elems:
+            estr = f' {{ {"; ".join(str(elem) for elem in elems)} }}'
+        else:
+            estr = ''
+
+        guard = self.guard
+        if guard:
+            gstr = ' {guard[0]} {guard[1]}'
+        else:
+            gstr = ''
+
+        return f'{name}{estr}{gstr}'
 
 
 def theory_symbols(reification_symbols: Sequence[Symbol]):

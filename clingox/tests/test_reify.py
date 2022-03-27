@@ -11,10 +11,11 @@ from typing import Any, Callable, Union, cast
 
 from clingo.control import Control
 from clingo.symbolic_atoms import SymbolicAtom
-from clingo.symbol import Function
+from clingo.symbol import Function, Number
 from clingo.application import Application, clingo_main
 
-from ..reify import Reifier, reify_program, theory_symbols
+from ..reify import Reifier, ReifiedTheory, reify_program, theory_symbols
+from ..theory import evaluate
 
 
 class _Application(Application):
@@ -85,11 +86,19 @@ def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: boo
 
 
 GRAMMAR = """
-#theory theory{
+#theory theory {
     term { <? : 4, binary, left;
            <  : 5, unary };
     &tel/0 : term, any;
-    &tel2/0 : term, {=}, term, head }.
+    &tel2/0 : term, {=}, term, head
+}.
+"""
+
+THEORY = """
+#theory theory {
+    t { + : 0, binary, left };
+    &a/0 : t, {=}, t, head
+}.
 """
 
 
@@ -159,6 +168,17 @@ class TestReifier(TestCase):
             self.assertListEqual(_reify(prg), _reify_check(prg))
             self.assertListEqual(_reify(prg, reify_steps=True), _reify_check(prg, reify_steps=True))
             self.assertListEqual(_reify(prg, calculate_sccs=True), _reify_check(prg, calculate_sccs=True))
+
+    def test_theory(self):
+        '''
+        Test the reified theory object.
+        '''
+        prg = THEORY + '&a { f(1+2): x }. { x }.'
+        symbols = reify_program(prg)
+        thy = ReifiedTheory(symbols)
+        atm = next(iter(thy))
+        self.assertEqual(str(atm), '&a { f((1)+(2)): l1 }')
+        self.assertEqual(evaluate(atm.elements[0].terms[0]), Function('f', [Number(3)]))
 
     def test_theory_symbols(self):
         """
