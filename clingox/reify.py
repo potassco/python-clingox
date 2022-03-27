@@ -561,6 +561,8 @@ class ReifiedTheoryTerm:
         if type_ == TheoryTermType.Function:
             args = self.arguments
             name = self.name
+            if len(args) == 1 and is_operator(name):
+                return f'{name}({args[0]})'
             if len(args) == 2 and is_operator(name):
                 return f'({args[0]}){name}({args[1]})'
             return f'{name}({",".join(str(arg) for arg in args)})'
