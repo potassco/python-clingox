@@ -220,40 +220,14 @@ class TestReifier(TestCase):
         Test function to get symbols in a theory.
         """
         prg = GRAMMAR + '&tel { a(s) <? b((2,3)) }.'
-        x = reify_program(prg)
-        t_s = theory_symbols(x)
-        expected_new_symbols = [
-            "theory_symbol(0,tel)",
-            "theory_symbol(3,s)",
-            "theory_symbol(2,a)",
-            "theory_symbol(4,a(s))",
-            "theory_symbol(8,(2,3))",
-            "theory_symbol(5,b)",
-            "theory_symbol(9,b((2,3)))",
-        ]
+        ret = theory_symbols(ReifiedTheory(reify_program(prg)))
+        self.assertListEqual([str(sym) for sym in ret.values()],
+                             ['a(s)', 'b((2,3))', 'tel'])
 
-        out_str = [str(s) for s in t_s]
-        self.assertListEqual(out_str, expected_new_symbols)
-
-        # Complex formula with string
         prg = GRAMMAR + '&tel{ (a("s") <? c) <? b((2,3)) }.'
-        x = reify_program(prg)
+        ret = theory_symbols(ReifiedTheory(reify_program(prg)))
+        self.assertListEqual([str(sym) for sym in ret.values()],
+                             ['a("s")', 'c', 'b((2,3))', 'tel'])
 
-        t_s = theory_symbols(x)
-        expected_new_symbols = [
-            'theory_symbol(0,tel)',
-            'theory_symbol(3,"s")',
-            'theory_symbol(2,a)',
-            'theory_symbol(4,a("s"))',
-            'theory_symbol(5,c)',
-            'theory_symbol(10,(2,3))',
-            'theory_symbol(7,b)',
-            'theory_symbol(11,b((2,3)))',
-        ]
-        out_str = [str(s) for s in t_s]
-        self.assertListEqual(out_str, expected_new_symbols)
-
-        # Error
         prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
-        x = reify_program(prg)
-        self.assertRaises(RuntimeError, theory_symbols, x)
+        self.assertRaises(RuntimeError, theory_symbols, ReifiedTheory(reify_program(prg)))

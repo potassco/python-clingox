@@ -61,10 +61,10 @@ from dataclasses import dataclass, field
 
 from clingo.control import Control
 from clingo.backend import HeuristicType, Observer, TruthValue
-from clingo.symbol import Function, Number, String, Symbol, SymbolType
+from clingo.symbol import Function, Number, String, Symbol
 from clingo.theory_atoms import TheoryTermType
 
-from .theory import is_operator
+from .theory import is_clingo_operator, is_operator, evaluate
 
 __all__ = ['Reifier', 'theory_symbols', 'reify_program']
 
@@ -713,90 +713,47 @@ class ReifiedTheoryAtom:
         return f'{name}{estr}{gstr}'
 
 
-def theory_symbols(reification_symbols: Sequence[Symbol]):
+def term_symbols(term: ReifiedTheoryTerm, ret: Dict[int, Symbol]) -> None:
     '''
-    Gets new symbols using predicate `theory_symbol` for the given reification symbols.
-    These new symbols contain as first argument the number to identify a `theory_function`,
-    and as a second argument, the corresponding symbol (Only for functions) that do not use
-    any theory operator.
+    Represent arguments to theory operators using clingo's `clingo.Symbol`
+    class.
 
+    Theory terms are evaluated using `clingox.theory.evaluate_unary` and added
+    to the given dictionary using the index of the theory term as key.
+    '''
+    if term.type == TheoryTermType.Function and is_operator(term.name) and not is_clingo_operator(term.name):
+        term_symbols(term.arguments[0], ret)
+        term_symbols(term.arguments[1], ret)
+    elif term.index not in ret:
+        ret[term.index] = evaluate(term)
+
+
+def theory_symbols(thy: ReifiedTheory) -> Dict[int, Symbol]:
+    '''
+    Represent arguments to theory operators in terms occurring in theory atoms
+    using clingo's theory class.
+
+    Theory terms are evaluated using `clingox.theory.evaluate_unary` and
+    returned in form of a dictionary using the index of the theory term as key.
 
     Example
     -------
-    For the theory symbols corresponding to `&tel{ < a }.`:
-
+    For the theory atom `&tel{ < a }`, the output of `theory_symbols` could be:
     ```
-    theory_string(0,"tel")
-    theory_string(2,"a")
-    theory_string(1,"<")
-    theory_tuple(0)
-    theory_tuple(0,0,2)
-    theory_function(3,1,0)
-    theory_tuple(1)
-    theory_tuple(1,0,3)
-    theory_element(0,1,0)
-    theory_element_tuple(0)
-    theory_element_tuple(0,0)
-    theory_atom(1,0,0)
+    {0: Function('tel'), 2: Function('a')}
     ```
-
-    The output of `theory_symbols` would be:
-    ```
-    [theory_symbol(0,tel), theory_symbol(2,a)]
-    ```
-
-    Parameters
-    ----------
-    reification_symbols
-        A list of clingo  `clingo.symbol.Symbol` representing the reification.
-        Can be obtained using the `Reifier` observer.
-
-    Returns
-    -------
-    A list of symbols containing the new `theory_symbol` predicate
     '''
-    t_basic: Dict[int, Symbol] = {}
-    t_tuple: Dict[int, List[Symbol]] = {}
-    for s in reification_symbols:
-        name = s.name
-        if not name.startswith('theory_'):
-            continue
+    ret: Dict[int, Symbol] = {}
+    for atm in thy:
+        for elem in atm.elements:
+            for term in elem.terms:
+                term_symbols(term, ret)
+        term_symbols(atm.term, ret)
+        guard = atm.guard
+        if guard:
+            term_symbols(guard[1], ret)
 
-        idx = s.arguments[0].number
-        if name == "theory_string":
-            val = s.arguments[1].string
-            if not is_operator(val):
-                t_basic.setdefault(idx, Function(val))
-        elif name == "theory_number":
-            t_basic.setdefault(idx, s.arguments[1])
-        elif name == "theory_tuple":
-            if len(s.arguments) == 1:
-                t_tuple.setdefault(idx, [])
-            else:
-                if idx not in t_tuple:
-                    continue
-                tup = t_tuple[idx]
-                if not s.arguments[2].number in t_basic:
-                    del t_tuple[idx]
-                    continue
-                tup.append(t_basic[s.arguments[2].number])
-        elif name == "theory_function":
-            if not s.arguments[1].number in t_basic:
-                continue
-            s = Function(t_basic[s.arguments[1].number].name, t_tuple[s.arguments[2].number])
-            t_basic.setdefault(idx, s)
-        elif name == "theory_sequence":
-            if s.arguments[1].name != 'tuple':
-                raise RuntimeError(f"Not supported {str(s)}")
-            s = Function("", t_tuple[s.arguments[2].number])
-            t_basic.setdefault(idx, s)
-
-    new_symbols = []
-    for idx, s in t_basic.items():
-        if s.type != SymbolType.Number:
-            new_symbols.append(Function("theory_symbol", [Number(idx), s]))
-
-    return new_symbols
+    return ret
 
 
 def reify_program(prg: str, calculate_sccs: bool = False, reify_steps: bool = False) -> List[Symbol]:
