@@ -470,13 +470,13 @@ class ReifiedTheoryTerm:
     _idx: int
     _theory: ReifiedTheory
 
-    def __init__(self, idx, theory):
-        assert idx < len(theory.terms)
+    def __init__(self, idx: int, theory: ReifiedTheory):
         self._idx = idx
         self._theory = theory
+        assert self.index < len(theory.terms)
 
     @property
-    def index(self):
+    def index(self) -> int:
         '''
         The index of the corresponding reified fact.
         '''
@@ -526,10 +526,8 @@ class ReifiedTheoryTerm:
             return TheoryTermType.Symbol
         if name == "theory_function":
             return TheoryTermType.Function
-        if name == "theory_tuple":
-            return TheoryTermType.Tuple
         assert name == "theory_sequence"
-        type_ = self._args[0].name
+        type_ = self._args[1].name
         if type_ == "tuple":
             return TheoryTermType.Tuple
         if type_ == "set":
@@ -570,7 +568,7 @@ class ReifiedTheoryTerm:
             lhs, rhs = '[', ']'
         else:
             lhs, rhs = '{', '}'
-        return f'{lhs}{",".join(self.arguments)}{rhs}'
+        return f'{lhs}{",".join(str(arg) for arg in self.arguments)}{rhs}'
 
 
 class ReifiedTheoryElement:
@@ -583,13 +581,13 @@ class ReifiedTheoryElement:
     _idx: int
     _theory: ReifiedTheory
 
-    def __init__(self, idx, theory):
-        assert idx < len(theory.elements)
+    def __init__(self, idx: int, theory: ReifiedTheory):
         self._idx = idx
         self._theory = theory
+        assert self.index < len(theory.elements)
 
     @property
-    def index(self):
+    def index(self) -> int:
         '''
         The index of the corresponding reified fact.
         '''
@@ -638,12 +636,12 @@ class ReifiedTheoryAtom:
     _theory: ReifiedTheory
 
     def __init__(self, idx: int, theory: ReifiedTheory):
-        assert idx < len(theory.atoms)
         self._idx = idx
         self._theory = theory
+        assert self.index < len(theory.atoms)
 
     @property
-    def index(self):
+    def index(self) -> int:
         '''
         The index of the corresponding reified fact.
         '''
@@ -672,7 +670,7 @@ class ReifiedTheoryAtom:
             return None
 
         op = self._theory.terms[args[3].number].arguments[1].string
-        return (op, ReifiedTheoryTerm(op, ReifiedTheoryTerm(args[4].number, self._theory)))
+        return (op, ReifiedTheoryTerm(args[4].number, self._theory))
 
     @property
     def literal(self) -> int:
@@ -708,7 +706,7 @@ class ReifiedTheoryAtom:
 
         guard = self.guard
         if guard:
-            gstr = ' {guard[0]} {guard[1]}'
+            gstr = f' {guard[0]} {guard[1]}'
         else:
             gstr = ''
 

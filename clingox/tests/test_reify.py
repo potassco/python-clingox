@@ -1,5 +1,5 @@
 '''
-Test cases for the ground program and observer.
+Test cases for the reify module.
 '''
 
 import os
@@ -96,8 +96,10 @@ GRAMMAR = """
 
 THEORY = """
 #theory theory {
-    t { + : 0, binary, left };
-    &a/0 : t, {=}, t, head
+    t { + : 0, binary, left;
+        - : 0, unary };
+    &a/0 : t, {=}, t, head;
+    &b/0 : t, directive
 }.
 """
 
@@ -171,14 +173,47 @@ class TestReifier(TestCase):
 
     def test_theory(self):
         '''
-        Test the reified theory object.
+        Test the reified theory class.
         '''
-        prg = THEORY + '&a { f(1+2): x }. { x }.'
-        symbols = reify_program(prg)
-        thy = ReifiedTheory(symbols)
-        atm = next(iter(thy))
-        self.assertEqual(str(atm), '&a { f((1)+(2)): literal_tuple(1) }')
-        self.assertEqual(evaluate(atm.elements[0].terms[0]), Function('f', [Number(3)]))
+        def get_theory(prg):
+            symbols = reify_program(prg)
+            thy = ReifiedTheory(symbols)
+            return list(thy)
+
+        atm1 = get_theory(THEORY + '&a { f(1+ -2): x } = z. { x }.')[0]
+        atm2 = get_theory(THEORY + '&a { f((1,2)): x }. { x }.')[0]
+        atm3 = get_theory(THEORY + '&a { f([1,2]): x }. { x }.')[0]
+        atm4 = get_theory(THEORY + '&a { f({1,2}): x }. { x }.')[0]
+        atm5 = get_theory(THEORY + '&a. { x }.')[0]
+        self.assertEqual(str(atm1), '&a { f((1)+(-(2))): literal_tuple(1) } = z')
+        self.assertEqual(str(atm2), '&a { f((1,2)): literal_tuple(1) }')
+        self.assertEqual(str(atm3), '&a { f([1,2]): literal_tuple(1) }')
+        self.assertEqual(str(atm4), '&a { f({1,2}): literal_tuple(1) }')
+        self.assertEqual(str(atm5), '&a')
+
+        self.assertEqual(evaluate(atm1.elements[0].terms[0]), Function('f', [Number(-1)]))
+        self.assertGreaterEqual(atm1.literal, 1)
+
+        dir1 = get_theory(THEORY + '&b.')[0]
+        self.assertEqual(dir1.literal, 0)
+
+        atms = get_theory(THEORY + '&a { 1 }. &a { 2 }. &a { 3 }.')
+        self.assertEqual(len(set(atms)), 3)
+        self.assertNotEqual(atms[0], atms[1])
+        self.assertNotEqual(atms[0] < atms[1],
+                            atms[0] > atms[1])
+
+        aele = get_theory(THEORY + '&a { 1; 2; 3 }.')[0]
+        self.assertEqual(len(set(aele.elements)), 3)
+        self.assertNotEqual(aele.elements[0], aele.elements[1])
+        self.assertNotEqual(aele.elements[0] < aele.elements[1],
+                            aele.elements[0] > aele.elements[1])
+
+        atup = get_theory(THEORY + '&a { 1,2,3 }.')[0]
+        self.assertEqual(len(set(atup.elements[0].terms)), 3)
+        self.assertNotEqual(atup.elements[0].terms[0], atup.elements[0].terms[1])
+        self.assertNotEqual(atup.elements[0].terms[0] < atup.elements[0].terms[1],
+                            atup.elements[0].terms[0] > atup.elements[0].terms[1])
 
     def test_theory_symbols(self):
         """
