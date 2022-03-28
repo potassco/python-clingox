@@ -33,10 +33,13 @@ Example
 ```
 '''
 
-from clingo import Symbol, Function, String, Tuple_, Number, SymbolType, TheoryTerm, TheoryTermType
+from typing import Any
 
-__all__ = ['evaluate', 'invert_symbol', 'is_operator', 'require_number', 'TermEvaluator']
+from clingo import Symbol, Function, String, Tuple_, Number, SymbolType, TheoryTermType
+
+__all__ = ['evaluate', 'invert_symbol', 'is_clingo_operator', 'is_operator', 'require_number', 'TermEvaluator']
 __pdoc__ = {}
+
 
 def require_number(x: Symbol) -> int:
     '''
@@ -47,6 +50,7 @@ def require_number(x: Symbol) -> int:
         return x.number
 
     raise TypeError('number exepected')
+
 
 def invert_symbol(sym: Symbol) -> Symbol:
     '''
@@ -69,6 +73,15 @@ def invert_symbol(sym: Symbol) -> Symbol:
 
     raise TypeError('cannot invert symbol')
 
+
+def is_clingo_operator(op: str):
+    '''
+    Return true if the given string is a operator as supported by the
+    Evaluator.
+    '''
+    return op in ('+', '-', '*', '\\', '/')
+
+
 def is_operator(op: str):
     '''
     Return true if the given string is an operator.
@@ -83,6 +96,7 @@ def is_operator(op: str):
     Whether the string is an operator name.
     '''
     return op and op[0] in "/!<=>+-*\\?&@|:;~^."
+
 
 def _unquote(s: str) -> str:
     '''
@@ -178,7 +192,7 @@ class TermEvaluator:
 
         return Function(op, [arg])
 
-    def __call__(self, term: TheoryTerm):
+    def __call__(self, term: Any):
         '''
         Evaluate the given term.
 
@@ -222,12 +236,17 @@ class TermEvaluator:
 
         raise RuntimeError("cannot evaluate term")
 
+
 __pdoc__['TermEvaluator.__call__'] = True
 
-def evaluate(term: TheoryTerm) -> Symbol:
+
+def evaluate(term: Any) -> Symbol:
     '''
     Evaluates the operators in a theory term in the same fashion as clingo
     evaluates its arithmetic functions.
+
+    We use `Any` as a type hint here to allow for evaluating terms that are
+    duck typing copmatible with clingo's `TheoryTerm` class.
 
     Parameters
     ----------

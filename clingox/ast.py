@@ -131,16 +131,20 @@ class Arity(Enum):
     '''
     Enumeration of operator arities.
     '''
+    # pylint:disable=invalid-name
     Unary = 1
     Binary = 2
+
 
 class Associativity(Enum):
     '''
     Enumeration of operator associativities.
     '''
+    # pylint: disable=invalid-name
     Left = auto()
     Right = auto()
     NoAssociativity = auto()
+
 
 def _s(m, a: str, b: str):
     '''
@@ -148,11 +152,14 @@ def _s(m, a: str, b: str):
     '''
     return m[a] if m[b] is None else m[b]
 
+
 def _quote(s: str) -> str:
     return s.replace('\\', '\\\\').replace(':', '\\:')
 
+
 def _unquote(s: str) -> str:
     return s.replace('\\:', ':').replace('\\\\', '\\')
+
 
 def location_to_str(loc: Location) -> str:
     """
@@ -172,20 +179,21 @@ def location_to_str(loc: Location) -> str:
     """
     begin, end = loc.begin, loc.end
     bf, ef = _quote(begin.filename), _quote(end.filename)
-    ret = "{}:{}:{}".format(bf, begin.line, begin.column)
+    ret = f"{bf}:{begin.line}:{begin.column}"
     dash, eq = True, bf == ef
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", ef)
+        ret += f"{'-' if dash else ':'}{ef}"
         dash = False
     eq = eq and begin.line == end.line
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end.line)
+        ret += f"{'-' if dash else ':'}{end.line}"
         dash = False
     eq = eq and begin.column == end.column
     if not eq:
-        ret += "{}{}".format("-" if dash else ":", end.column)
+        ret += f"{'-' if dash else ':'}{end.column}"
         dash = False
     return ret
+
 
 def str_to_location(loc: str) -> Location:
     """
@@ -213,12 +221,14 @@ def str_to_location(loc: str) -> Location:
     end = Position(_unquote(_s(m, 'bf', 'ef')), int(_s(m, 'bl', 'el')), int(_s(m, 'bc', 'ec')))
     return Location(begin, end)
 
+
 OperatorTable = Mapping[Tuple[str, Arity],
-                    Tuple[int, Associativity]]
+                        Tuple[int, Associativity]]
 AtomTable = Mapping[Tuple[str, int],
                     Tuple[TheoryAtomType,
                           str,
                           Optional[Tuple[List[str], str]]]]
+
 
 class TheoryUnparsedTermParser:
     """
@@ -277,8 +287,8 @@ class TheoryUnparsedTermParser:
             self._terms.append(TheoryFunction(b.location, operator, [b]))
         else:
             a = self._terms.pop()
-            l = Location(a.location.begin, b.location.end)
-            self._terms.append(TheoryFunction(l, operator, [a, b]))
+            loc = Location(a.location.begin, b.location.end)
+            self._terms.append(TheoryFunction(loc, operator, [a, b]))
 
     def check_operator(self, operator: str, arity: Arity, location: Location) -> None:
         """
@@ -295,7 +305,7 @@ class TheoryUnparsedTermParser:
             Location of the operator for error reporting.
         """
         if (operator, arity) not in self._table:
-            raise RuntimeError("cannot parse operator `{}`: {}".format(operator, location_to_str(location)))
+            raise RuntimeError(f"cannot parse operator `{operator}`: {location_to_str(location)}")
 
     def parse(self, x: AST) -> AST:
         """
@@ -333,6 +343,7 @@ class TheoryUnparsedTermParser:
             self._reduce()
 
         return self._terms[0]
+
 
 class TheoryTermParser(Transformer):
     """
@@ -392,6 +403,7 @@ class TheoryTermParser(Transformer):
         The rewritten AST.
         """
         return cast(AST, self(self._parser.parse(x)))
+
 
 class TheoryParser(Transformer):
     """
@@ -594,6 +606,7 @@ class TheoryParser(Transformer):
 
         return x
 
+
 def theory_parser_from_definition(x: AST) -> TheoryParser:
     """
     Turn an AST node of type TheoryDefinition into a TheoryParser.
@@ -681,6 +694,7 @@ class SymbolicAtomRenamer(Transformer):
             term = Function(term.location, self._rename_function(term.name), term.arguments, term.external)
         return SymbolicAtom(term)
 
+
 def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
     '''
     Rename all symbolic atoms in the given AST node with the given function.
@@ -697,6 +711,7 @@ def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
     The rewritten AST.
     '''
     return cast(AST, SymbolicAtomRenamer(rename_function)(x))
+
 
 def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
     '''
@@ -724,33 +739,41 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 def _encode(x: Any) -> Any:
     assert False, f"unknown value to encode: {x}"
 
-@_encode.register
+
+@_encode.register(str)
 def _encode_str(x: str) -> str:
     return x
 
-@_encode.register
+
+@_encode.register(clingo.Symbol)
 def _encode_symbol(x: clingo.Symbol) -> str:
     return str(x)
 
-@_encode.register
+
+@_encode.register(int)
 def _encode_int(x: int) -> int:
     return x
 
-@_encode.register
+
+@_encode.register(ASTSequence)
 def _encode_ast_seq(x: ASTSequence) -> List[Any]:
     return [_encode(y) for y in x]
 
-@_encode.register
+
+@_encode.register(StrSequence)
 def _encode_str_seq(x: StrSequence) -> List[Any]:
     return [_encode(y) for y in x]
 
-@_encode.register
+
+@_encode.register(type(None))
 def _encode_none(x: None) -> None:
     return x
 
-@_encode.register
+
+@_encode.register(AST)
 def _encode_ast(x: AST) -> Any:
     return ast_to_dict(x)
+
 
 def ast_to_dict(x: AST) -> dict:
     """
@@ -788,7 +811,8 @@ def ast_to_dict(x: AST) -> dict:
 def _decode(x: Any, key: str) -> Any:
     raise RuntimeError(f"unknown key/value to decode: {key}: {x}")
 
-@_decode.register
+
+@_decode.register(str)
 def _decode_str(x: str, key: str) -> Any:
     if key == "location":
         return str_to_location(x)
@@ -799,25 +823,30 @@ def _decode_str(x: str, key: str) -> Any:
     assert key in ("name", "id", "code", "elements", "term", "list", "operator_name")
     return x
 
-@_decode.register
+
+@_decode.register(int)
 def _decode_int(x: int, key: str) -> Any:
     # pylint: disable=unused-argument
     return x
 
-@_decode.register
+
+@_decode.register(type(None))
 def _decode_none(x: None, key: str) -> Any:
     # pylint: disable=unused-argument
     return x
 
-@_decode.register
+
+@_decode.register(list)
 def _decode_list(x: list, key_: str) -> Any:
     # pylint: disable=unused-argument
     return [_decode(y, "list") for y in x]
 
-@_decode.register
+
+@_decode.register(dict)
 def _decode_dict(x: dict, key_: str) -> Any:
     # pylint: disable=unused-argument
     return dict_to_ast(x)
+
 
 def dict_to_ast(x: dict) -> AST:
     """
