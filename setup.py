@@ -13,9 +13,12 @@ setup(
     author_email='kaminski@cs.uni-potsdam.de',
     license='MIT',
     url='https://github.com/potassco/python-clingox',
-    install_requires=['clingo'],
+    install_requires=[
+        'clingo',
+        'dataclasses ; python_version<"3.7"',
+    ],
     packages=['clingox'],
     package_data={'clingox': ['py.typed']},
     zip_safe=False,
-    python_requires=">=3.6"
+    python_requires=">=3.6",
 )

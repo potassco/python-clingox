@@ -24,12 +24,7 @@ jobs:
 
     - name: install prerequisites
       shell: pwsh
-      run: pip install --extra-index-url https://test.pypi.org/simple/ clingo clingo-dl clingcon flake8 mypy pylint coverage --upgrade
-
-    - name: install dataclases
-      if: ${{ matrix.python-version == '3.6' }}
-      shell: pwsh
-      run: pip install dataclasses types-dataclasses
+      run: pip install -f .github/requirements.txt
 
     - name: info
       shell: pwsh
