@@ -2,7 +2,7 @@
 Test cases for the reify module.
 '''
 
-import os, unittest
+import os
 from tempfile import NamedTemporaryFile
 from multiprocessing import Process
 from unittest import TestCase
@@ -174,7 +174,7 @@ class TestReifier(TestCase):
         self.assertSetEqual(set(_reify(_incremental, True, True)),
                             set(_reify_check(_incremental, True, True)))
 
-    @unittest.skip("failing due to clingo version?")
+    
     def test_reify(self):
         '''
         Test reification of different language elements.

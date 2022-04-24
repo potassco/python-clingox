@@ -116,13 +116,13 @@ from clingo import ast
 from clingo.ast import (
     AST, ASTSequence, ASTType, Function, Location, Position, StrSequence,
     SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
-    TheoryOperatorType, Transformer, UnaryOperator, UnaryOperation)
+    TheoryOperatorType, Transformer, UnaryOperation)
 from .theory import is_operator
 
 __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
            'prefix_symbolic_atoms', 'rename_symbolic_atoms', 'str_to_location',
            'theory_parser_from_definition', 'Arity', 'Associativity',
-           'AtomTable', 'OperatorTable', 'SymbolicAtomRenamer', 'TheoryParser',
+           'AtomTable', 'OperatorTable', 'SymbolicAtomTransformer', 'TheoryParser',
            'TheoryTermParser', 'TheoryUnparsedTermParser',
            'TheoryUnparsedTermParser']
 
@@ -655,9 +655,14 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
 
 
 class SymbolicAtomTransformer(Transformer):
+    '''
+        Transforms the given symbolic atom.
+    '''
+
     def __init__(self, transformer_function: Callable[[AST], AST]):
         self._transformer_function = transformer_function
 
+    # pylint: disable=invalid-name
     def visit_SymbolicAtom(self, x: AST) -> AST:
         '''
         Transform the given symbolic atom and return the Transformed version.
@@ -688,7 +693,7 @@ def rewrite_symbolic_atoms(x: AST, rewrite_function: Callable[[AST], AST]) -> AS
         The ast in which to rename symbolic atoms.
     rename_function
         A function for rewriting terms in the symbolic atom.
-        The function receives an AST of a type compatible with term and 
+        The function receives an AST of a type compatible with term and
         return an AST of a type compatible with term
 
     Returns
@@ -750,8 +755,8 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
     return rename_symbolic_atoms(x, lambda s: prefix + s)
 
 
-def reify_symbolic_atoms(x: AST, reifing_name, 
-        argument_function: Callable[[AST], Sequence[AST]]=lambda u: []) -> AST:
+def reify_symbolic_atoms(x: AST, reifing_name,
+                         argument_function: Callable[[AST], Sequence[AST]] = lambda u: []) -> AST:
     '''
     Reify all symbolic atoms in the given AST node with the given name and function.
 
@@ -776,7 +781,7 @@ def reify_symbolic_atoms(x: AST, reifing_name,
         new_arguments = [term]
         extra_arguments = argument_function(term)
         if extra_arguments:
-            new_arguments.extend(extra_arguments)       
+            new_arguments.extend(extra_arguments)
         if term.ast_type == ASTType.Function:
             external = term.external
         else:
