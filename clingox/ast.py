@@ -755,7 +755,7 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
     return rename_symbolic_atoms(x, lambda s: prefix + s)
 
 
-def reify_symbolic_atoms(x: AST, 
+def reify_symbolic_atoms(x: AST,
                          reifing_name: str,
                          argument_function: Callable[[AST], Sequence[AST]] = lambda u: [],
                          reifing_strong_negation_name: Optional[str] = None) -> AST:
@@ -782,9 +782,9 @@ def reify_symbolic_atoms(x: AST,
     '''
 
     def reifier(term: AST):
-        if term.ast_type == ASTType.UnaryOperation and reifing_strong_negation_name is None:
-            return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
         if term.ast_type == ASTType.UnaryOperation:
+            if reifing_strong_negation_name is None:
+                return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
             new_name = reifing_strong_negation_name
             new_arguments = [term.argument]
         else:
