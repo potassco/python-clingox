@@ -755,8 +755,10 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
     return rename_symbolic_atoms(x, lambda s: prefix + s)
 
 
-def reify_symbolic_atoms(x: AST, reifing_name,
-                         argument_function: Callable[[AST], Sequence[AST]] = lambda u: []) -> AST:
+def reify_symbolic_atoms(x: AST, 
+                         reifing_name: str,
+                         argument_function: Callable[[AST], Sequence[AST]] = lambda u: [],
+                         reifing_strong_negation_name: Optional[str] = None) -> AST:
     '''
     Reify all symbolic atoms in the given AST node with the given name and function.
 
@@ -765,10 +767,14 @@ def reify_symbolic_atoms(x: AST, reifing_name,
     x
         The ast in which to rename symbolic atoms.
     reifing_name
-        The name of the new symbolic atom.
+        A string to serve as name of the new symbolic atom.
     argument_function
         A function for to provide extra arguments.
         If not provided, no extra arguments are added.
+    reifing_strong_negation_name
+        An optional string to serve as name of the new symbolic atom
+        when it is strongly negated. If not provided reifing_name is used
+        and the result is strongly negated.
 
     Returns
     -------
@@ -776,17 +782,22 @@ def reify_symbolic_atoms(x: AST, reifing_name,
     '''
 
     def reifier(term: AST):
-        if term.ast_type == ASTType.UnaryOperation:
+        if term.ast_type == ASTType.UnaryOperation and reifing_strong_negation_name is None:
             return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
-        new_arguments = [term]
+        if term.ast_type == ASTType.UnaryOperation:
+            new_name = reifing_strong_negation_name
+            new_arguments = [term.argument]
+        else:
+            new_name = reifing_name
+            new_arguments = [term]
         extra_arguments = argument_function(term)
-        if extra_arguments:
+        if len(extra_arguments) > 0:
             new_arguments.extend(extra_arguments)
         if term.ast_type == ASTType.Function:
             external = term.external
         else:
             external = 0
-        return Function(term.location, reifing_name, new_arguments, external)
+        return Function(term.location, new_name, new_arguments, external)
 
     return rewrite_symbolic_atoms(x, reifier)
 
