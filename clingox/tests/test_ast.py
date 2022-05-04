@@ -157,7 +157,7 @@ def test_rename(s: str) -> Sequence[str]:
     return parse_with(s, lambda s: prefix_symbolic_atoms(s, "u_"))
 
 
-def test_reify(s: str, sn: Optional[str]=None, f: Callable[[AST], Sequence[AST]] = None) -> Sequence[str]:
+def test_reify(s: str, sn: Optional[str] = None, f: Callable[[AST], Sequence[AST]] = None) -> Sequence[str]:
     '''
     Parse the given program and reify symbolic atoms in it.
     '''
