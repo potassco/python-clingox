@@ -657,8 +657,6 @@ class _SymbolicAtomTransformer(Transformer):
     '''
     Transforms symbolic atoms with the given function.
     '''
-    _transformer_function: Callable[[AST], AST]
-
     def __init__(self, transformer_function: Callable[[AST], AST]):
         self._transformer_function = transformer_function
 
