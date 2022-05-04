@@ -110,6 +110,7 @@ from functools import singledispatch
 from copy import copy
 from re import fullmatch
 from enum import Enum, auto
+from xmlrpc.client import Boolean
 
 import clingo
 from clingo import ast
@@ -751,7 +752,8 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 
 def reify_symbolic_atoms(x: AST, name: str,
                          strong_negation_name: Optional[str] = None,
-                         argument_extender: Callable[[AST], Sequence[AST]] = lambda x: [x]) -> AST:
+                         argument_extender: Callable[[AST], Sequence[AST]] = lambda x: [x],
+                         strong_negation_as_term: Boolean = False) -> AST:
     '''
     Reify all symbolic atoms in the given AST node with the given name and
     function.
@@ -770,14 +772,18 @@ def reify_symbolic_atoms(x: AST, name: str,
         A function to provide extra arguments. If not provided, no extra
         arguments are added. The term passed as argument should be placed in
         the correct position.
-
+    strong_negation_as_term
+        Boolean indicating how to encode strong negation.
+        By default False. If true, then -p(X) is reified as name(-p(X)) instead of
+        -name(p(X)).
     Returns
     -------
     The rewritten AST.
     '''
 
     def reifier(term: AST):
-        if term.ast_type == ASTType.UnaryOperation:
+        assert not strong_negation_as_term or strong_negation_name is None
+        if term.ast_type == ASTType.UnaryOperation and not strong_negation_as_term:
             if strong_negation_name is None:
                 return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
             new_name = strong_negation_name

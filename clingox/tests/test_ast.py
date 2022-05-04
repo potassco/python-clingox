@@ -4,6 +4,7 @@ Simple tests for ast manipulation.
 
 from unittest import TestCase
 from typing import Callable, List, Optional, Sequence, cast
+from xmlrpc.client import Boolean
 
 import clingo
 from clingo import Function
@@ -157,11 +158,15 @@ def test_rename(s: str) -> Sequence[str]:
     return parse_with(s, lambda s: prefix_symbolic_atoms(s, "u_"))
 
 
-def test_reify(s: str, sn: Optional[str] = None, f: Callable[[AST], Sequence[AST]] = lambda x: [x]) -> Sequence[str]:
+def test_reify(s: str,
+               sn: Optional[str] = None,
+               f: Callable[[AST], Sequence[AST]] = lambda x: [x],
+               st: Boolean = False
+               ) -> Sequence[str]:
     '''
     Parse the given program and reify symbolic atoms in it.
     '''
-    return parse_with(s, lambda x: reify_symbolic_atoms(x, 'u', sn, f))
+    return parse_with(s, lambda x: reify_symbolic_atoms(x, 'u', sn, f, st))
 
 
 def test_ast_dict(tc: TestCase, s: str):
@@ -326,6 +331,15 @@ class TestAST(TestCase):
         self.assertEqual(
             test_reify("a :- -b(X,Y), not c(f(3,b)).", f=lambda x: [Variable(LOC, 'T'), x, Variable(LOC, 'I')], sn='s'),
             ['#program base.', 'u(T,a,I) :- s(T,b(X,Y),I); not u(T,c(f(3,b)),I).'])
+
+        def fun(x):
+            return [Variable(LOC, 'T'), x, Variable(LOC, 'I')]
+
+        self.assertEqual(
+            test_reify("a :- -b(X,Y), not c(f(3,b)).", f=fun, st=True),
+            ['#program base.', 'u(T,a,I) :- u(T,-b(X,Y),I); not u(T,c(f(3,b)),I).'])
+        with self.assertRaises(AssertionError):
+            test_reify("a :- -b(X,Y), not c(f(3,b)).", f=fun, sn='s', st=True)
         sym = ast.SymbolicAtom(ast.SymbolicTerm(LOC, Function('a', [Function('b')])))
         self.assertEqual(
             str(reify_symbolic_atoms(sym, 'u')),
