@@ -751,7 +751,6 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 
 
 def reify_symbolic_atoms(x: AST, name: str,
-                         strong_negation_name: Optional[str] = None,
                          argument_extender: Callable[[AST], Sequence[AST]] = lambda x: [x],
                          strong_negation_as_term: Boolean = False) -> AST:
     '''
@@ -764,33 +763,29 @@ def reify_symbolic_atoms(x: AST, name: str,
         The ast in which to rename symbolic atoms.
     name
         A string to serve as name of the new symbolic atom.
-    strong_negation_name
-        An optional string to serve as name of the new symbolic atom when it is
-        strongly negated. If not provided `name` is used and the result is
-        strongly negated.
     argument_extender
         A function to provide extra arguments. If not provided, no extra
         arguments are added. The term passed as argument should be placed in
         the correct position.
     strong_negation_as_term
         Boolean indicating how to encode strong negation.
-        By default False. If true, then -p(X) is reified as name(-p(X)) instead of
-        -name(p(X)).
+        By default False and -p(X) is reified as -name(p(X)).
+        If true, then -p(X) is reified as name(-p(X)) instead.
+        This means that stable models containing both
+        name(p(a)) and name(-p(a)) are possible. Clingo style consistency can be
+        restored by adding the constraint
+        :- holds(X), holds(-X), X<-X.
+
     Returns
     -------
     The rewritten AST.
     '''
 
     def reifier(term: AST):
-        assert not strong_negation_as_term or strong_negation_name is None
         if term.ast_type == ASTType.UnaryOperation and not strong_negation_as_term:
-            if strong_negation_name is None:
-                return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
-            new_name = strong_negation_name
-            new_term = term.argument
-        else:
-            new_name = name
-            new_term = term
+            return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
+        new_name = name
+        new_term = term
         new_arguments = argument_extender(new_term)
         return Function(term.location, new_name, new_arguments, False)
 

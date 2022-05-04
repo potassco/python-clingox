@@ -159,14 +159,13 @@ def test_rename(s: str) -> Sequence[str]:
 
 
 def test_reify(s: str,
-               sn: Optional[str] = None,
                f: Callable[[AST], Sequence[AST]] = lambda x: [x],
                st: Boolean = False
                ) -> Sequence[str]:
     '''
     Parse the given program and reify symbolic atoms in it.
     '''
-    return parse_with(s, lambda x: reify_symbolic_atoms(x, 'u', sn, f, st))
+    return parse_with(s, lambda x: reify_symbolic_atoms(x, 'u', f, st))
 
 
 def test_ast_dict(tc: TestCase, s: str):
@@ -317,20 +316,17 @@ class TestAST(TestCase):
             str(reify_symbolic_atoms(sym, 'u')),
             '-u(a)')
         self.assertEqual(
-            str(reify_symbolic_atoms(sym, 'u', strong_negation_name='s')),
-            's(a)')
+            str(reify_symbolic_atoms(sym, 'u', strong_negation_as_term=True)),
+            'u(-a)')
         self.assertEqual(
             test_reify("-a :- -b(X,Y), not -c(f(3,b))."),
             ['#program base.', '-u(a) :- -u(b(X,Y)); not -u(c(f(3,b))).'])
         self.assertEqual(
-            test_reify("-a :- b(X,Y), not -c(f(3,b)). a :- -b(X,Y), not c(f(3,b)).", sn='s'),
-            ['#program base.', 's(a) :- u(b(X,Y)); not s(c(f(3,b))).', 'u(a) :- s(b(X,Y)); not u(c(f(3,b))).'])
+            test_reify("-a :- b(X,Y), not -c(f(3,b)). a :- -b(X,Y), not c(f(3,b)).", st=True),
+            ['#program base.', 'u(-a) :- u(b(X,Y)); not u(-c(f(3,b))).', 'u(a) :- u(-b(X,Y)); not u(c(f(3,b))).'])
         self.assertEqual(
             test_reify("a :- b(X,Y), not c(f(3,b)).", f=lambda x: [x, Variable(LOC, 'T'), Variable(LOC, 'I')]),
             ['#program base.', 'u(a,T,I) :- u(b(X,Y),T,I); not u(c(f(3,b)),T,I).'])
-        self.assertEqual(
-            test_reify("a :- -b(X,Y), not c(f(3,b)).", f=lambda x: [Variable(LOC, 'T'), x, Variable(LOC, 'I')], sn='s'),
-            ['#program base.', 'u(T,a,I) :- s(T,b(X,Y),I); not u(T,c(f(3,b)),I).'])
 
         def fun(x):
             return [Variable(LOC, 'T'), x, Variable(LOC, 'I')]
@@ -338,8 +334,11 @@ class TestAST(TestCase):
         self.assertEqual(
             test_reify("a :- -b(X,Y), not c(f(3,b)).", f=fun, st=True),
             ['#program base.', 'u(T,a,I) :- u(T,-b(X,Y),I); not u(T,c(f(3,b)),I).'])
-        with self.assertRaises(AssertionError):
-            test_reify("a :- -b(X,Y), not c(f(3,b)).", f=fun, sn='s', st=True)
+
+        self.assertEqual(
+            test_reify("a :- -b(X,Y), not c(f(3,b)).", f=fun, st=True),
+            ['#program base.', 'u(T,a,I) :- u(T,-b(X,Y),I); not u(T,c(f(3,b)),I).'])
+
         sym = ast.SymbolicAtom(ast.SymbolicTerm(LOC, Function('a', [Function('b')])))
         self.assertEqual(
             str(reify_symbolic_atoms(sym, 'u')),
