@@ -105,7 +105,7 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
-from typing import Any, Callable, cast, List, Mapping, Optional, Set, Tuple, Union, Sequence
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 from functools import singledispatch
 from copy import copy
 from re import fullmatch
@@ -122,9 +122,8 @@ from .theory import is_operator
 __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
            'prefix_symbolic_atoms', 'rename_symbolic_atoms', 'str_to_location',
            'theory_parser_from_definition', 'Arity', 'Associativity',
-           'AtomTable', 'OperatorTable', 'SymbolicAtomTransformer', 'TheoryParser',
-           'TheoryTermParser', 'TheoryUnparsedTermParser',
-           'TheoryUnparsedTermParser']
+           'AtomTable', 'OperatorTable', 'TheoryParser', 'TheoryTermParser',
+           'TheoryUnparsedTermParser', 'TheoryUnparsedTermParser']
 
 
 class Arity(Enum):
@@ -654,10 +653,11 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
     return TheoryParser(terms, atoms)
 
 
-class SymbolicAtomTransformer(Transformer):
+class _SymbolicAtomTransformer(Transformer):
     '''
-        Transforms the given symbolic atom.
+    Transforms symbolic atoms with the given function.
     '''
+    _transformer_function: Callable[[AST], AST]
 
     def __init__(self, transformer_function: Callable[[AST], AST]):
         self._transformer_function = transformer_function
@@ -665,7 +665,7 @@ class SymbolicAtomTransformer(Transformer):
     # pylint: disable=invalid-name
     def visit_SymbolicAtom(self, x: AST) -> AST:
         '''
-        Transform the given symbolic atom and return the Transformed version.
+        Transform the given symbolic.
 
         Parameters
         ----------
@@ -678,9 +678,7 @@ class SymbolicAtomTransformer(Transformer):
         '''
         term = x.symbol
         new_term = self._transformer_function(term)
-        if new_term is term:
-            return x
-        return SymbolicAtom(new_term)
+        return x if new_term is term else SymbolicAtom(new_term)
 
 
 def rewrite_symbolic_atoms(x: AST, rewrite_function: Callable[[AST], AST]) -> AST:
@@ -692,15 +690,14 @@ def rewrite_symbolic_atoms(x: AST, rewrite_function: Callable[[AST], AST]) -> AS
     x
         The ast in which to rename symbolic atoms.
     rename_function
-        A function for rewriting terms in the symbolic atom.
-        The function receives an AST of a type compatible with term and
-        return an AST of a type compatible with term
+        A function applied to the term representation of the symbolic atom. The
+        function has to return a term compatible with symbolic atoms.
 
     Returns
     -------
     The rewritten AST.
     '''
-    return cast(AST, SymbolicAtomTransformer(rewrite_function)(x))
+    return cast(AST, _SymbolicAtomTransformer(rewrite_function)(x))
 
 
 def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
@@ -718,7 +715,6 @@ def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
     -------
     The rewritten AST.
     '''
-
     def renamer(term: AST):
         if term.ast_type == ASTType.UnaryOperation:
             return UnaryOperation(term.location, term.operator_type, renamer(term.argument))
@@ -755,26 +751,26 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
     return rename_symbolic_atoms(x, lambda s: prefix + s)
 
 
-def reify_symbolic_atoms(x: AST,
-                         reifing_name: str,
-                         argument_function: Callable[[AST], Sequence[AST]] = lambda u: [],
-                         reifing_strong_negation_name: Optional[str] = None) -> AST:
+def reify_symbolic_atoms(x: AST, name: str,
+                         strong_negation_name: Optional[str] = None,
+                         argument_extender: Callable[[AST], Sequence[AST]] = None) -> AST:
     '''
-    Reify all symbolic atoms in the given AST node with the given name and function.
+    Reify all symbolic atoms in the given AST node with the given name and
+    function.
 
     Parameters
     ----------
     x
         The ast in which to rename symbolic atoms.
-    reifing_name
+    name
         A string to serve as name of the new symbolic atom.
-    argument_function
-        A function for to provide extra arguments.
-        If not provided, no extra arguments are added.
-    reifing_strong_negation_name
-        An optional string to serve as name of the new symbolic atom
-        when it is strongly negated. If not provided reifing_name is used
-        and the result is strongly negated.
+    strong_negation_name
+        An optional string to serve as name of the new symbolic atom when it is
+        strongly negated. If not provided `name` is used and the result is
+        strongly negated.
+    argument_extender
+        A function to provide extra arguments. If not provided, no extra
+        arguments are added.
 
     Returns
     -------
@@ -783,21 +779,16 @@ def reify_symbolic_atoms(x: AST,
 
     def reifier(term: AST):
         if term.ast_type == ASTType.UnaryOperation:
-            if reifing_strong_negation_name is None:
+            if strong_negation_name is None:
                 return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
-            new_name = reifing_strong_negation_name
+            new_name = strong_negation_name
             new_arguments = [term.argument]
         else:
-            new_name = reifing_name
+            new_name = name
             new_arguments = [term]
-        extra_arguments = argument_function(term)
-        if len(extra_arguments) > 0:
-            new_arguments.extend(extra_arguments)
-        if term.ast_type == ASTType.Function:
-            external = term.external
-        else:
-            external = 0
-        return Function(term.location, new_name, new_arguments, external)
+        if argument_extender:
+            new_arguments.extend(argument_extender(term))
+        return Function(term.location, new_name, new_arguments, False)
 
     return rewrite_symbolic_atoms(x, reifier)
 
