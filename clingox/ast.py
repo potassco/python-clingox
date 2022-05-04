@@ -751,7 +751,7 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 
 def reify_symbolic_atoms(x: AST, name: str,
                          strong_negation_name: Optional[str] = None,
-                         argument_extender: Callable[[AST], Sequence[AST]] = None) -> AST:
+                         argument_extender: Callable[[AST], Sequence[AST]] = lambda x: [x]) -> AST:
     '''
     Reify all symbolic atoms in the given AST node with the given name and
     function.
@@ -768,7 +768,8 @@ def reify_symbolic_atoms(x: AST, name: str,
         strongly negated.
     argument_extender
         A function to provide extra arguments. If not provided, no extra
-        arguments are added.
+        arguments are added. The term passed as argument should be placed in
+        the correct position.
 
     Returns
     -------
@@ -780,12 +781,11 @@ def reify_symbolic_atoms(x: AST, name: str,
             if strong_negation_name is None:
                 return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
             new_name = strong_negation_name
-            new_arguments = [term.argument]
+            new_term = term.argument
         else:
             new_name = name
-            new_arguments = [term]
-        if argument_extender:
-            new_arguments.extend(argument_extender(term))
+            new_term = term
+        new_arguments = argument_extender(new_term)
         return Function(term.location, new_name, new_arguments, False)
 
     return rewrite_symbolic_atoms(x, reifier)
