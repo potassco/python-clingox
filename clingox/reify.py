@@ -37,7 +37,7 @@ Function('p', [], True)
 ```
 '''
 
-from typing import Callable, Dict, Generic, Iterator, List, Optional, Sequence, Tuple, TypeVar
+from typing import Callable, Dict, Generic, Iterator, List, Optional, Sequence, Set, Tuple, TypeVar
 from dataclasses import dataclass, field
 
 from clingo.control import Control
@@ -244,7 +244,7 @@ class Reifier(Observer):
             pruned = elems
             ident = tuple(elems)
         else:
-            seen = set()
+            seen: Set[U] = set()
             pruned = []
             for elem in elems:
                 if elem not in seen:

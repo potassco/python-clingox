@@ -4,7 +4,6 @@ Simple tests for ast manipulation.
 
 from unittest import TestCase
 from typing import Callable, List, Optional, Sequence, cast
-from xmlrpc.client import Boolean
 
 import clingo
 from clingo import Function
@@ -160,7 +159,7 @@ def test_rename(s: str) -> Sequence[str]:
 
 def test_reify(s: str,
                f: Callable[[AST], Sequence[AST]] = lambda x: [x],
-               st: Boolean = False
+               st: bool = False
                ) -> Sequence[str]:
     '''
     Parse the given program and reify symbolic atoms in it.
@@ -282,8 +281,8 @@ class TestAST(TestCase):
             test_rename("a :- b(X,Y), not c(f(3,b))."),
             ['#program base.', 'u_a :- u_b(X,Y); not u_c(f(3,b)).'])
         sym = clingo.ast.SymbolicAtom(
-                clingo.ast.UnaryOperation(LOC, clingo.ast.UnaryOperator.Minus,
-                                          clingo.ast.Function(LOC, 'a', [], 0)))
+            clingo.ast.UnaryOperation(LOC, clingo.ast.UnaryOperator.Minus,
+                                      clingo.ast.Function(LOC, 'a', [], 0)))
         self.assertEqual(
             str(prefix_symbolic_atoms(sym, 'u_')),
             '-u_a')
@@ -310,13 +309,13 @@ class TestAST(TestCase):
             test_reify("a :- b(X,Y), not c(f(3,b))."),
             ['#program base.', 'u(a) :- u(b(X,Y)); not u(c(f(3,b))).'])
         sym = clingo.ast.SymbolicAtom(
-                clingo.ast.UnaryOperation(LOC, clingo.ast.UnaryOperator.Minus,
-                                          clingo.ast.Function(LOC, 'a', [], 0)))
+            clingo.ast.UnaryOperation(LOC, clingo.ast.UnaryOperator.Minus,
+                                      clingo.ast.Function(LOC, 'a', [], 0)))
         self.assertEqual(
             str(reify_symbolic_atoms(sym, 'u')),
             '-u(a)')
         self.assertEqual(
-            str(reify_symbolic_atoms(sym, 'u', strong_negation_as_term=True)),
+            str(reify_symbolic_atoms(sym, 'u', reify_strong_negation=True)),
             'u(-a)')
         self.assertEqual(
             test_reify("-a :- -b(X,Y), not -c(f(3,b))."),

@@ -110,7 +110,6 @@ from functools import singledispatch
 from copy import copy
 from re import fullmatch
 from enum import Enum, auto
-from xmlrpc.client import Boolean
 
 import clingo
 from clingo import ast
@@ -658,10 +657,11 @@ class _SymbolicAtomTransformer(Transformer):
     '''
     Transforms symbolic atoms with the given function.
     '''
+    # pylint: disable=invalid-name
+
     def __init__(self, transformer_function: Callable[[AST], AST]):
         self._transformer_function = transformer_function
 
-    # pylint: disable=invalid-name
     def visit_SymbolicAtom(self, x: AST) -> AST:
         '''
         Transform the given symbolic.
@@ -751,8 +751,8 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 
 
 def reify_symbolic_atoms(x: AST, name: str,
-                         argument_extender: Callable[[AST], Sequence[AST]] = lambda x: [x],
-                         strong_negation_as_term: Boolean = False) -> AST:
+                         argument_extender: Callable[[AST], Sequence[AST]] = None,
+                         reify_strong_negation: bool = False) -> AST:
     '''
     Reify all symbolic atoms in the given AST node with the given name and
     function.
@@ -767,14 +767,13 @@ def reify_symbolic_atoms(x: AST, name: str,
         A function to provide extra arguments. If not provided, no extra
         arguments are added. The term passed as argument should be placed in
         the correct position.
-    strong_negation_as_term
-        Boolean indicating how to encode strong negation.
-        By default False and -p(X) is reified as -name(p(X)).
-        If true, then -p(X) is reified as name(-p(X)) instead.
-        This means that stable models containing both
-        name(p(a)) and name(-p(a)) are possible. Clingo style consistency can be
-        restored by adding the constraint
-        :- name(X), name(-X), X<-X.
+    reify_strong_negation
+        Boolean indicating how to encode strong negation. If false, `-p(X)` is
+        reified as `-name(p(X))`. If true, then -p(X) is reified as
+        name(-p(X)). In the latter case, this means that stable models
+        containing both `name(p(a))` and `name(-p(a))` are possible. Clingo
+        style consistency can be restored by adding the constraint
+        `:- name(X), name(-X), X<-X.`
 
     Returns
     -------
@@ -782,12 +781,10 @@ def reify_symbolic_atoms(x: AST, name: str,
     '''
 
     def reifier(term: AST):
-        if term.ast_type == ASTType.UnaryOperation and not strong_negation_as_term:
+        if term.ast_type == ASTType.UnaryOperation and not reify_strong_negation:
             return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
-        new_name = name
-        new_term = term
-        new_arguments = argument_extender(new_term)
-        return Function(term.location, new_name, new_arguments, False)
+        arguments = argument_extender(term) if argument_extender else [term]
+        return Function(term.location, name, arguments, False)
 
     return rewrite_symbolic_atoms(x, reifier)
 
