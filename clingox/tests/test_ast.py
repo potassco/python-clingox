@@ -3,14 +3,16 @@ Simple tests for ast manipulation.
 """
 
 from unittest import TestCase
-from typing import List, Optional, cast
+from typing import Callable, List, Optional, Sequence, cast
 
+import clingo
 from clingo import Function
-from clingo.ast import AST, ASTType, Location, Position, Transformer, parse_string
+from clingo.ast import AST, ASTType, Location, Position, Transformer, parse_string, Variable
 from .. import ast
 from ..ast import (
     Arity, Associativity, TheoryTermParser, TheoryParser, TheoryAtomType,
-    ast_to_dict, dict_to_ast, location_to_str, prefix_symbolic_atoms, str_to_location, theory_parser_from_definition)
+    ast_to_dict, dict_to_ast, location_to_str, prefix_symbolic_atoms, str_to_location, theory_parser_from_definition,
+    reify_symbolic_atoms)
 
 TERM_TABLE = {"t": {("-", Arity.Unary): (3, Associativity.NoAssociativity),
                     ("**", Arity.Binary): (2, Associativity.Right),
@@ -131,9 +133,9 @@ def parse_theory(s: str) -> TheoryParser:
     return cast(TheoryParser, parser)
 
 
-def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
+def parse_with(s: str, f: Callable[[AST], AST] = lambda x: x) -> Sequence[str]:
     '''
-    Parse the given program and rename symbolic atoms in it.
+    Parse the given program and apply the given function to it.
     '''
     prg: List[str]
     prg = []
@@ -146,6 +148,23 @@ def test_rename(s: str, f=lambda s: prefix_symbolic_atoms(s, "u_")):
 
     parse_string(s, append)
     return prg
+
+
+def test_rename(s: str) -> Sequence[str]:
+    '''
+    Parse the given program and rename symbolic atoms in it.
+    '''
+    return parse_with(s, lambda s: prefix_symbolic_atoms(s, "u_"))
+
+
+def test_reify(s: str,
+               f: Callable[[AST], Sequence[AST]] = lambda x: [x],
+               st: bool = False
+               ) -> Sequence[str]:
+    '''
+    Parse the given program and reify symbolic atoms in it.
+    '''
+    return parse_with(s, lambda x: reify_symbolic_atoms(x, 'u', f, st))
 
 
 def test_ast_dict(tc: TestCase, s: str):
@@ -261,11 +280,72 @@ class TestAST(TestCase):
         self.assertEqual(
             test_rename("a :- b(X,Y), not c(f(3,b))."),
             ['#program base.', 'u_a :- u_b(X,Y); not u_c(f(3,b)).'])
-
+        sym = clingo.ast.SymbolicAtom(
+            clingo.ast.UnaryOperation(LOC, clingo.ast.UnaryOperator.Minus,
+                                      clingo.ast.Function(LOC, 'a', [], 0)))
+        self.assertEqual(
+            str(prefix_symbolic_atoms(sym, 'u_')),
+            '-u_a')
+        self.assertEqual(
+            test_rename("-a :- -b(X,Y), not -c(f(3,b))."),
+            ['#program base.', '-u_a :- -u_b(X,Y); not -u_c(f(3,b)).'])
         sym = ast.SymbolicAtom(ast.SymbolicTerm(LOC, Function('a', [Function('b')])))
         self.assertEqual(
             str(prefix_symbolic_atoms(sym, 'u_')),
             'u_a(b)')
+        sym = ast.SymbolicAtom(Variable(LOC, 'B'))
+        self.assertEqual(
+            prefix_symbolic_atoms(sym, 'u'),
+            sym)
+
+    def test_reify(self):
+        '''
+        Test reifying symbolic atoms.
+        '''
+        self.assertEqual(
+            test_reify("a."),
+            ['#program base.', 'u(a).'])
+        self.assertEqual(
+            test_reify("a :- b(X,Y), not c(f(3,b))."),
+            ['#program base.', 'u(a) :- u(b(X,Y)); not u(c(f(3,b))).'])
+        sym = clingo.ast.SymbolicAtom(
+            clingo.ast.UnaryOperation(LOC, clingo.ast.UnaryOperator.Minus,
+                                      clingo.ast.Function(LOC, 'a', [], 0)))
+        self.assertEqual(
+            str(reify_symbolic_atoms(sym, 'u')),
+            '-u(a)')
+        self.assertEqual(
+            str(reify_symbolic_atoms(sym, 'u', reify_strong_negation=True)),
+            'u(-a)')
+        self.assertEqual(
+            test_reify("-a :- -b(X,Y), not -c(f(3,b))."),
+            ['#program base.', '-u(a) :- -u(b(X,Y)); not -u(c(f(3,b))).'])
+        self.assertEqual(
+            test_reify("-a :- b(X,Y), not -c(f(3,b)). a :- -b(X,Y), not c(f(3,b)).", st=True),
+            ['#program base.', 'u(-a) :- u(b(X,Y)); not u(-c(f(3,b))).', 'u(a) :- u(-b(X,Y)); not u(c(f(3,b))).'])
+        self.assertEqual(
+            test_reify("a :- b(X,Y), not c(f(3,b)).", f=lambda x: [x, Variable(LOC, 'T'), Variable(LOC, 'I')]),
+            ['#program base.', 'u(a,T,I) :- u(b(X,Y),T,I); not u(c(f(3,b)),T,I).'])
+
+        def fun(x):
+            return [Variable(LOC, 'T'), x, Variable(LOC, 'I')]
+
+        self.assertEqual(
+            test_reify("a :- -b(X,Y), not c(f(3,b)).", f=fun, st=True),
+            ['#program base.', 'u(T,a,I) :- u(T,-b(X,Y),I); not u(T,c(f(3,b)),I).'])
+
+        self.assertEqual(
+            test_reify("a :- -b(X,Y), not c(f(3,b)).", f=fun, st=True),
+            ['#program base.', 'u(T,a,I) :- u(T,-b(X,Y),I); not u(T,c(f(3,b)),I).'])
+
+        sym = ast.SymbolicAtom(ast.SymbolicTerm(LOC, Function('a', [Function('b')])))
+        self.assertEqual(
+            str(reify_symbolic_atoms(sym, 'u')),
+            'u(a(b))')
+        sym = ast.SymbolicAtom(Variable(LOC, 'B'))
+        self.assertEqual(
+            prefix_symbolic_atoms(sym, 'u'),
+            sym)
 
     def test_encode_term(self):
         '''
