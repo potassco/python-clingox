@@ -1,8 +1,8 @@
 '''
 This module provides functions to reify programs.
 
-This includes a `Reifier` implementing clingo's `clingo.Observer` interface
-that can be registered with a `clingo.Control` object.
+This includes a `Reifier` implementing clingo's `clingo.backend.Observer`
+interface that can be registered with a `clingo.control.Control` object.
 
 Additionally, the module provides a `ReifiedTheory` class that provides a
 similar interface as clingo's theory atoms but uses the reified symbols.
