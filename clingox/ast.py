@@ -120,7 +120,8 @@ from clingo.ast import (
 from .theory import is_operator
 
 __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
-           'prefix_symbolic_atoms', 'rename_symbolic_atoms', 'str_to_location',
+           'prefix_symbolic_atoms', 'reify_symbolic_atoms',
+           'rename_symbolic_atoms', 'str_to_location',
            'theory_parser_from_definition', 'Arity', 'Associativity',
            'AtomTable', 'OperatorTable', 'TheoryParser', 'TheoryTermParser',
            'TheoryUnparsedTermParser', 'TheoryUnparsedTermParser']
