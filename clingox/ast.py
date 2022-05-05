@@ -770,8 +770,8 @@ def reify_symbolic_atoms(x: AST, name: str,
         the correct position.
     reify_strong_negation
         Boolean indicating how to encode strong negation. If false, `-p(X)` is
-        reified as `-name(p(X))`. If true, then -p(X) is reified as
-        name(-p(X)). In the latter case, this means that stable models
+        reified as `-name(p(X))`. If true, then `-p(X)` is reified as
+        `name(-p(X))`. In the latter case, this means that stable models
         containing both `name(p(a))` and `name(-p(a))` are possible. Clingo
         style consistency can be restored by adding the constraint
         `:- name(X), name(-X), X<-X.`
