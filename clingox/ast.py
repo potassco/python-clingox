@@ -774,7 +774,7 @@ def reify_symbolic_atoms(x: AST, name: str,
         This means that stable models containing both
         name(p(a)) and name(-p(a)) are possible. Clingo style consistency can be
         restored by adding the constraint
-        :- holds(X), holds(-X), X<-X.
+        :- name(X), name(-X), X<-X.
 
     Returns
     -------
