@@ -596,49 +596,62 @@ class TestAST(TestCase):
             test_ast_dict(self, 'a <= b.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
               'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
-                       'atom': {'ast_type': 'Comparison', 'comparison': 2,
-                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
-              'body': []}])
+                       'atom': {'ast_type': 'Comparison',
+                                'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'guards': [{'ast_type': 'Guard', 'comparison': 2,
+                                            'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7',
+                                                     'symbol': 'b'}}]}},
+              'body': []}]
+            )
         self.assertEqual(
             test_ast_dict(self, 'a < b.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
               'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
-                       'atom': {'ast_type': 'Comparison', 'comparison': 1,
-                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+                       'atom': {'ast_type': 'Comparison',
+                                'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'guards': [{'ast_type': 'Guard', 'comparison': 1,
+                                            'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6',
+                                                     'symbol': 'b'}}]}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a >= b.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
               'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
-                       'atom': {'ast_type': 'Comparison', 'comparison': 3,
-                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+                       'atom': {'ast_type': 'Comparison',
+                                'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'guards': [{'ast_type': 'Guard', 'comparison': 3,
+                                            'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7',
+                                                     'symbol': 'b'}}]}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a > b.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
               'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
-                       'atom': {'ast_type': 'Comparison', 'comparison': 0,
-                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+                       'atom': {'ast_type': 'Comparison',
+                                'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'guards': [{'ast_type': 'Guard', 'comparison': 0,
+                                            'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6',
+                                                     'symbol': 'b'}}]}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a = b.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-7',
               'head': {'ast_type': 'Literal', 'location': '<string>:1:1-6', 'sign': 0,
-                       'atom': {'ast_type': 'Comparison', 'comparison': 5,
-                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6', 'symbol': 'b'}}},
+                       'atom': {'ast_type': 'Comparison',
+                                'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'guards': [{'ast_type': 'Guard', 'comparison': 5,
+                                            'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:5-6',
+                                                     'symbol': 'b'}}]}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a != b.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
               'head': {'ast_type': 'Literal', 'location': '<string>:1:1-7', 'sign': 0,
-                       'atom': {'ast_type': 'Comparison', 'comparison': 4,
-                                'left': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
-                                'right': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7', 'symbol': 'b'}}},
+                       'atom': {'ast_type': 'Comparison',
+                                'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:1-2', 'symbol': 'a'},
+                                'guards': [{'ast_type': 'Guard', 'comparison': 4,
+                                            'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:6-7',
+                                                     'symbol': 'b'}}]}},
               'body': []}])
         self.assertEqual(
             test_ast_dict(self, 'a : b.'),
@@ -674,7 +687,7 @@ class TestAST(TestCase):
             test_ast_dict(self, '#sum {1:a:b} <= 2.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-19',
               'head': {'ast_type': 'HeadAggregate', 'location': '<string>:1:1-18',
-                       'left_guard': {'ast_type': 'AggregateGuard', 'comparison': 3,
+                       'left_guard': {'ast_type': 'Guard', 'comparison': 3,
                                       'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:17-18',
                                                'symbol': '2'}},
                        'function': 1,
@@ -705,7 +718,7 @@ class TestAST(TestCase):
                        'atom': {'ast_type': 'BooleanConstant', 'value': 0}},
               'body': [{'ast_type': 'Literal', 'location': '<string>:1:4-19', 'sign': 0,
                         'atom': {'ast_type': 'BodyAggregate', 'location': '<string>:1:4-19',
-                                 'left_guard': {'ast_type': 'AggregateGuard', 'comparison': 3,
+                                 'left_guard': {'ast_type': 'Guard', 'comparison': 3,
                                                 'term': {'ast_type': 'SymbolicTerm', 'location': '<string>:1:18-19',
                                                          'symbol': '2'}},
                                  'function': 1,
@@ -866,12 +879,10 @@ class TestAST(TestCase):
               'body': [{'ast_type': 'Literal', 'location': '<string>:1:11-12', 'sign': 0,
                         'atom': {'ast_type': 'SymbolicAtom',
                                  'symbol': {'ast_type': 'Function', 'location': '<string>:1:11-12', 'name': 'b',
-                                            'arguments': [], 'external': 0}}}],
-              'csp': 0}])
+                                            'arguments': [], 'external': 0}}}]}])
         self.assertEqual(
             test_ast_dict(self, '#show a/0.'),
-            [{'ast_type': 'ShowSignature', 'location': '<string>:1:1-11', 'name': 'a', 'arity': 0, 'positive': True,
-              'csp': 0}])
+            [{'ast_type': 'ShowSignature', 'location': '<string>:1:1-11', 'name': 'a', 'arity': 0, 'positive': True}])
         self.assertEqual(
             test_ast_dict(self, '#minimize { 1@2,a : b }.'),
             [{'ast_type': 'Minimize', 'location': '<string>:1:13-22',

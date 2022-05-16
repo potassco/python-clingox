@@ -184,7 +184,6 @@ class TestReifier(TestCase):
             GRAMMAR + '&tel { a(s) <? b((2,3)) }.',
             GRAMMAR + '&tel2 { a <? b } = c.',
             'a :- b. b :- a. c :- d. {a; d}.',
-            '$x$=1.',
             '{ a(1); a(2) } 2. :- a(1..2).',
             ':- not b. {b}.',
             '{ a(1..4) }. :- #count{ X: a(X) } > 2.',
