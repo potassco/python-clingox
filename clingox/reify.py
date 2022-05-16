@@ -304,10 +304,6 @@ class Reifier(Observer):
     def output_term(self, symbol: Symbol, condition: Sequence[int]) -> None:
         self._output("output", [symbol, self._lit_tuple(condition)])
 
-    def output_csp(self, symbol: Symbol, value: int,
-                   condition: Sequence[int]) -> None:
-        self._output("output_csp", [symbol, Number(value), self._lit_tuple(condition)])
-
     def external(self, atom: int, value: TruthValue) -> None:
         value_name = str(value).replace('TruthValue.', '').lower().rstrip('_')
         self._output("external", [Number(atom), Function(value_name)])
