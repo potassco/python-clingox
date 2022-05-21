@@ -326,6 +326,12 @@ class TestAST(TestCase):
         self.assertEqual(
             test_reify("a :- b(X,Y), not c(f(3,b)).", f=lambda x: [x, Variable(LOC, 'T'), Variable(LOC, 'I')]),
             ['#program base.', 'u(a,T,I) :- u(b(X,Y),T,I); not u(c(f(3,b)),T,I).'])
+        self.assertEqual(
+            test_reify("-a :- -b(X,Y), &theory(X){ p(X): q(X), -r(X) }."),
+            ['#program base.', '-u(a) :- -u(b(X,Y)); &theory(X) { p(X): u(q(X)), -u(r(X)) }.'])
+        self.assertEqual(
+            test_reify("-a :- -b(X,Y), &theory(X){ p(X): q(X), not r(X) }."),
+            ['#program base.', '-u(a) :- -u(b(X,Y)); &theory(X) { p(X): u(q(X)), not u(r(X)) }.'])
 
         def fun(x):
             return [Variable(LOC, 'T'), x, Variable(LOC, 'I')]
