@@ -995,6 +995,9 @@ class TestAST(TestCase):
         self.helper_get_positive_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)', 'Z = { d(X) }'])
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
+            ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'])
 
         self.helper_get_positive_body(
             'a(X) :- b(X), c(Y), not d(X), not e(X,Y).',
@@ -1011,6 +1014,10 @@ class TestAST(TestCase):
         self.helper_get_positive_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)', 'Z = { d(X) }'],
+            discard_theory_atoms=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
+            ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
             discard_theory_atoms=True)
 
         self.helper_get_positive_body(
@@ -1029,6 +1036,10 @@ class TestAST(TestCase):
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)'],
             discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
+            ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
+            discard_aggregates=True)
 
         self.helper_get_positive_body(
             'a(X) :- b(X), c(Y), not d(X), not e(X,Y).',
@@ -1048,5 +1059,10 @@ class TestAST(TestCase):
         self.helper_get_positive_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)'],
+            discard_theory_atoms=True,
+            discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
+            ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
             discard_theory_atoms=True,
             discard_aggregates=True)

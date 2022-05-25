@@ -963,6 +963,10 @@ class PositiveBodyVisitor(Transformer):
             self._discard = True
         return x
 
+    def visit_ConditionalLiteral(self, x):
+        self.positive_body.append(x)
+        return x
+
 
 def get_positive_body(rule: AST, discard_theory_atoms: bool = False, discard_aggregates: bool = False):
     '''
