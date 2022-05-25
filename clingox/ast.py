@@ -921,3 +921,73 @@ def dict_to_ast(x: dict) -> AST:
     ast_to_dict
     """
     return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
+
+
+class PositiveBodyVisitor(Transformer):
+    '''
+    Visits a rule and extracts the positive body.
+    '''
+    def __init__(self, discard_theory_atoms: bool = False, discard_aggregates: bool = False):
+        self.positive_body: Sequence[AST] = []
+        self._discard_theory_atoms = discard_theory_atoms
+        self._discard_aggregates = discard_aggregates
+        self._discard = False
+
+    # pylint: disable=invalid-name, missing-function-docstring
+
+    def visit_Rule(self, x: AST) -> AST:
+        self.visit_sequence(x.body)
+        return x
+
+    def visit_Literal(self, x):
+        if x.sign != ast.Sign.NoSign:
+            return x
+        self._discard = False
+        self.visit(x.atom)
+        if not self._discard:
+            self.positive_body.append(x)
+        return x
+
+    def visit_TheoryAtom(self, x):
+        if self._discard_theory_atoms:
+            self._discard = True
+        return x
+
+    def visit_Aggregate(self, x):
+        if self._discard_aggregates:
+            self._discard = True
+        return x
+
+    def visit_BodyAggregate(self, x):
+        if self._discard_aggregates:
+            self._discard = True
+        return x
+
+
+def get_positive_body(rule: AST, discard_theory_atoms: bool = False, discard_aggregates: bool = False):
+    '''
+    Returns the positive body of a rule as a list of literals.
+
+    Parameters
+    ----------
+    rule
+        The Python representation of the AST with ast_type Rule.
+
+    discard_theory_atoms
+        Boolean indicating if theory atoms should be included
+
+    discard_aggregates
+        Boolean indicating if aggregates should be included
+
+    Returns
+    -------
+    The corresponding a list of literals representing the positive body of the rule.
+
+    See Also
+    --------
+    ast_to_dict
+    '''
+    assert rule.ast_type == ASTType.Rule
+    visitor = PositiveBodyVisitor(discard_theory_atoms, discard_aggregates)
+    visitor.visit(rule)
+    return visitor.positive_body

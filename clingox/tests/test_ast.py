@@ -2,6 +2,8 @@
 Simple tests for ast manipulation.
 """
 
+# pylint: disable=too-many-lines
+
 from unittest import TestCase
 from typing import Callable, List, Optional, Sequence, cast
 
@@ -12,7 +14,7 @@ from .. import ast
 from ..ast import (
     Arity, Associativity, TheoryTermParser, TheoryParser, TheoryAtomType,
     ast_to_dict, dict_to_ast, location_to_str, prefix_symbolic_atoms, str_to_location, theory_parser_from_definition,
-    reify_symbolic_atoms)
+    reify_symbolic_atoms, get_positive_body)
 
 TERM_TABLE = {"t": {("-", Arity.Unary): (3, Associativity.NoAssociativity),
                     ("**", Arity.Binary): (2, Associativity.Right),
@@ -963,3 +965,88 @@ class TestAST(TestCase):
         Test error condititons when converting between ast and dict.
         '''
         self.assertRaises(RuntimeError, dict_to_ast, {"ast_type": "Rule", "body": set()})
+
+    def helper_get_positive_body(self, rule, pos_body,
+                                 discard_theory_atoms: bool = False,
+                                 discard_aggregates: bool = False):
+        '''
+        Helper for testing get_positive_body
+        '''
+        rule = last_stm(rule)
+        result = get_positive_body(rule, discard_theory_atoms, discard_aggregates)
+        result = [str(s) for s in result]
+        result.sort()
+        pos_body.sort()
+        self.assertListEqual(pos_body, result)
+
+    def test_get_positive_body(self):
+        '''
+        Test for get_positive_body
+        '''
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), not d(X), not e(X,Y).',
+            ['b(X)', 'c(Y)'])
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
+            ['b(X)', 'c(Y)', 'Z = #sum { X: d(X) }'])
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
+            ['b(X)', 'c(Y)', '&sum { X: d(X) } = Z'])
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = { d(X) }.',
+            ['b(X)', 'c(Y)', 'Z = { d(X) }'])
+
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), not d(X), not e(X,Y).',
+            ['b(X)', 'c(Y)'],
+            discard_theory_atoms=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
+            ['b(X)', 'c(Y)', 'Z = #sum { X: d(X) }'],
+            discard_theory_atoms=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
+            ['b(X)', 'c(Y)'],
+            discard_theory_atoms=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = { d(X) }.',
+            ['b(X)', 'c(Y)', 'Z = { d(X) }'],
+            discard_theory_atoms=True)
+
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), not d(X), not e(X,Y).',
+            ['b(X)', 'c(Y)'],
+            discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
+            ['b(X)', 'c(Y)'],
+            discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
+            ['b(X)', 'c(Y)', '&sum { X: d(X) } = Z'],
+            discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = { d(X) }.',
+            ['b(X)', 'c(Y)'],
+            discard_aggregates=True)
+
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), not d(X), not e(X,Y).',
+            ['b(X)', 'c(Y)'],
+            discard_theory_atoms=True,
+            discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
+            ['b(X)', 'c(Y)'],
+            discard_theory_atoms=True,
+            discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
+            ['b(X)', 'c(Y)'],
+            discard_theory_atoms=True,
+            discard_aggregates=True)
+        self.helper_get_positive_body(
+            'a(X) :- b(X), c(Y), Z = { d(X) }.',
+            ['b(X)', 'c(Y)'],
+            discard_theory_atoms=True,
+            discard_aggregates=True)
