@@ -30,7 +30,9 @@ def approximate(ctl: Control) -> Optional[Tuple[Sequence[Symbol], Sequence[Symbo
 
     Notes
     -----
-    Runs in polynomial time.
+    Runs in polynomial time. Returing an approximation does not mean that the
+    program is satiafiable, only that this was not yet determined. This cannot
+    be determined in polynomial time.
     '''
     # solve with a limit of 0 conflicts to propagate direct consequences
     assert isinstance(ctl.configuration.solve, Configuration)
