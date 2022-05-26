@@ -105,7 +105,7 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Any, Callable, Container, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 from functools import singledispatch
 from copy import copy
 from re import fullmatch
@@ -116,7 +116,7 @@ from clingo import ast
 from clingo.ast import (
     AST, ASTSequence, ASTType, Function, Location, Position, StrSequence,
     SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
-    TheoryOperatorType, Transformer, UnaryOperation)
+    TheoryOperatorType, Transformer, UnaryOperation, Sign)
 from .theory import is_operator
 
 __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
@@ -124,7 +124,7 @@ __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
            'rename_symbolic_atoms', 'str_to_location',
            'theory_parser_from_definition', 'Arity', 'Associativity',
            'AtomTable', 'OperatorTable', 'TheoryParser', 'TheoryTermParser',
-           'TheoryUnparsedTermParser', 'TheoryUnparsedTermParser']
+           'TheoryUnparsedTermParser', 'get_body']
 
 
 class Arity(Enum):
@@ -923,52 +923,59 @@ def dict_to_ast(x: dict) -> AST:
     return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
 
 
-class PositiveBodyVisitor(Transformer):
+class _BodyVisitor(Transformer):
     '''
     Visits a rule and extracts the positive body.
     '''
-    def __init__(self, discard_theory_atoms: bool = False, discard_aggregates: bool = False):
+    def __init__(self,
+                 exclude_signs: Container[Sign] = (),
+                 exclude_theory_atoms: bool = False,
+                 exclude_aggregates: bool = False,
+                 exclude_conditional_literals: bool = False):
         self.positive_body: Sequence[AST] = []
-        self._discard_theory_atoms = discard_theory_atoms
-        self._discard_aggregates = discard_aggregates
-        self._discard = False
+        self._exclude_theory_atoms = exclude_theory_atoms
+        self._exclude_aggregates = exclude_aggregates
+        self._exclude = False
+        self._exclude_signs = exclude_signs
+        self._exclude_conditional_literals = exclude_conditional_literals
 
     # pylint: disable=invalid-name, missing-function-docstring
 
-    def visit_Rule(self, x: AST) -> AST:
-        self.visit_sequence(x.body)
-        return x
-
     def visit_Literal(self, x):
-        if x.sign != ast.Sign.NoSign:
+        if x.sign in self._exclude_signs:
             return x
-        self._discard = False
+        self._exclude = False
         self.visit(x.atom)
-        if not self._discard:
+        if not self._exclude:
             self.positive_body.append(x)
         return x
 
     def visit_TheoryAtom(self, x):
-        if self._discard_theory_atoms:
-            self._discard = True
+        if self._exclude_theory_atoms:
+            self._exclude = True
         return x
 
     def visit_Aggregate(self, x):
-        if self._discard_aggregates:
-            self._discard = True
+        if self._exclude_aggregates:
+            self._exclude = True
         return x
 
     def visit_BodyAggregate(self, x):
-        if self._discard_aggregates:
-            self._discard = True
+        if self._exclude_aggregates:
+            self._exclude = True
         return x
 
     def visit_ConditionalLiteral(self, x):
-        self.positive_body.append(x)
+        if not self._exclude_conditional_literals:
+            self.positive_body.append(x)
         return x
 
 
-def get_positive_body(rule: AST, discard_theory_atoms: bool = False, discard_aggregates: bool = False):
+def get_body(rule: AST,
+             exclude_signs: Container[Sign] = (),
+             exclude_theory_atoms: bool = False,
+             exclude_aggregates: bool = False,
+             exclude_conditional_literals: bool = False):
     '''
     Returns the positive body of a rule as a list of literals.
 
@@ -977,21 +984,25 @@ def get_positive_body(rule: AST, discard_theory_atoms: bool = False, discard_agg
     rule
         The Python representation of the AST with ast_type Rule.
 
-    discard_theory_atoms
+    exclude_theory_atoms
         Boolean indicating if theory atoms should be included
 
-    discard_aggregates
+    exclude_aggregates
         Boolean indicating if aggregates should be included
+
+    exclude_signs
+        An iterable containing the signs to be ignoered
 
     Returns
     -------
-    The corresponding a list of literals representing the positive body of the rule.
+    The corresponding a list of literals representing the body of the rule
+    after excluding the marked parts
 
     See Also
     --------
     ast_to_dict
     '''
     assert rule.ast_type == ASTType.Rule
-    visitor = PositiveBodyVisitor(discard_theory_atoms, discard_aggregates)
-    visitor.visit(rule)
+    visitor = _BodyVisitor(exclude_signs, exclude_theory_atoms, exclude_aggregates, exclude_conditional_literals)
+    visitor.visit_sequence(rule.body)
     return visitor.positive_body
