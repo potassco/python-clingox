@@ -34,10 +34,10 @@ def approximate(ctl: Control) -> Optional[Tuple[Sequence[Symbol], Sequence[Symbo
     '''
     # solve with a limit of 0 conflicts to propagate direct consequences
     assert isinstance(ctl.configuration.solve, Configuration)
-    solve_limits = ctl.configuration.solve.solve_limit
+    solve_limit = ctl.configuration.solve.solve_limit
     ctl.configuration.solve.solve_limit = 0
     ctl.solve()
-    ctl.configuration.solve.solve_limit = solve_limits
+    ctl.configuration.solve.solve_limit = solve_limit
     ctl.cleanup()
 
     # check if the problem is conflicting
