@@ -37,6 +37,7 @@ def approximate(ctl: Control) -> Optional[Tuple[Sequence[Symbol], Sequence[Symbo
     solve_limits = ctl.configuration.solve.solve_limit
     ctl.configuration.solve.solve_limit = 0
     ctl.solve()
+    ctl.configuration.solve.solve_limit = solve_limits
     ctl.cleanup()
 
     # check if the problem is conflicting
@@ -50,5 +51,4 @@ def approximate(ctl: Control) -> Optional[Tuple[Sequence[Symbol], Sequence[Symbo
         upper.append(sa.symbol)
         if sa.is_fact:
             lower.append(sa.symbol)
-    ctl.configuration.solve.solve_limit = solve_limits
     return lower, upper
