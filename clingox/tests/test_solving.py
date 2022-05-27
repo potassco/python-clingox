@@ -3,57 +3,54 @@ Simple tests for solving.
 """
 
 from unittest import TestCase
+
 from clingo.control import Control
-from ..solving import approximate_cautions_consequences
+
+from ..solving import approximate
 
 
-class TestApproximateCautionsConsequences(TestCase):
+class TestSolving(TestCase):
     '''
-    Tests for approximate_cautions_consequences.
+    Tests for solving module.
     '''
 
-    def aux_approximate_cautions_consequences(self, prg: str, expected_lower, expected_upper):
+    def approximate(self, prg: str, expected_res):
         '''
-        Auxiliary function to test approximate_cautions_consequences.
+        Auxiliary function to test approximate.
         '''
         ctl = Control()
         ctl.add("base", [], prg)
         ctl.ground([("base", [])])
-        lower, upper = approximate_cautions_consequences(ctl)
-        lower_str = [str(s) for s in lower]
-        upper_str = [str(s) for s in upper]
-        lower_str.sort()
-        upper_str.sort()
-        expected_lower.sort()
-        expected_upper.sort()
-        self.assertListEqual(expected_lower, lower_str)
-        self.assertListEqual(expected_upper, upper_str)
+        res = approximate(ctl)
+        if res:
+            sorted_res = (sorted([str(s) for s in res[0]]),
+                          sorted([str(s) for s in res[1]]))
+        else:
+            sorted_res = None
 
-    def test_approximate_cautions_consequences(self):
+        self.assertEqual(sorted_res, expected_res)
+
+    def test_approximate(self):
         '''
-        Tests for approximate_cautions_consequences.
+        Tests for approximate.
         '''
-        prg = 'a. {b}. c:- not d. d :- not c. e :- not e.'
-        lower = ['a']
-        upper = ['a', 'b', 'c', 'd']
-        self.aux_approximate_cautions_consequences(prg, lower, upper)
-
-        prg = '{a}. :- not a.'
-        lower = ['a']
-        upper = ['a']
-        self.aux_approximate_cautions_consequences(prg, lower, upper)
-
-        prg = '{a}. :- a.'
-        lower = []
-        upper = []
-        self.aux_approximate_cautions_consequences(prg, lower, upper)
-
-        prg = 'a, b.'
-        lower = []
-        upper = ['a', 'b']
-        self.aux_approximate_cautions_consequences(prg, lower, upper)
-
-        prg = 'a, b. :- not a.'
-        lower = ['a']
-        upper = ['a']
-        self.aux_approximate_cautions_consequences(prg, lower, upper)
+        self.approximate(
+            'a. {b}. c :- not d.'
+            'd :- not c. e :- not e.',
+            None)
+        self.approximate(
+            'a. {b}. c :- not d.'
+            'd :- not c.',
+            (['a'], ['a', 'b', 'c', 'd']))
+        self.approximate(
+            '{a}. :- not a.',
+            (['a'], ['a']))
+        self.approximate(
+            '{a}. :- a.',
+            ([], []))
+        self.approximate(
+            'a, b.',
+            ([], ['a', 'b']))
+        self.approximate(
+            'a, b. :- not a.',
+            (['a'], ['a']))
