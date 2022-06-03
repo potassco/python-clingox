@@ -105,7 +105,7 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Any, Callable, Container, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
 from functools import singledispatch
 from copy import copy
 from re import fullmatch
@@ -116,7 +116,7 @@ from clingo import ast
 from clingo.ast import (
     AST, ASTSequence, ASTType, Function, Location, Position, StrSequence,
     SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
-    TheoryOperatorType, Transformer, UnaryOperation)
+    TheoryOperatorType, Transformer, UnaryOperation, Sign)
 from .theory import is_operator
 
 __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
@@ -124,7 +124,7 @@ __all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
            'rename_symbolic_atoms', 'str_to_location',
            'theory_parser_from_definition', 'Arity', 'Associativity',
            'AtomTable', 'OperatorTable', 'TheoryParser', 'TheoryTermParser',
-           'TheoryUnparsedTermParser', 'TheoryUnparsedTermParser']
+           'TheoryUnparsedTermParser', 'get_body']
 
 
 class Arity(Enum):
@@ -921,3 +921,53 @@ def dict_to_ast(x: dict) -> AST:
     ast_to_dict
     """
     return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
+
+
+def get_body(stm: AST,
+             exclude_signs: Container[Sign] = (),
+             exclude_theory_atoms: bool = False,
+             exclude_aggregates: bool = False,
+             exclude_conditional_literals: bool = False) -> List[AST]:
+    '''
+    Returns the body of a statement applying optional filters.
+
+    Parameters
+    ----------
+    stm
+        An `AST` for a statement with a body.
+    exclude_signs
+        Literals having any of the given signs are excluded.
+    exclude_theory_atoms
+        Whether theory atoms should be excluded.
+    exclude_aggregates
+        Whether aggregates should be excluded.
+    exclude_conditional_literals
+        Whether conditional literals should be excluded.
+
+    Returns
+    -------
+    A list of body literals.
+    '''
+    assert hasattr(stm, "body")
+
+    body: List[AST] = []
+
+    for lit in stm.body:
+        if lit.ast_type == ASTType.Literal:
+            atom = lit.atom
+            if lit.sign in exclude_signs:
+                continue
+            if exclude_theory_atoms and atom.ast_type == ASTType.TheoryAtom:
+                continue
+            if exclude_aggregates and atom.ast_type == ASTType.Aggregate:
+                continue
+            if exclude_aggregates and atom.ast_type == ASTType.BodyAggregate:
+                continue
+
+        if lit.ast_type == ASTType.ConditionalLiteral:
+            if exclude_conditional_literals:
+                continue
+
+        body.append(lit)
+
+    return body
