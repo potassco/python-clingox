@@ -943,7 +943,6 @@ def get_body(stm: AST,
         Whether aggregates should be excluded.
     exclude_conditional_literals
         Whether conditional literals should be excluded.
-    
 
     Returns
     -------
