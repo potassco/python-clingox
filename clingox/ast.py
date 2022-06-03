@@ -132,27 +132,20 @@ from clingo.ast import (
     Function,
     Location,
     Position,
+    Sign,
     StrSequence,
-    SymbolicTerm,
     SymbolicAtom,
+    SymbolicTerm,
     TheoryAtomType,
     TheoryFunction,
     TheoryOperatorType,
     Transformer,
     UnaryOperation,
-    Sign,
+    parse_string,
 )
 from .theory import is_operator
 
 __all__ = [
-    "ast_to_dict",
-    "dict_to_ast",
-    "location_to_str",
-    "prefix_symbolic_atoms",
-    "reify_symbolic_atoms",
-    "rename_symbolic_atoms",
-    "str_to_location",
-    "theory_parser_from_definition",
     "Arity",
     "Associativity",
     "AtomTable",
@@ -160,7 +153,16 @@ __all__ = [
     "TheoryParser",
     "TheoryTermParser",
     "TheoryUnparsedTermParser",
+    "ast_to_dict",
+    "dict_to_ast",
     "get_body",
+    "location_to_str",
+    "parse_theory",
+    "prefix_symbolic_atoms",
+    "reify_symbolic_atoms",
+    "rename_symbolic_atoms",
+    "str_to_location",
+    "theory_parser_from_definition",
 ]
 
 
@@ -729,6 +731,31 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         )
 
     return TheoryParser(terms, atoms)
+
+
+def parse_theory(s: str) -> TheoryParser:
+    """
+    Turn the given theory into a parser.
+    """
+    parser = None
+
+    def extract(stm):
+        nonlocal parser
+        if stm.ast_type == ASTType.TheoryDefinition:
+            if parser is not None:
+                raise ValueError("multiple theory definitions")
+            parser = theory_parser_from_definition(stm)
+        else:
+            assert (
+                stm.ast_type == ASTType.Program
+                and stm.name == "base"
+                and not stm.parameters
+            )
+
+    parse_string(f"{s}.", extract)
+    if parser is None:
+        raise ValueError("no theory definition found")
+    return cast(TheoryParser, parser)
 
 
 class _SymbolicAtomTransformer(Transformer):
