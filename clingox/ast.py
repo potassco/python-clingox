@@ -163,6 +163,7 @@ __all__ = [
     "rename_symbolic_atoms",
     "str_to_location",
     "theory_parser_from_definition",
+    "theory_term_to_term",
 ]
 
 
@@ -1092,3 +1093,91 @@ def get_body(
         body.append(lit)
 
     return body
+
+
+_unary_operators_string_to_operator_mapping = {
+    "-": ast.UnaryOperator.Minus,
+    "~": ast.UnaryOperator.Negation,
+    "|": ast.UnaryOperator.Absolute,
+}
+
+_binary_operators_string_to_operator_mapping = {
+    "+": ast.BinaryOperator.Plus,
+    "-": ast.BinaryOperator.Minus,
+    "*": ast.BinaryOperator.Multiplication,
+    "/": ast.BinaryOperator.Division,
+    "\\": ast.BinaryOperator.Modulo,
+    "**": ast.BinaryOperator.Power,
+    "&": ast.BinaryOperator.And,
+    "?": ast.BinaryOperator.Or,
+    "^": ast.BinaryOperator.XOr,
+}
+
+
+class _TheoryTermToTermTransformer(Transformer):
+    """
+    This class transforms a given theory term into a plain term.
+    """
+
+    # pylint: disable=invalid-name
+    def visit_TheorySequence(self, x):
+        """
+        Theory term tuples are mapped to term tuples.
+        """
+        if x.sequence_type == ast.TheorySequenceType.Tuple:
+            return ast.Function(x.location, "", [self(a) for a in x.terms], False)
+        raise RuntimeError(f"invalid term: {x.location}")
+
+    def visit_TheoryFunction(self, x):
+        """
+        Theory functions are mapped to functions.
+
+        If the function name refers to a function in the table, an exception is thrown.
+        """
+        if (
+            len(x.arguments) == 1
+            and x.name in _unary_operators_string_to_operator_mapping
+        ):
+            rhs = self(x.arguments[0])
+            op = _unary_operators_string_to_operator_mapping[x.name]
+            return ast.UnaryOperation(x.location, op, rhs)
+        if len(x.arguments) == 2:
+            lhs = self(x.arguments[0])
+            rhs = self(x.arguments[1])
+            if x.name in _binary_operators_string_to_operator_mapping:
+                op = _binary_operators_string_to_operator_mapping[x.name]
+                return ast.BinaryOperation(x.location, op, lhs, rhs)
+            if x.name == "..":
+                return ast.Interval(x.location, lhs, rhs)
+        # if x.name == ";":
+        #     return ast.Pool(x.location, x.arguments)
+        return ast.Function(x.location, x.name, [self(a) for a in x.arguments], False)
+
+
+_ARITHMETIC_TERM_TABLE = {
+    ("-", Arity.Unary): (5, Associativity.NoAssociativity),
+    ("~", Arity.Unary): (5, Associativity.NoAssociativity),
+    ("**", Arity.Binary): (4, Associativity.Right),
+    ("*", Arity.Binary): (3, Associativity.Left),
+    ("/", Arity.Binary): (3, Associativity.Left),
+    ("\\", Arity.Binary): (3, Associativity.Left),
+    ("+", Arity.Binary): (2, Associativity.Left),
+    ("-", Arity.Binary): (2, Associativity.Left),
+    ("&", Arity.Binary): (1, Associativity.Left),
+    ("?", Arity.Binary): (1, Associativity.Left),
+    ("^", Arity.Binary): (1, Associativity.Left),
+    ("..", Arity.Binary): (0, Associativity.Left),
+}
+
+parse_arithmetic_term = TheoryTermParser(_ARITHMETIC_TERM_TABLE)
+
+
+def theory_term_to_term(x: AST, parse_unparsed_terms: bool = True) -> AST:
+    """
+    Convert the given theory term into a term.
+    """
+    # TODO: I'ld rather pass in an optional parser instead of a Boolean
+    # we can make the parse_arithmetic_term  a public member
+    if parse_unparsed_terms:
+        x = parse_arithmetic_term(x)
+    return _TheoryTermToTermTransformer()(x)

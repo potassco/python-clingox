@@ -14,6 +14,8 @@ from clingo.ast import (
     Location,
     Position,
     Sign,
+    TheorySequence,
+    TheorySequenceType,
     Transformer,
     Variable,
     parse_string,
@@ -33,15 +35,23 @@ from ..ast import (
     get_body,
     parse_theory,
     reify_symbolic_atoms,
+    theory_term_to_term,
 )
 
 TERM_TABLE = {
     "t": {
-        ("-", Arity.Unary): (3, Associativity.NoAssociativity),
-        ("**", Arity.Binary): (2, Associativity.Right),
-        ("*", Arity.Binary): (1, Associativity.Left),
-        ("+", Arity.Binary): (0, Associativity.Left),
-        ("-", Arity.Binary): (0, Associativity.Left),
+        ("-", Arity.Unary): (5, Associativity.NoAssociativity),
+        ("~", Arity.Unary): (5, Associativity.NoAssociativity),
+        ("**", Arity.Binary): (4, Associativity.Right),
+        ("*", Arity.Binary): (3, Associativity.Left),
+        ("/", Arity.Binary): (3, Associativity.Left),
+        ("\\", Arity.Binary): (3, Associativity.Left),
+        ("+", Arity.Binary): (2, Associativity.Left),
+        ("-", Arity.Binary): (2, Associativity.Left),
+        ("&", Arity.Binary): (1, Associativity.Left),
+        ("?", Arity.Binary): (1, Associativity.Left),
+        ("^", Arity.Binary): (1, Associativity.Left),
+        ("..", Arity.Binary): (0, Associativity.Left),
     }
 }
 
@@ -57,6 +67,7 @@ TEST_THEORY = """\
         -  : 3, unary;
         ** : 2, binary, right;
         *  : 1, binary, left;
+        /  : 1, binary, left;
         +  : 0, binary, left;
         -  : 0, binary, left
     };
@@ -118,15 +129,20 @@ def last_stm(s: str) -> AST:
     return cast(AST, stm)
 
 
-def parse_term(s: str) -> str:
+def parse_theory_term(s: str) -> AST:
     """
     Parse the given theory term using a simple parse table for testing.
     """
-    return str(
-        TheoryTermParser(TERM_TABLE["t"])(
-            theory_atom(f"&p {{{s}}}").elements[0].terms[0]
-        )
+    return TheoryTermParser(TERM_TABLE["t"])(
+        theory_atom(f"&p {{{s}}}").elements[0].terms[0]
     )
+
+
+def parse_clingo_term(s: str) -> AST:
+    """
+    Parse the given theory term using a simple parse table for testing.
+    """
+    return last_stm(f"p({s}).").head.atom.symbol.arguments[0]
 
 
 def parse_atom(s: str, parser: Optional[TheoryParser] = None) -> str:
@@ -233,13 +249,13 @@ class TestAST(TestCase):
         """
         Test parsing of theory terms.
         """
-        self.assertEqual(parse_term("1+2"), "+(1,2)")
-        self.assertEqual(parse_term("1+2+3"), "+(+(1,2),3)")
-        self.assertEqual(parse_term("1+2*3"), "+(1,*(2,3))")
-        self.assertEqual(parse_term("1**2**3"), "**(1,**(2,3))")
-        self.assertEqual(parse_term("-1+2"), "+(-(1),2)")
-        self.assertEqual(parse_term("f(1+2)+3"), "+(f(+(1,2)),3)")
-        self.assertRaises(RuntimeError, parse_term, "1++2")
+        self.assertEqual(str(parse_theory_term("1+2")), "+(1,2)")
+        self.assertEqual(str(parse_theory_term("1+2+3")), "+(+(1,2),3)")
+        self.assertEqual(str(parse_theory_term("1+2*3")), "+(1,*(2,3))")
+        self.assertEqual(str(parse_theory_term("1**2**3")), "**(1,**(2,3))")
+        self.assertEqual(str(parse_theory_term("-1+2")), "+(-(1),2)")
+        self.assertEqual(str(parse_theory_term("f(1+2)+3")), "+(f(+(1,2)),3)")
+        self.assertRaises(RuntimeError, parse_theory_term, "1++2")
 
     def test_parse_atom(self):
         """
@@ -2574,3 +2590,104 @@ class TestAST(TestCase):
             ["b(X)", "c(Y)"],
             exclude_conditional_literals=True,
         )
+
+    def _aux_theory_term_to_term(self, s: str) -> None:
+        """
+        Parse the given theory term using a simple parse table for testing.
+        """
+        parsed = parse_theory_term(s)
+        unparsed = theory_atom(f"&p {{{s}}}").elements[0].terms[0]
+        term = parse_clingo_term(s)
+
+        self.assertEqual(theory_term_to_term(parsed, False), term, "without parsing")
+        self.assertEqual(theory_term_to_term(unparsed, True), term, "with parsing")
+
+    def test_theory_term_to_term(self):
+        """
+        Tests for converting between ast representation of theory_term and term.
+        """
+        # TODO: too much we don't have to test if precedence works for all the different combinations
+        # but should select a meaningful subset of terms to test
+        terms = [
+            "1",
+            "-1",
+            "~1",
+            "1+2",
+            "1-2",
+            "1*2",
+            "1/2",
+            "1\\2",
+            "1**2",
+            "1+2+3",
+            "1+2-3",
+            "1+2*3",
+            "1+2/3",
+            "1+2\\3",
+            "1+2**3",
+            "1-2-3",
+            "1-2*3",
+            "1-2/3",
+            "1-2**3",
+            "X",
+            "-X",
+            "X+2",
+            "X-2",
+            "X*2",
+            "X/2",
+            "X\\2",
+            "X**2",
+            "X+2+3",
+            "X+2-3",
+            "X+2*3",
+            "X+2/3",
+            "X+2\\3",
+            "X+2**3",
+            "X-2-3",
+            "X-2*3",
+            "X-2/3",
+            "X-2\\3",
+            "X-2**3",
+            "X",
+            "-X",
+            "X+Y",
+            "X-Y",
+            "X*Y",
+            "X/Y",
+            "X\\Y",
+            "X**Y",
+            "X+Y+3",
+            "X+Y-3",
+            "X+Y*3",
+            "X+Y/3",
+            "X+Y\\3",
+            "X+Y**3",
+            "X-Y-3",
+            "X-Y*3",
+            "X-Y/3",
+            "X-Y\\3",
+            "X-Y**3",
+            "1&2&3",
+            "1?2?3",
+            "1^2^3",
+            "1^2^ ~3",
+            "1^2* ~3",
+            "1^2+ ~3",
+            "(1,5)",
+            "(1+2,5)",
+            "f(1+2,3)",
+            "1..2",
+            "1+2..3",
+            "1+2..3*4",
+            "1+2..3/4",
+            "1+2..3\\4",
+            "1+2..3**4",
+        ]
+
+        for term in terms:
+            self._aux_theory_term_to_term(term)
+
+        term1 = parse_theory_term("1+2")
+        term2 = parse_theory_term("3*4")
+        term = TheorySequence(LOC, TheorySequenceType.List, [term1, term2])
+        with self.assertRaisesRegex(RuntimeError, "invalid term"):
+            theory_term_to_term(term, False)
