@@ -935,12 +935,15 @@ def get_body(stm: AST,
     ----------
     stm
         An `AST` for a statement with a body.
+    exclude_signs
+        Literals having any of the given signs are excluded.
     exclude_theory_atoms
         Whether theory atoms should be excluded.
     exclude_aggregates
         Whether aggregates should be excluded.
-    exclude_signs
-        Literals having any of the given signs are excluded.
+    exclude_conditional_literals
+        Whether conditional literals should be excluded.
+    
 
     Returns
     -------
