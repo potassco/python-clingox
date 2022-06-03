@@ -250,30 +250,34 @@ class TestAST(TestCase):
         Test creating parsers from theory definitions.
         """
         parser = parse_theory(TEST_THEORY)
-        pa = lambda s: parse_atom(s, parser)  # noqa: E731
-        pr = lambda s: parse_stm(s, parser)  # noqa: E731
 
-        self.assertEqual(parse_atom("&p {1+2}", pa), "&p { +(1,2) }")
-        self.assertEqual(parse_atom("&p {1+2+3}", pa), "&p { +(+(1,2),3) }")
-        self.assertEqual(parse_atom("&q(1+2+3) { }", pa), "&q(((1+2)+3)) { }")
-        self.assertEqual(parse_atom("&r { } < 1+2+3", pa), "&r { } < +(+(1,2),3)")
+        def pawp(s):
+            return parse_atom(s, parser)
 
-        self.assertEqual(pr("&p {1+2}."), "&p { +(1,2) }.")
-        self.assertEqual(pr("#show x : &q(0) {1+2}."), "#show x : &q(0) { +(1,2) }.")
-        self.assertEqual(pr(":~ &q(0) {1+2}. [0]"), ":~ &q(0) { +(1,2) }. [0@0]")
-        self.assertEqual(pr("#edge (u, v) : &q(0) {1+2}."), "#edge (u,v) : &q(0) { +(1,2) }.")
-        self.assertEqual(pr("#heuristic a : &q(0) {1+2}. [sign,true]"),
+        def prwp(s):
+            return parse_stm(s, parser)
+
+        self.assertEqual(parse_atom("&p {1+2}", pawp), "&p { +(1,2) }")
+        self.assertEqual(parse_atom("&p {1+2+3}", pawp), "&p { +(+(1,2),3) }")
+        self.assertEqual(parse_atom("&q(1+2+3) { }", pawp), "&q(((1+2)+3)) { }")
+        self.assertEqual(parse_atom("&r { } < 1+2+3", pawp), "&r { } < +(+(1,2),3)")
+
+        self.assertEqual(prwp("&p {1+2}."), "&p { +(1,2) }.")
+        self.assertEqual(prwp("#show x : &q(0) {1+2}."), "#show x : &q(0) { +(1,2) }.")
+        self.assertEqual(prwp(":~ &q(0) {1+2}. [0]"), ":~ &q(0) { +(1,2) }. [0@0]")
+        self.assertEqual(prwp("#edge (u, v) : &q(0) {1+2}."), "#edge (u,v) : &q(0) { +(1,2) }.")
+        self.assertEqual(prwp("#heuristic a : &q(0) {1+2}. [sign,true]"),
                          "#heuristic a : &q(0) { +(1,2) }. [sign@0,true]")
-        self.assertEqual(pr("#project a : &q(0) {1+2}."), "#project a : &q(0) { +(1,2) }.")
-        self.assertRaises(RuntimeError, pr, ":- &p {1+2}.")
-        self.assertRaises(RuntimeError, pr, "&q(1+2+3) { }.")
-        self.assertEqual(pr(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) { }.")
-        self.assertEqual(pr("&r { } < 1+2+3."), "&r { } < +(+(1,2),3).")
-        self.assertRaises(RuntimeError, pr, "&r { } < 1+2+3 :- x.")
-        self.assertRaises(RuntimeError, pr, ":- &r { } < 1+2+3.")
-        self.assertRaises(RuntimeError, pr, "&s(1+2+3) { }.")
-        self.assertRaises(RuntimeError, pr, "&p { } <= 3.")
-        self.assertRaises(RuntimeError, pr, "&r { } <= 3.")
+        self.assertEqual(prwp("#project a : &q(0) {1+2}."), "#project a : &q(0) { +(1,2) }.")
+        self.assertRaises(RuntimeError, prwp, ":- &p {1+2}.")
+        self.assertRaises(RuntimeError, prwp, "&q(1+2+3) { }.")
+        self.assertEqual(prwp(":- &q(1+2+3) { }."), "#false :- &q(((1+2)+3)) { }.")
+        self.assertEqual(prwp("&r { } < 1+2+3."), "&r { } < +(+(1,2),3).")
+        self.assertRaises(RuntimeError, prwp, "&r { } < 1+2+3 :- x.")
+        self.assertRaises(RuntimeError, prwp, ":- &r { } < 1+2+3.")
+        self.assertRaises(RuntimeError, prwp, "&s(1+2+3) { }.")
+        self.assertRaises(RuntimeError, prwp, "&p { } <= 3.")
+        self.assertRaises(RuntimeError, prwp, "&r { } <= 3.")
 
     def test_rename(self):
         '''
@@ -962,193 +966,192 @@ class TestAST(TestCase):
 
     def test_dict_ast_error(self):
         '''
-        Test error condititons when converting between ast and dict.
+        Test error conditions when converting between ast and dict.
         '''
         self.assertRaises(RuntimeError, dict_to_ast, {"ast_type": "Rule", "body": set()})
 
-    def helper_get_positive_body(self, rule, pos_body,
-                                 exclude_signs: Container[Sign] = (Sign.Negation, Sign.DoubleNegation),
-                                 exclude_theory_atoms: bool = False,
-                                 exclude_aggregates: bool = False,
-                                 exclude_conditional_literals: bool = False):
+    def helper_get_body(self,
+                        stm: str,
+                        body: Sequence[str],
+                        exclude_signs: Container[Sign] = (Sign.Negation, Sign.DoubleNegation),
+                        exclude_theory_atoms: bool = False,
+                        exclude_aggregates: bool = False,
+                        exclude_conditional_literals: bool = False):
         '''
-        Helper for testing get_positive_body
+        Helper for testing get_body.
         '''
-        rule = last_stm(rule)
-        result = get_body(rule, exclude_signs, exclude_theory_atoms, exclude_aggregates, exclude_conditional_literals)
-        result = [str(s) for s in result]
-        result.sort()
-        pos_body.sort()
-        self.assertListEqual(pos_body, result)
+        res = get_body(last_stm(stm), exclude_signs, exclude_theory_atoms, exclude_aggregates,
+                       exclude_conditional_literals)
+        self.assertListEqual(sorted(body), sorted(str(s) for s in res))
 
     def test_get_positive_body(self):
         '''
-        Test for get_positive_body
+        Test for get_body.
         '''
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['b(X)', 'c(Y)'])
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             ['b(X)', 'c(Y)', 'Z = #sum { X: d(X) }'])
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             ['b(X)', 'c(Y)', '&sum { X: d(X) } = Z'])
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)', 'Z = { d(X) }'])
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'])
 
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['b(X)', 'c(Y)'],
             exclude_theory_atoms=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             ['b(X)', 'c(Y)', 'Z = #sum { X: d(X) }'],
             exclude_theory_atoms=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             ['b(X)', 'c(Y)'],
             exclude_theory_atoms=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)', 'Z = { d(X) }'],
             exclude_theory_atoms=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
             exclude_theory_atoms=True)
 
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['b(X)', 'c(Y)'],
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             ['b(X)', 'c(Y)'],
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             ['b(X)', 'c(Y)', '&sum { X: d(X) } = Z'],
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)'],
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
             exclude_aggregates=True)
 
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['b(X)', 'c(Y)'],
             exclude_theory_atoms=True,
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             ['b(X)', 'c(Y)'],
             exclude_theory_atoms=True,
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             ['b(X)', 'c(Y)'],
             exclude_theory_atoms=True,
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)'],
             exclude_theory_atoms=True,
             exclude_aggregates=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
             exclude_theory_atoms=True,
             exclude_aggregates=True)
 
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['b(X)', 'c(Y)', 'not d(X)'],
             exclude_signs=(Sign.DoubleNegation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             ['b(X)', 'c(Y)', 'Z = #sum { X: d(X) }'],
             exclude_signs=(Sign.DoubleNegation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             ['b(X)', 'c(Y)', '&sum { X: d(X) } = Z'],
             exclude_signs=(Sign.DoubleNegation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)', 'Z = { d(X) }'],
             exclude_signs=(Sign.DoubleNegation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
             exclude_signs=(Sign.DoubleNegation,))
 
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['b(X)', 'c(Y)', 'not not e(X,Y)'],
             exclude_signs=(Sign.Negation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             ['b(X)', 'c(Y)', 'Z = #sum { X: d(X) }'],
             exclude_signs=(Sign.Negation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             ['b(X)', 'c(Y)', '&sum { X: d(X) } = Z'],
             exclude_signs=(Sign.Negation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)', 'Z = { d(X) }'],
             exclude_signs=(Sign.Negation,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['b(X)', 'c(Y)', 'd(Z): e(X,Z)'],
             exclude_signs=(Sign.Negation,))
 
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['not d(X)', 'not not e(X,Y)'],
             exclude_signs=(Sign.NoSign,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             [],
             exclude_signs=(Sign.NoSign,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             [],
             exclude_signs=(Sign.NoSign,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             [],
             exclude_signs=(Sign.NoSign,))
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['d(Z): e(X,Z)'],
             exclude_signs=(Sign.NoSign,))
 
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), not d(X), not not e(X,Y).',
             ['b(X)', 'c(Y)'],
             exclude_conditional_literals=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.',
             ['b(X)', 'c(Y)', 'Z = #sum { X: d(X) }'],
             exclude_conditional_literals=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.',
             ['b(X)', 'c(Y)', '&sum { X: d(X) } = Z'],
             exclude_conditional_literals=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), Z = { d(X) }.',
             ['b(X)', 'c(Y)', 'Z = { d(X) }'],
             exclude_conditional_literals=True)
-        self.helper_get_positive_body(
+        self.helper_get_body(
             'a(X) :- b(X), c(Y), d(Z): e(X,Z).',
             ['b(X)', 'c(Y)'],
             exclude_conditional_literals=True)

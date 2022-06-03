@@ -923,86 +923,49 @@ def dict_to_ast(x: dict) -> AST:
     return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
 
 
-class _BodyVisitor(Transformer):
-    '''
-    Visits a rule and extracts the positive body.
-    '''
-    def __init__(self,
-                 exclude_signs: Container[Sign] = (),
-                 exclude_theory_atoms: bool = False,
-                 exclude_aggregates: bool = False,
-                 exclude_conditional_literals: bool = False):
-        self.positive_body: Sequence[AST] = []
-        self._exclude_theory_atoms = exclude_theory_atoms
-        self._exclude_aggregates = exclude_aggregates
-        self._exclude = False
-        self._exclude_signs = exclude_signs
-        self._exclude_conditional_literals = exclude_conditional_literals
-
-    # pylint: disable=invalid-name, missing-function-docstring
-
-    def visit_Literal(self, x):
-        if x.sign in self._exclude_signs:
-            return x
-        self._exclude = False
-        self.visit(x.atom)
-        if not self._exclude:
-            self.positive_body.append(x)
-        return x
-
-    def visit_TheoryAtom(self, x):
-        if self._exclude_theory_atoms:
-            self._exclude = True
-        return x
-
-    def visit_Aggregate(self, x):
-        if self._exclude_aggregates:
-            self._exclude = True
-        return x
-
-    def visit_BodyAggregate(self, x):
-        if self._exclude_aggregates:
-            self._exclude = True
-        return x
-
-    def visit_ConditionalLiteral(self, x):
-        if not self._exclude_conditional_literals:
-            self.positive_body.append(x)
-        return x
-
-
-def get_body(rule: AST,
+def get_body(stm: AST,
              exclude_signs: Container[Sign] = (),
              exclude_theory_atoms: bool = False,
              exclude_aggregates: bool = False,
-             exclude_conditional_literals: bool = False):
+             exclude_conditional_literals: bool = False) -> List[AST]:
     '''
-    Returns the positive body of a rule as a list of literals.
+    Returns the body of a statement applying optional filters.
 
     Parameters
     ----------
-    rule
-        The Python representation of the AST with ast_type Rule.
-
+    stm
+        An `AST` for a statement with a body.
     exclude_theory_atoms
-        Boolean indicating if theory atoms should be included
-
+        Whether theory atoms should be excluded.
     exclude_aggregates
-        Boolean indicating if aggregates should be included
-
+        Whether aggregates should be excluded.
     exclude_signs
-        An iterable containing the signs to be ignoered
+        Literals having any of the given signs are excluded.
 
     Returns
     -------
-    The corresponding a list of literals representing the body of the rule
-    after excluding the marked parts
-
-    See Also
-    --------
-    ast_to_dict
+    A list of body literals.
     '''
-    assert rule.ast_type == ASTType.Rule
-    visitor = _BodyVisitor(exclude_signs, exclude_theory_atoms, exclude_aggregates, exclude_conditional_literals)
-    visitor.visit_sequence(rule.body)
-    return visitor.positive_body
+    assert hasattr(stm, "body")
+
+    body: List[AST] = []
+
+    for lit in stm.body:
+        if lit.ast_type == ASTType.Literal:
+            atom = lit.atom
+            if lit.sign in exclude_signs:
+                continue
+            if exclude_theory_atoms and atom.ast_type == ASTType.TheoryAtom:
+                continue
+            if exclude_aggregates and atom.ast_type == ASTType.Aggregate:
+                continue
+            if exclude_aggregates and atom.ast_type == ASTType.BodyAggregate:
+                continue
+
+        if lit.ast_type == ASTType.ConditionalLiteral:
+            if exclude_conditional_literals:
+                continue
+
+        body.append(lit)
+
+    return body
