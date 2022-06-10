@@ -6,13 +6,14 @@ on:
 
 jobs:
   build:
-    name: clingox ${{ matrix.python-version }} ${{ matrix.os }}
+    name: clingox using python ${{ matrix.python-version }} on ${{ matrix.os }} installing ${{ matrix.requirements }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'macos-latest', 'windows-latest']
         python-version: ['3.6', '3.9']
+        requirements: ['requirements.txt', 'requirements-stable.txt']
 
     steps:
     - uses: actions/checkout@v2
@@ -24,7 +25,7 @@ jobs:
 
     - name: install prerequisites
       shell: pwsh
-      run: pip install -r .github/requirements.txt
+      run: pip install -r .github/${{ matrix.requirements }}
 
     - name: info
       shell: pwsh
@@ -48,5 +49,6 @@ jobs:
       run: flake8
 
     - name: coverage
+      if: ${{ matrix.requirements != 'requirements-stable.txt' }}
       shell: pwsh
       run: coverage report --fail-under=100

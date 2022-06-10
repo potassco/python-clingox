@@ -14,7 +14,7 @@ setup(
     license='MIT',
     url='https://github.com/potassco/python-clingox',
     install_requires=[
-        'clingo>=5.6',
+        'clingo>=5.5',
         'dataclasses ; python_version<"3.7"',
     ],
     packages=['clingox'],
