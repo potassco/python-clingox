@@ -580,6 +580,9 @@ class TestAST(TestCase):
         '''
         Tests for converting between python and ast representation of literals.
         '''
+        # Note: tests are simply skipped for older clingo versions
+        if clingo.version() < (5, 6, 0):
+            return  # nocoverage
         self.assertEqual(
             test_ast_dict(self, 'a.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-3',
@@ -870,6 +873,9 @@ class TestAST(TestCase):
         '''
         Tests for converting between python and ast representation of statements.
         '''
+        # Note: tests are simply skipped for older clingo versions
+        if clingo.version() < (5, 6, 0):
+            return  # nocoverage
         self.assertEqual(
             test_ast_dict(self, 'a :- b.'),
             [{'ast_type': 'Rule', 'location': '<string>:1:1-8',
