@@ -105,7 +105,19 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
-from typing import Any, Callable, Container, List, Mapping, Optional, Sequence, Set, Tuple, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Container,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 from functools import singledispatch
 from copy import copy
 from re import fullmatch
@@ -114,32 +126,59 @@ from enum import Enum, auto
 import clingo
 from clingo import ast
 from clingo.ast import (
-    AST, ASTSequence, ASTType, Function, Location, Position, StrSequence,
-    SymbolicTerm, SymbolicAtom, TheoryAtomType, TheoryFunction,
-    TheoryOperatorType, Transformer, UnaryOperation, Sign)
+    AST,
+    ASTSequence,
+    ASTType,
+    Function,
+    Location,
+    Position,
+    StrSequence,
+    SymbolicTerm,
+    SymbolicAtom,
+    TheoryAtomType,
+    TheoryFunction,
+    TheoryOperatorType,
+    Transformer,
+    UnaryOperation,
+    Sign,
+)
 from .theory import is_operator
 
-__all__ = ['ast_to_dict', 'dict_to_ast', 'location_to_str',
-           'prefix_symbolic_atoms', 'reify_symbolic_atoms',
-           'rename_symbolic_atoms', 'str_to_location',
-           'theory_parser_from_definition', 'Arity', 'Associativity',
-           'AtomTable', 'OperatorTable', 'TheoryParser', 'TheoryTermParser',
-           'TheoryUnparsedTermParser', 'get_body']
+__all__ = [
+    "ast_to_dict",
+    "dict_to_ast",
+    "location_to_str",
+    "prefix_symbolic_atoms",
+    "reify_symbolic_atoms",
+    "rename_symbolic_atoms",
+    "str_to_location",
+    "theory_parser_from_definition",
+    "Arity",
+    "Associativity",
+    "AtomTable",
+    "OperatorTable",
+    "TheoryParser",
+    "TheoryTermParser",
+    "TheoryUnparsedTermParser",
+    "get_body",
+]
 
 
 class Arity(Enum):
-    '''
+    """
     Enumeration of operator arities.
-    '''
+    """
+
     # pylint:disable=invalid-name
     Unary = 1
     Binary = 2
 
 
 class Associativity(Enum):
-    '''
+    """
     Enumeration of operator associativities.
-    '''
+    """
+
     # pylint: disable=invalid-name
     Left = auto()
     Right = auto()
@@ -147,18 +186,18 @@ class Associativity(Enum):
 
 
 def _s(m, a: str, b: str):
-    '''
+    """
     Select the match group b if not None and group a otherwise.
-    '''
+    """
     return m[a] if m[b] is None else m[b]
 
 
 def _quote(s: str) -> str:
-    return s.replace('\\', '\\\\').replace(':', '\\:')
+    return s.replace("\\", "\\\\").replace(":", "\\:")
 
 
 def _unquote(s: str) -> str:
-    return s.replace('\\:', ':').replace('\\\\', '\\')
+    return s.replace("\\:", ":").replace("\\\\", "\\")
 
 
 def location_to_str(loc: Location) -> str:
@@ -213,21 +252,23 @@ def str_to_location(loc: str) -> Location:
     location_to_str
     """
     m = fullmatch(
-        r'(?P<bf>([^\\:]|\\\\|\\:)*):(?P<bl>[0-9]*):(?P<bc>[0-9]+)'
-        r'(-(((?P<ef>([^\\:]|\\\\|\\:)*):)?(?P<el>[0-9]*):)?(?P<ec>[0-9]+))?', loc)
+        r"(?P<bf>([^\\:]|\\\\|\\:)*):(?P<bl>[0-9]*):(?P<bc>[0-9]+)"
+        r"(-(((?P<ef>([^\\:]|\\\\|\\:)*):)?(?P<el>[0-9]*):)?(?P<ec>[0-9]+))?",
+        loc,
+    )
     if not m:
-        raise RuntimeError('could not parse location')
-    begin = Position(_unquote(m['bf']), int(m['bl']), int(m['bc']))
-    end = Position(_unquote(_s(m, 'bf', 'ef')), int(_s(m, 'bl', 'el')), int(_s(m, 'bc', 'ec')))
+        raise RuntimeError("could not parse location")
+    begin = Position(_unquote(m["bf"]), int(m["bl"]), int(m["bc"]))
+    end = Position(
+        _unquote(_s(m, "bf", "ef")), int(_s(m, "bl", "el")), int(_s(m, "bc", "ec"))
+    )
     return Location(begin, end)
 
 
-OperatorTable = Mapping[Tuple[str, Arity],
-                        Tuple[int, Associativity]]
-AtomTable = Mapping[Tuple[str, int],
-                    Tuple[TheoryAtomType,
-                          str,
-                          Optional[Tuple[List[str], str]]]]
+OperatorTable = Mapping[Tuple[str, Arity], Tuple[int, Associativity]]
+AtomTable = Mapping[
+    Tuple[str, int], Tuple[TheoryAtomType, str, Optional[Tuple[List[str], str]]]
+]
 
 
 class TheoryUnparsedTermParser:
@@ -243,6 +284,7 @@ class TheoryUnparsedTermParser:
     table
         Mapping of operator/arity pairs to priority/associativity pairs.
     """
+
     _stack: List[Tuple[str, Arity]]
     _terms: List[AST]
     _table: OperatorTable
@@ -274,8 +316,9 @@ class TheoryUnparsedTermParser:
             return False
         priority, associativity = self._priority_and_associativity(operator)
         previous_priority = self._priority(*self._stack[-1])
-        return (previous_priority > priority or
-                (previous_priority == priority and associativity == Associativity.Left))
+        return previous_priority > priority or (
+            previous_priority == priority and associativity == Associativity.Left
+        )
 
     def _reduce(self) -> None:
         """
@@ -305,7 +348,9 @@ class TheoryUnparsedTermParser:
             Location of the operator for error reporting.
         """
         if (operator, arity) not in self._table:
-            raise RuntimeError(f"cannot parse operator `{operator}`: {location_to_str(location)}")
+            raise RuntimeError(
+                f"cannot parse operator `{operator}`: {location_to_str(location)}"
+            )
 
     def parse(self, x: AST) -> AST:
         """
@@ -361,10 +406,15 @@ class TheoryTermParser(Transformer):
     --------
     TheoryUnparsedTermParser
     """
+
     # pylint: disable=invalid-name
 
     def __init__(self, table: Union[OperatorTable, TheoryUnparsedTermParser]):
-        self._parser = table if isinstance(table, TheoryUnparsedTermParser) else TheoryUnparsedTermParser(table)
+        self._parser = (
+            table
+            if isinstance(table, TheoryUnparsedTermParser)
+            else TheoryUnparsedTermParser(table)
+        )
 
     def visit_TheoryFunction(self, x) -> AST:
         """
@@ -419,16 +469,25 @@ class TheoryParser(Transformer):
         Mapping from atom name/arity pairs to tuples defining the acceptable
         structure of the theory atom.
     """
+
     # pylint: disable=invalid-name
-    _table: Mapping[Tuple[str, int],
-                    Tuple[TheoryAtomType,
-                          TheoryTermParser,
-                          Optional[Tuple[Set[str], TheoryTermParser]]]]
+    _table: Mapping[
+        Tuple[str, int],
+        Tuple[
+            TheoryAtomType,
+            TheoryTermParser,
+            Optional[Tuple[Set[str], TheoryTermParser]],
+        ],
+    ]
     _in_body: bool
     _in_head: bool
     _is_directive: bool
 
-    def __init__(self, terms: Mapping[str, Union[OperatorTable, TheoryTermParser]], atoms: AtomTable):
+    def __init__(
+        self,
+        terms: Mapping[str, Union[OperatorTable, TheoryTermParser]],
+        atoms: AtomTable,
+    ):
         self._reset()
 
         term_parsers = {}
@@ -579,15 +638,25 @@ class TheoryParser(Transformer):
         name = x.term.name
         arity = len(x.term.arguments)
         if (name, arity) not in self._table:
-            raise RuntimeError(f"theory atom definiton not found: {location_to_str(x.location)}")
+            raise RuntimeError(
+                f"theory atom definiton not found: {location_to_str(x.location)}"
+            )
 
         type_, element_parser, guard_table = self._table[(name, arity)]
         if type_ == TheoryAtomType.Head and not self._in_head:
-            raise RuntimeError(f"theory atom only accepted in head: {location_to_str(x.location)}")
+            raise RuntimeError(
+                f"theory atom only accepted in head: {location_to_str(x.location)}"
+            )
         if type_ == TheoryAtomType.Body and not self._in_body:
-            raise RuntimeError(f"theory atom only accepted in body: {location_to_str(x.location)}")
-        if type_ == TheoryAtomType.Directive and not (self._in_head and self._is_directive):
-            raise RuntimeError(f"theory atom must be a directive: {location_to_str(x.location)}")
+            raise RuntimeError(
+                f"theory atom only accepted in body: {location_to_str(x.location)}"
+            )
+        if type_ == TheoryAtomType.Directive and not (
+            self._in_head and self._is_directive
+        ):
+            raise RuntimeError(
+                f"theory atom must be a directive: {location_to_str(x.location)}"
+            )
 
         x = copy(x)
         x.term = element_parser(x.term)
@@ -595,11 +664,15 @@ class TheoryParser(Transformer):
 
         if x.guard is not None:
             if guard_table is None:
-                raise RuntimeError(f"unexpected guard in theory atom: {location_to_str(x.location)}")
+                raise RuntimeError(
+                    f"unexpected guard in theory atom: {location_to_str(x.location)}"
+                )
 
             guards, guard_parser = guard_table
             if x.guard.operator_name not in guards:
-                raise RuntimeError(f"unexpected guard in theory atom: {location_to_str(x.location)}")
+                raise RuntimeError(
+                    f"unexpected guard in theory atom: {location_to_str(x.location)}"
+                )
 
             x.guard = copy(x.guard)
             x.guard.term = guard_parser(x.guard.term)
@@ -649,22 +722,27 @@ def theory_parser_from_definition(x: AST) -> TheoryParser:
         if atom_def.guard is not None:
             guard = (atom_def.guard.operators, atom_def.guard.term)
 
-        atoms[(atom_def.name, atom_def.arity)] = (atom_def.atom_type, atom_def.term, guard)
+        atoms[(atom_def.name, atom_def.arity)] = (
+            atom_def.atom_type,
+            atom_def.term,
+            guard,
+        )
 
     return TheoryParser(terms, atoms)
 
 
 class _SymbolicAtomTransformer(Transformer):
-    '''
+    """
     Transforms symbolic atoms with the given function.
-    '''
+    """
+
     # pylint: disable=invalid-name
 
     def __init__(self, transformer_function: Callable[[AST], AST]):
         self._transformer_function = transformer_function
 
     def visit_SymbolicAtom(self, x: AST) -> AST:
-        '''
+        """
         Transform the given symbolic.
 
         Parameters
@@ -675,14 +753,14 @@ class _SymbolicAtomTransformer(Transformer):
         Returns
         -------
         The rewritten AST.
-        '''
+        """
         term = x.symbol
         new_term = self._transformer_function(term)
         return x if new_term is term else SymbolicAtom(new_term)
 
 
 def rewrite_symbolic_atoms(x: AST, rewrite_function: Callable[[AST], AST]) -> AST:
-    '''
+    """
     Rewrite all symbolic atoms in the given AST node with the given function.
 
     Parameters
@@ -696,12 +774,12 @@ def rewrite_symbolic_atoms(x: AST, rewrite_function: Callable[[AST], AST]) -> AS
     Returns
     -------
     The rewritten AST.
-    '''
+    """
     return cast(AST, _SymbolicAtomTransformer(rewrite_function)(x))
 
 
 def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
-    '''
+    """
     Rename all symbolic atoms in the given AST node with the given function.
 
     Parameters
@@ -714,23 +792,30 @@ def rename_symbolic_atoms(x: AST, rename_function: Callable[[str], str]) -> AST:
     Returns
     -------
     The rewritten AST.
-    '''
+    """
+
     def renamer(term: AST):
         if term.ast_type == ASTType.UnaryOperation:
-            return UnaryOperation(term.location, term.operator_type, renamer(term.argument))
+            return UnaryOperation(
+                term.location, term.operator_type, renamer(term.argument)
+            )
         if term.ast_type == ASTType.SymbolicTerm:
             sym = term.symbol
             new_name = rename_function(sym.name)
-            return SymbolicTerm(term.location, clingo.Function(new_name, sym.arguments, sym.positive))
+            return SymbolicTerm(
+                term.location, clingo.Function(new_name, sym.arguments, sym.positive)
+            )
         if term.ast_type == ASTType.Function:
-            return Function(term.location, rename_function(term.name), term.arguments, term.external)
+            return Function(
+                term.location, rename_function(term.name), term.arguments, term.external
+            )
         return term
 
     return rewrite_symbolic_atoms(x, renamer)
 
 
 def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
-    '''
+    """
     Prefix all symbolic atoms in the given AST with the given string.
 
     Parameters
@@ -747,14 +832,17 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
     See Also
     --------
     rename_symbolic_atoms
-    '''
+    """
     return rename_symbolic_atoms(x, lambda s: prefix + s)
 
 
-def reify_symbolic_atoms(x: AST, name: str,
-                         argument_extender: Callable[[AST], Sequence[AST]] = None,
-                         reify_strong_negation: bool = False) -> AST:
-    '''
+def reify_symbolic_atoms(
+    x: AST,
+    name: str,
+    argument_extender: Callable[[AST], Sequence[AST]] = None,
+    reify_strong_negation: bool = False,
+) -> AST:
+    """
     Reify all symbolic atoms in the given AST node with the given name and
     function.
 
@@ -779,11 +867,13 @@ def reify_symbolic_atoms(x: AST, name: str,
     Returns
     -------
     The rewritten AST.
-    '''
+    """
 
     def reifier(term: AST):
         if term.ast_type == ASTType.UnaryOperation and not reify_strong_negation:
-            return UnaryOperation(term.location, term.operator_type, reifier(term.argument))
+            return UnaryOperation(
+                term.location, term.operator_type, reifier(term.argument)
+            )
         arguments = argument_extender(term) if argument_extender else [term]
         return Function(term.location, name, arguments, False)
 
@@ -851,9 +941,9 @@ def ast_to_dict(x: AST) -> dict:
     --------
     dict_to_ast
     """
-    ret = {"ast_type": str(x.ast_type).replace('ASTType.', '')}
+    ret = {"ast_type": str(x.ast_type).replace("ASTType.", "")}
     for key, val in x.items():
-        if key == 'location':
+        if key == "location":
             assert isinstance(val, Location)
             enc = location_to_str(val)
         else:
@@ -920,15 +1010,19 @@ def dict_to_ast(x: dict) -> AST:
     --------
     ast_to_dict
     """
-    return getattr(ast, x['ast_type'])(**{key: _decode(value, key) for key, value in x.items() if key != "ast_type"})
+    return getattr(ast, x["ast_type"])(
+        **{key: _decode(value, key) for key, value in x.items() if key != "ast_type"}
+    )
 
 
-def get_body(stm: AST,
-             exclude_signs: Container[Sign] = (),
-             exclude_theory_atoms: bool = False,
-             exclude_aggregates: bool = False,
-             exclude_conditional_literals: bool = False) -> List[AST]:
-    '''
+def get_body(
+    stm: AST,
+    exclude_signs: Container[Sign] = (),
+    exclude_theory_atoms: bool = False,
+    exclude_aggregates: bool = False,
+    exclude_conditional_literals: bool = False,
+) -> List[AST]:
+    """
     Returns the body of a statement applying optional filters.
 
     Parameters
@@ -947,7 +1041,7 @@ def get_body(stm: AST,
     Returns
     -------
     A list of body literals.
-    '''
+    """
     assert hasattr(stm, "body")
 
     body: List[AST] = []

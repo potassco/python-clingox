@@ -1,4 +1,4 @@
-'''
+"""
 This module provides functions to reify programs.
 
 This includes a `Reifier` implementing clingo's `clingo.backend.Observer`
@@ -35,9 +35,20 @@ The last example shows how to use the `ReifiedTheory` class.
 >>> evaluate(next(iter(thy)).term)
 Function('p', [], True)
 ```
-'''
+"""
 
-from typing import Callable, Dict, Generic, Iterator, List, Optional, Sequence, Set, Tuple, TypeVar
+from typing import (
+    Callable,
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+)
 from dataclasses import dataclass, field
 
 from clingo.control import Control
@@ -47,18 +58,26 @@ from clingo.theory_atoms import TheoryTermType
 
 from .theory import is_operator
 
-__all__ = ['Reifier', 'ReifiedTheory', 'ReifiedTheoryAtom', 'ReifiedTheoryElement', 'ReifiedTheoryTerm',
-           'ReifiedTheory', 'reify_program']
+__all__ = [
+    "Reifier",
+    "ReifiedTheory",
+    "ReifiedTheoryAtom",
+    "ReifiedTheoryElement",
+    "ReifiedTheoryTerm",
+    "ReifiedTheory",
+    "reify_program",
+]
 
-T = TypeVar('T')  # pylint: disable=invalid-name
-U = TypeVar('U', int, Tuple[int, int])  # pylint: disable=invalid-name
+T = TypeVar("T")  # pylint: disable=invalid-name
+U = TypeVar("U", int, Tuple[int, int])  # pylint: disable=invalid-name
 
 
 @dataclass
 class _Vertex(Generic[T]):
-    '''
+    """
     Vertex data to calculate SCCs of a graph.
-    '''
+    """
+
     name: T
     visited: int
     index: int = 0
@@ -66,10 +85,11 @@ class _Vertex(Generic[T]):
 
 
 class _Graph(Generic[T]):
-    '''
+    """
     Simple class to compute strongly connected components using Tarjan's
     algorithm.
-    '''
+    """
+
     _names: Dict[T, int]
     _vertices: List[_Vertex]
     _phase: bool
@@ -93,17 +113,17 @@ class _Graph(Generic[T]):
         return key_u
 
     def add_edge(self, val_u: T, val_v: T) -> None:
-        '''
+        """
         Add an edge to the graph.
-        '''
+        """
         key_u = self._add_vertex(val_u)
         key_v = self._add_vertex(val_v)
         self._vertices[key_u].edges.append(key_v)
 
     def tarjan(self) -> List[List[T]]:
-        '''
+        """
         Returns the strictly connected components of the graph.
-        '''
+        """
         sccs: List[List[T]] = []
         stack = []
         trail = []
@@ -182,7 +202,7 @@ def _wlit(i: Symbol, pos: int, wlit: Tuple[int, int]) -> Sequence[Symbol]:
 
 
 class Reifier(Observer):
-    '''
+    """
     An observer that will gather the symbols of the reification, in the same way as `clingo --output=reify`.
 
     Parameters
@@ -194,7 +214,8 @@ class Reifier(Observer):
     reify_steps
         Flag to add a number as the last argument of all reification symbols for the corresponding step
 
-    '''
+    """
+
     # pylint:disable=too-many-public-methods
     _step: int
     # Bug in mypy???
@@ -203,7 +224,12 @@ class Reifier(Observer):
     _reify_steps: bool
     _step_data: _StepData
 
-    def __init__(self, cb: Callable[[Symbol], None], calculate_sccs: bool = False, reify_steps: bool = False):
+    def __init__(
+        self,
+        cb: Callable[[Symbol], None],
+        calculate_sccs: bool = False,
+        reify_steps: bool = False,
+    ):
         self._step = 0
         self._cb = cb
         self._calculate_sccs = calculate_sccs
@@ -211,16 +237,16 @@ class Reifier(Observer):
         self._step_data = _StepData()
 
     def calculate_sccs(self) -> None:
-        '''
+        """
         Trigger computation of SCCs.
 
         SCCs can only be computed if the Reifier has been initialized with
         `calculate_sccs=True`, This function is called automatically if
         `reify_steps=True` has been set when initializing the Reifier.
-        '''
+        """
         for idx, scc in enumerate(self._step_data.graph.tarjan()):
             for atm in scc:
-                self._output('scc', [Number(idx), Number(atm)])
+                self._output("scc", [Number(idx), Number(atm)])
 
     def _add_edges(self, head: Sequence[int], body: Sequence[int]):
         if self._calculate_sccs:
@@ -234,11 +260,14 @@ class Reifier(Observer):
             args = list(args) + [Number(self._step)]
         self._cb(Function(name, args))
 
-    def _tuple(self, name: str,
-               snmap: Dict[Sequence[U], int],
-               elems: Sequence[U],
-               afun: Callable[[Symbol, int, U], Sequence[Symbol]],
-               ordered: bool = False) -> Symbol:
+    def _tuple(
+        self,
+        name: str,
+        snmap: Dict[Sequence[U], int],
+        elems: Sequence[U],
+        afun: Callable[[Symbol, int, U], Sequence[Symbol]],
+        ordered: bool = False,
+    ) -> Symbol:
         pruned: Sequence[U]
         if ordered:
             pruned = elems
@@ -267,7 +296,9 @@ class Reifier(Observer):
         return self._tuple("literal_tuple", self._step_data.lit_tuples, lits, _lit)
 
     def _wlit_tuple(self, wlits: Sequence[Tuple[int, int]]):
-        return self._tuple("weighted_literal_tuple", self._step_data.wlit_tuples, wlits, _wlit)
+        return self._tuple(
+            "weighted_literal_tuple", self._step_data.wlit_tuples, wlits, _wlit
+        )
 
     def init_program(self, incremental: bool) -> None:
         if incremental:
@@ -283,8 +314,13 @@ class Reifier(Observer):
         self._output("rule", [hd, bd])
         self._add_edges(head, body)
 
-    def weight_rule(self, choice: bool, head: Sequence[int], lower_bound: int,
-                    body: Sequence[Tuple[int, int]]) -> None:
+    def weight_rule(
+        self,
+        choice: bool,
+        head: Sequence[int],
+        lower_bound: int,
+        body: Sequence[Tuple[int, int]],
+    ) -> None:
         hn = "choice" if choice else "disjunction"
         hd = Function(hn, [self._atom_tuple(head)])
         bd = Function("sum", [self._wlit_tuple(body), Number(lower_bound)])
@@ -305,26 +341,38 @@ class Reifier(Observer):
         self._output("output", [symbol, self._lit_tuple(condition)])
 
     def external(self, atom: int, value: TruthValue) -> None:
-        value_name = str(value).replace('TruthValue.', '').lower().rstrip('_')
+        value_name = str(value).replace("TruthValue.", "").lower().rstrip("_")
         self._output("external", [Number(atom), Function(value_name)])
 
     def assume(self, literals: Sequence[int]) -> None:
         for lit in literals:
             self._output("assume", [Number(lit)])
 
-    def heuristic(self, atom: int, type_: HeuristicType, bias: int,
-                  priority: int, condition: Sequence[int]) -> None:
-        type_name = str(type_).replace('HeuristicType.', '').lower().rstrip('_')
+    def heuristic(
+        self,
+        atom: int,
+        type_: HeuristicType,
+        bias: int,
+        priority: int,
+        condition: Sequence[int],
+    ) -> None:
+        type_name = str(type_).replace("HeuristicType.", "").lower().rstrip("_")
         condition_lit = self._lit_tuple(condition)
-        self._output("heuristic", [Number(atom),
-                                   Function(type_name),
-                                   Number(bias),
-                                   Number(priority),
-                                   condition_lit])
+        self._output(
+            "heuristic",
+            [
+                Number(atom),
+                Function(type_name),
+                Number(bias),
+                Number(priority),
+                condition_lit,
+            ],
+        )
 
-    def acyc_edge(self, node_u: int, node_v: int,
-                  condition: Sequence[int]) -> None:
-        self._output("edge", [Number(node_u), Number(node_v), self._lit_tuple(condition)])
+    def acyc_edge(self, node_u: int, node_v: int, condition: Sequence[int]) -> None:
+        self._output(
+            "edge", [Number(node_u), Number(node_v), self._lit_tuple(condition)]
+        )
 
     def theory_term_number(self, term_id: int, number: int) -> None:
         self._output("theory_number", [Number(term_id), Number(number)])
@@ -332,8 +380,9 @@ class Reifier(Observer):
     def theory_term_string(self, term_id: int, name: str) -> None:
         self._output("theory_string", [Number(term_id), String(name)])
 
-    def theory_term_compound(self, term_id: int, name_id_or_type: int,
-                             arguments: Sequence[int]) -> None:
+    def theory_term_compound(
+        self, term_id: int, name_id_or_type: int, arguments: Sequence[int]
+    ) -> None:
         names = {-1: "tuple", -2: "set", -3: "list"}
         if name_id_or_type in names:
             name = "theory_sequence"
@@ -341,29 +390,59 @@ class Reifier(Observer):
         else:
             name = "theory_function"
             value = Number(name_id_or_type)
-        tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, arguments, _theory, True)
+        tuple_id = self._tuple(
+            "theory_tuple", self._step_data.theory_tuples, arguments, _theory, True
+        )
         self._output(name, [Number(term_id), value, tuple_id])
 
-    def theory_element(self, element_id: int, terms: Sequence[int],
-                       condition: Sequence[int]) -> None:
-        tuple_id = self._tuple("theory_tuple", self._step_data.theory_tuples, terms, _theory, True)
-        condition_id = self._tuple("literal_tuple", self._step_data.lit_tuples, condition, _lit)
+    def theory_element(
+        self, element_id: int, terms: Sequence[int], condition: Sequence[int]
+    ) -> None:
+        tuple_id = self._tuple(
+            "theory_tuple", self._step_data.theory_tuples, terms, _theory, True
+        )
+        condition_id = self._tuple(
+            "literal_tuple", self._step_data.lit_tuples, condition, _lit
+        )
         self._output("theory_element", [Number(element_id), tuple_id, condition_id])
 
-    def theory_atom(self, atom_id_or_zero: int, term_id: int,
-                    elements: Sequence[int]) -> None:
-        tuple_e_id = self._tuple("theory_element_tuple", self._step_data.theory_element_tuples, elements, _lit)
-        self._output("theory_atom", [Number(atom_id_or_zero), Number(term_id), tuple_e_id])
+    def theory_atom(
+        self, atom_id_or_zero: int, term_id: int, elements: Sequence[int]
+    ) -> None:
+        tuple_e_id = self._tuple(
+            "theory_element_tuple",
+            self._step_data.theory_element_tuples,
+            elements,
+            _lit,
+        )
+        self._output(
+            "theory_atom", [Number(atom_id_or_zero), Number(term_id), tuple_e_id]
+        )
 
-    def theory_atom_with_guard(self, atom_id_or_zero: int, term_id: int,
-                               elements: Sequence[int], operator_id: int,
-                               right_hand_side_id: int) -> None:
-        tuple_id = self._tuple("theory_element_tuple", self._step_data.theory_element_tuples, elements, _lit)
-        self._output("theory_atom", [Number(atom_id_or_zero),
-                                     Number(term_id),
-                                     tuple_id,
-                                     Number(operator_id),
-                                     Number(right_hand_side_id)])
+    def theory_atom_with_guard(
+        self,
+        atom_id_or_zero: int,
+        term_id: int,
+        elements: Sequence[int],
+        operator_id: int,
+        right_hand_side_id: int,
+    ) -> None:
+        tuple_id = self._tuple(
+            "theory_element_tuple",
+            self._step_data.theory_element_tuples,
+            elements,
+            _lit,
+        )
+        self._output(
+            "theory_atom",
+            [
+                Number(atom_id_or_zero),
+                Number(term_id),
+                tuple_id,
+                Number(operator_id),
+                Number(right_hand_side_id),
+            ],
+        )
 
     def end_step(self) -> None:
         if self._reify_steps:
@@ -372,8 +451,13 @@ class Reifier(Observer):
             self._step_data = _StepData()
 
 
-def _set(matches: Sequence[Tuple[str, int]], lst: List[Symbol], sym,
-         append: bool = False, default: Symbol = Number(0)) -> bool:
+def _set(
+    matches: Sequence[Tuple[str, int]],
+    lst: List[Symbol],
+    sym,
+    append: bool = False,
+    default: Symbol = Number(0),
+) -> bool:
     for match in matches:
         if not sym.match(*match):
             continue
@@ -405,13 +489,14 @@ def _ensure(name: str, lst: List[List[int]], sym: Symbol, ordered=False) -> bool
 
 
 class ReifiedTheory:
-    '''
+    """
     Class indexing the symbols related to a theory.
 
     The `ReifiedTheoryTerm`, `ReifiedTheoryElement`, and `ReifiedTheoryElement`
     classes provide views on this data that behave as the corresponding classes
     in clingo's `clingo.theory_atoms` module.
-    '''
+    """
+
     terms: List[Symbol]
     elements: List[Symbol]
     atoms: List[Symbol]
@@ -426,25 +511,36 @@ class ReifiedTheory:
         self.element_tuples = []
 
         for sym in symbols:
-            _ = (_set((('theory_atom', 3), ('theory_atom', 5)), self.atoms, sym, True) or
-                 _set((('theory_element', 3),), self.elements, sym) or
-                 _set((('theory_sequence', 3), ('theory_string', 2),
-                       ('theory_number', 2), ('theory_function', 3)), self.terms, sym) or
-                 _ensure('theory_tuple', self.term_tuples, sym, True) or
-                 _ensure('theory_element_tuple', self.element_tuples, sym))
+            _ = (
+                _set((("theory_atom", 3), ("theory_atom", 5)), self.atoms, sym, True)
+                or _set((("theory_element", 3),), self.elements, sym)
+                or _set(
+                    (
+                        ("theory_sequence", 3),
+                        ("theory_string", 2),
+                        ("theory_number", 2),
+                        ("theory_function", 3),
+                    ),
+                    self.terms,
+                    sym,
+                )
+                or _ensure("theory_tuple", self.term_tuples, sym, True)
+                or _ensure("theory_element_tuple", self.element_tuples, sym)
+            )
 
-    def __iter__(self) -> Iterator['ReifiedTheoryAtom']:
+    def __iter__(self) -> Iterator["ReifiedTheoryAtom"]:
         for idx in range(len(self.atoms)):
             yield ReifiedTheoryAtom(idx, self)
 
 
 class ReifiedTheoryTerm:
-    '''
+    """
     Class to represent theory terms.
 
     ReifiedTheory terms have a readable string representation, implement Python's rich
     comparison operators, and can be used as dictionary keys.
-    '''
+    """
+
     _idx: int
     _theory: ReifiedTheory
 
@@ -455,9 +551,9 @@ class ReifiedTheoryTerm:
 
     @property
     def index(self) -> int:
-        '''
+        """
         The index of the corresponding reified fact.
-        '''
+        """
         return self._idx
 
     @property
@@ -465,20 +561,24 @@ class ReifiedTheoryTerm:
         return self._theory.terms[self._idx].arguments
 
     @property
-    def arguments(self) -> List['ReifiedTheoryTerm']:
-        '''
+    def arguments(self) -> List["ReifiedTheoryTerm"]:
+        """
         The arguments of the term (for functions, tuples, list, and sets).
-        '''
-        assert self.type in (TheoryTermType.List, TheoryTermType.Set,
-                             TheoryTermType.Tuple, TheoryTermType.Function)
+        """
+        assert self.type in (
+            TheoryTermType.List,
+            TheoryTermType.Set,
+            TheoryTermType.Tuple,
+            TheoryTermType.Function,
+        )
         term_ids = self._theory.term_tuples[self._args[2].number]
         return [ReifiedTheoryTerm(term_id, self._theory) for term_id in term_ids]
 
     @property
     def name(self) -> str:
-        '''
+        """
         The name of the term (for symbols and functions).
-        '''
+        """
         assert self.type in (TheoryTermType.Symbol, TheoryTermType.Function)
         if self.type == TheoryTermType.Function:
             return self._theory.terms[self._args[1].number].arguments[1].string
@@ -486,17 +586,17 @@ class ReifiedTheoryTerm:
 
     @property
     def number(self) -> int:
-        '''
+        """
         The numeric representation of the term (for numbers).
-        '''
+        """
         assert self.type == TheoryTermType.Number
         return self._args[1].number
 
     @property
     def type(self) -> TheoryTermType:
-        '''
+        """
         The type of the theory term.
-        '''
+        """
         name = self._theory.terms[self._idx].name
         if name == "theory_number":
             return TheoryTermType.Number
@@ -526,36 +626,37 @@ class ReifiedTheoryTerm:
         type_ = self.type
 
         if type_ == TheoryTermType.Number:
-            return f'{self.number}'
+            return f"{self.number}"
 
         if type_ == TheoryTermType.Symbol:
-            return f'{self.name}'
+            return f"{self.name}"
 
         if type_ == TheoryTermType.Function:
             args = self.arguments
             name = self.name
             if len(args) == 1 and is_operator(name):
-                return f'{name}({args[0]})'
+                return f"{name}({args[0]})"
             if len(args) == 2 and is_operator(name):
-                return f'({args[0]}){name}({args[1]})'
+                return f"({args[0]}){name}({args[1]})"
             return f'{name}({",".join(str(arg) for arg in args)})'
 
         if type_ == TheoryTermType.Tuple:
-            lhs, rhs = '(', ')'
+            lhs, rhs = "(", ")"
         elif type_ == TheoryTermType.List:
-            lhs, rhs = '[', ']'
+            lhs, rhs = "[", "]"
         else:
-            lhs, rhs = '{', '}'
+            lhs, rhs = "{", "}"
         return f'{lhs}{",".join(str(arg) for arg in self.arguments)}{rhs}'
 
 
 class ReifiedTheoryElement:
-    '''
+    """
     Class to represent theory elements.
 
     ReifiedTheory elements have a readable string representation, implement Python's
     rich comparison operators, and can be used as dictionary keys.
-    '''
+    """
+
     _idx: int
     _theory: ReifiedTheory
 
@@ -566,9 +667,9 @@ class ReifiedTheoryElement:
 
     @property
     def index(self) -> int:
-        '''
+        """
         The index of the corresponding reified fact.
-        '''
+        """
         return self._idx
 
     @property
@@ -577,16 +678,16 @@ class ReifiedTheoryElement:
 
     @property
     def condition_id(self) -> int:
-        '''
+        """
         The id of the literal tuple of the condition.
-        '''
+        """
         return self._args[2].number
 
     @property
     def terms(self) -> List[ReifiedTheoryTerm]:
-        '''
+        """
         The tuple of the element.
-        '''
+        """
         term_ids = self._theory.term_tuples[self._args[1].number]
         return [ReifiedTheoryTerm(term_id, self._theory) for term_id in term_ids]
 
@@ -604,12 +705,13 @@ class ReifiedTheoryElement:
 
 
 class ReifiedTheoryAtom:
-    '''
+    """
     Class to represent theory atoms.
 
     Theory atoms have a readable string representation, implement Python's rich
     comparison operators, and can be used as dictionary keys.
-    '''
+    """
+
     _idx: int
     _theory: ReifiedTheory
 
@@ -620,9 +722,9 @@ class ReifiedTheoryAtom:
 
     @property
     def index(self) -> int:
-        '''
+        """
         The index of the corresponding reified fact.
-        '''
+        """
         return self._idx
 
     @property
@@ -631,18 +733,20 @@ class ReifiedTheoryAtom:
 
     @property
     def elements(self) -> List[ReifiedTheoryElement]:
-        '''
+        """
         The elements of the atom.
-        '''
+        """
         tuple_id = self._args[2].number
-        return [ReifiedTheoryElement(elem_id, self._theory)
-                for elem_id in self._theory.element_tuples[tuple_id]]
+        return [
+            ReifiedTheoryElement(elem_id, self._theory)
+            for elem_id in self._theory.element_tuples[tuple_id]
+        ]
 
     @property
     def guard(self) -> Optional[Tuple[str, ReifiedTheoryTerm]]:
-        '''
+        """
         The guard of the atom or None if the atom has no guard.
-        '''
+        """
         args = self._args
         if len(args) <= 3:
             return None
@@ -652,16 +756,16 @@ class ReifiedTheoryAtom:
 
     @property
     def literal(self) -> int:
-        '''
+        """
         The reified literal associated with the atom.
-        '''
+        """
         return self._args[0].number
 
     @property
     def term(self) -> ReifiedTheoryTerm:
-        '''
+        """
         The term of the atom.
-        '''
+        """
         return ReifiedTheoryTerm(self._args[1].number, self._theory)
 
     def __hash__(self):
@@ -674,25 +778,27 @@ class ReifiedTheoryAtom:
         return self._idx < other._idx
 
     def __str__(self):
-        name = f'&{self.term}'
+        name = f"&{self.term}"
 
         elems = self.elements
         if elems:
             estr = f' {{ {"; ".join(str(elem) for elem in elems)} }}'
         else:
-            estr = ''
+            estr = ""
 
         guard = self.guard
         if guard:
-            gstr = f' {guard[0]} {guard[1]}'
+            gstr = f" {guard[0]} {guard[1]}"
         else:
-            gstr = ''
+            gstr = ""
 
-        return f'{name}{estr}{gstr}'
+        return f"{name}{estr}{gstr}"
 
 
-def reify_program(prg: str, calculate_sccs: bool = False, reify_steps: bool = False) -> List[Symbol]:
-    '''
+def reify_program(
+    prg: str, calculate_sccs: bool = False, reify_steps: bool = False
+) -> List[Symbol]:
+    """
     Reify the given program and return the reified symbols.
 
     Parameters
@@ -707,13 +813,13 @@ def reify_program(prg: str, calculate_sccs: bool = False, reify_steps: bool = Fa
     Returns
     -------
     A list of symbols containing the reified facts.
-    '''
+    """
     ret: List[Symbol] = []
     ctl = Control()
     reifier = Reifier(ret.append, calculate_sccs, reify_steps)
     ctl.register_observer(reifier)
     ctl.add("base", [], prg)
-    ctl.ground([('base', [])])
+    ctl.ground([("base", [])])
     if calculate_sccs and not reify_steps:
         reifier.calculate_sccs()
 
