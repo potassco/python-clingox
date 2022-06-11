@@ -7,4 +7,5 @@ pylint
 coverage
 dataclasses; python_version < '3.7'
 types-dataclasses; python_version < '3.7'
+pre-commit==2.19.0
 --extra-index-url https://test.pypi.org/simple/
