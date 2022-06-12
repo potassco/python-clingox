@@ -5,7 +5,7 @@ Simple tests for ast manipulation.
 # pylint: disable=too-many-lines
 
 from unittest import TestCase
-from typing import Callable, Container,    List, Optional, Sequence, cast
+from typing import Callable, Container, List, Optional, Sequence, cast
 
 
 import clingo
