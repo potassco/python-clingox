@@ -64,7 +64,7 @@ Statement = TypeVar('Statement', 'Fact', 'Show', 'Rule', 'WeightRule', 'Heuristi
 
 
 @singledispatch
-def pretty_str(stm, output_atoms: OutputTable) -> str:  # pylint: disable=unused-argument
+def pretty_str(stm, output_atoms: OutputTable) -> str:
     '''
     Pretty print statements.
 
@@ -79,11 +79,12 @@ def pretty_str(stm, output_atoms: OutputTable) -> str:  # pylint: disable=unused
     -------
     The string representation of the statement.
     '''
+    # pylint: disable=unused-argument
     assert False, 'unexpected type'
 
 
 @singledispatch
-def remap(stm, mapping: AtomMap):  # pylint: disable=unused-argument
+def remap(stm, mapping: AtomMap):
     '''
     Remap literals in the given statement with the provided mapping.
 
@@ -102,11 +103,12 @@ def remap(stm, mapping: AtomMap):  # pylint: disable=unused-argument
     --------
     Remapping
     '''
+    # pylint: disable=unused-argument
     assert False, 'unexpected type'
 
 
 @singledispatch
-def add_to_backend(stm, backend: Backend):  # pylint: disable=unused-argument
+def add_to_backend(stm, backend: Backend):
     '''
     Add statements to the backend using the provided mapping to map literals.
 
@@ -117,6 +119,7 @@ def add_to_backend(stm, backend: Backend):  # pylint: disable=unused-argument
     backend
         The backend.
     '''
+    # pylint: disable=unused-argument
     assert False, 'unexpected type'
 
 
@@ -208,29 +211,32 @@ class Fact(NamedTuple):
 
 
 @pretty_str.register(Fact)
-def _pretty_str_fact(stm: Fact, output_atoms: OutputTable) -> str:  # pylint: disable=unused-argument
+def _pretty_str_fact(stm: Fact, output_atoms: OutputTable) -> str:
     '''
     Pretty print a fact.
     '''
+    # pylint: disable=unused-argument
     return f'{stm.symbol}.'
 
 
 @remap.register(Fact)
-def _remap_fact(stm: Fact, mapping: AtomMap) -> Fact:  # pylint: disable=unused-argument
+def _remap_fact(stm: Fact, mapping: AtomMap) -> Fact:
     '''
     Remap a fact statement.
     '''
+    # pylint: disable=unused-argument
     return stm
 
 
 @add_to_backend.register(Fact)
-def _add_to_backend_fact(stm: Fact, backend: Backend) -> None:  # pylint: disable=unused-argument
+def _add_to_backend_fact(stm: Fact, backend: Backend) -> None:
     '''
     Add a fact to the backend.
 
     This does nothing to not interfere with the mapping of literals. If facts
     are to be mapped, then this should be done manually beforehand.
     '''
+    # pylint: disable=unused-argument
 
 
 class Show(NamedTuple):
@@ -259,13 +265,14 @@ def _remap_show(stm: Show, mapping: AtomMap) -> Show:
 
 
 @add_to_backend.register(Show)
-def _add_to_backend_show(stm: Show, backend: Backend) -> None:  # pylint: disable=unused-argument
+def _add_to_backend_show(stm: Show, backend: Backend) -> None:
     '''
     Add a show statement to the backend.
 
     Note that this currently does nothing because backend does not yet support
     adding to the symbol table.
     '''
+    # pylint: disable=unused-argument
 
 
 class Rule(NamedTuple):
