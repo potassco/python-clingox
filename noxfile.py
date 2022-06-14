@@ -3,7 +3,7 @@ import os
 
 nox.options.sessions = "lint_flake8", "lint_pylint", "typecheck", "test"
 
-PYTHON_VERSIONS = ["3.6", "3.9"] if 'GITHUB_ACTIONS' in os.environ else None
+PYTHON_VERSIONS = ["3.6", "3.9"] if "GITHUB_ACTIONS" in os.environ else None
 
 
 @nox.session
@@ -19,9 +19,11 @@ def lint_flake8(session):
 
 
 @nox.session
-@nox.parametrize('stable', [True, False])
+@nox.parametrize("stable", [True, False])
 def lint_pylint(session, stable):
-    session.install("-r", f".github/requirements{'-stable' if stable else ''}.txt", "pylint")
+    session.install(
+        "-r", f".github/requirements{'-stable' if stable else ''}.txt", "pylint"
+    )
     session.run("pylint", "clingox")
 
 
@@ -32,12 +34,14 @@ def typecheck(session):
 
 
 @nox.session(python=PYTHON_VERSIONS)
-@nox.parametrize('stable', [True, False])
+@nox.parametrize("stable", [True, False])
 def test(session, stable):
     if stable:
         session.install("-r", f".github/requirements{'-stable' if stable else ''}.txt")
-        session.run("python", '-m', 'unittest', 'discover', '-v')
+        session.run("python", "-m", "unittest", "discover", "-v")
     else:
-        session.install("-r", f".github/requirements{'-stable' if stable else ''}.txt", "coverage")
-        session.run("coverage", 'run', '-m', 'unittest', 'discover', '-v')
-        session.run("coverage", 'report', '--fail-under=100')
+        session.install(
+            "-r", f".github/requirements{'-stable' if stable else ''}.txt", "coverage"
+        )
+        session.run("coverage", "run", "-m", "unittest", "discover", "-v")
+        session.run("coverage", "report", "--fail-under=100")
