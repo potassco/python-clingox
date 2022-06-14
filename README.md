@@ -14,8 +14,8 @@ python -m pip install nox
 nox
 ```
 
-Note that `nox -r` to speed up subsequent runs avoiding the recreation of
-virtual environments.
+Note that `nox -r` can be used to speed up subsequent runs. It avoids
+recreating virtual environments.
 
 Furthermore, we auto format code using [black]. We provide a [pre-commit][pre]
 config to automate this process. It can be set up using the following commands:
