@@ -11,29 +11,28 @@ import clingo
 from clingo import Function
 from clingo.ast import (
     AST,
-    ASTType,
     Location,
     Position,
-    Transformer,
-    parse_string,
-    Variable,
     Sign,
+    Transformer,
+    Variable,
+    parse_string,
 )
 from .. import ast
 from ..ast import (
     Arity,
     Associativity,
-    TheoryTermParser,
-    TheoryParser,
-    TheoryAtomType,
     ast_to_dict,
     dict_to_ast,
     location_to_str,
     prefix_symbolic_atoms,
     str_to_location,
-    theory_parser_from_definition,
-    reify_symbolic_atoms,
+    TheoryAtomType,
+    TheoryParser,
+    TheoryTermParser,
     get_body,
+    parse_theory,
+    reify_symbolic_atoms,
 )
 
 TERM_TABLE = {
@@ -148,21 +147,6 @@ def parse_stm(s: str, parser: Optional[TheoryParser] = None) -> str:
         parser = TheoryParser(TERM_TABLE, ATOM_TABLE)
 
     return str(parser(last_stm(s)))
-
-
-def parse_theory(s: str) -> TheoryParser:
-    """
-    Turn the given theory into a parser.
-    """
-    parser = None
-
-    def extract(stm):
-        nonlocal parser
-        if stm.ast_type == ASTType.TheoryDefinition:
-            parser = theory_parser_from_definition(stm)
-
-    parse_string(f"{s}.", extract)
-    return cast(TheoryParser, parser)
 
 
 def parse_with(s: str, f: Callable[[AST], AST] = lambda x: x) -> Sequence[str]:
@@ -285,6 +269,10 @@ class TestAST(TestCase):
         """
         Test creating parsers from theory definitions.
         """
+        with self.assertRaisesRegex(ValueError, "no theory definition found"):
+            parse_theory("#program base")
+        with self.assertRaisesRegex(ValueError, "multiple theory definitions"):
+            parse_theory(TEST_THEORY + "." + TEST_THEORY)
         parser = parse_theory(TEST_THEORY)
 
         def pawp(s):

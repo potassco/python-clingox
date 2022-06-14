@@ -9,7 +9,8 @@ PYTHON_VERSIONS = ["3.6", "3.9"] if "GITHUB_ACTIONS" in os.environ else None
 @nox.session
 def format(session):
     session.install("black")
-    session.run("black", "clingox")
+    args = session.posargs if session.posargs else ["clingox"]
+    session.run("black", *args)
 
 
 @nox.session

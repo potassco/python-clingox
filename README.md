@@ -27,6 +27,15 @@ pre-commit install
 
 This blackens the source code whenever `git commit` is used.
 
+There is also a format session for nox. It can be run as follows:
+
+```bash
+nox -rs format
+nox -rs format -- --check --diff clingox
+```
+
+The latter command can be usde to inspect changes before applying them.
+
 [doc]: https://potassco.org/clingo/python-api/current/
 [nox]: https://nox.thea.codes/en/stable/index.html
 [pre]: https://pre-commit.com/
