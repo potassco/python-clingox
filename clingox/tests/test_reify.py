@@ -1,6 +1,6 @@
-'''
+"""
 Test cases for the reify module.
-'''
+"""
 
 import os
 from tempfile import NamedTemporaryFile
@@ -51,8 +51,8 @@ class _AppMain:
         self._prg = prg
 
     def __call__(self, ctl: Control):
-        ctl.add('base', [], self._prg)  # nocoverage
-        ctl.ground([('base', [])])  # nocoverage
+        ctl.add("base", [], self._prg)  # nocoverage
+        ctl.ground([("base", [])])  # nocoverage
         ctl.solve()  # nocoverage
 
 
@@ -69,7 +69,11 @@ def _reify(prg, calculate_sccs: bool = False, reify_steps: bool = False):
     return [str(sym) for sym in symbols]
 
 
-def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: bool = False, reify_steps: bool = False):
+def _reify_check(
+    prg: Union[str, Callable[[Control], None]],
+    calculate_sccs: bool = False,
+    reify_steps: bool = False,
+):
     with NamedTemporaryFile(delete=False) as temp_out:
         name_out = temp_out.name
 
@@ -81,9 +85,9 @@ def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: boo
 
         args = ["--output=reify", "-Wnone"]
         if calculate_sccs:
-            args.append('--reify-sccs')
+            args.append("--reify-sccs")
         if reify_steps:
-            args.append('--reify-steps')
+            args.append("--reify-steps")
 
         if isinstance(prg, str):
             app_main = _AppMain(prg)
@@ -99,21 +103,25 @@ def _reify_check(prg: Union[str, Callable[[Control], None]], calculate_sccs: boo
         os.close(fd_stdout)
 
         with open(name_out, encoding="utf8") as file_out:
-            return [s.rstrip('.\n') for s in file_out]
+            return [s.rstrip(".\n") for s in file_out]
 
     finally:
         os.unlink(name_out)
 
 
 def term_symbols(term: ReifiedTheoryTerm, ret: Dict[int, Symbol]) -> None:
-    '''
+    """
     Represent arguments to theory operators using clingo's `clingo.Symbol`
     class.
 
     Theory terms are evaluated using `clingox.theory.evaluate_unary` and added
     to the given dictionary using the index of the theory term as key.
-    '''
-    if term.type == TheoryTermType.Function and is_operator(term.name) and not is_clingo_operator(term.name):
+    """
+    if (
+        term.type == TheoryTermType.Function
+        and is_operator(term.name)
+        and not is_clingo_operator(term.name)
+    ):
         term_symbols(term.arguments[0], ret)
         term_symbols(term.arguments[1], ret)
     elif term.index not in ret:
@@ -121,11 +129,11 @@ def term_symbols(term: ReifiedTheoryTerm, ret: Dict[int, Symbol]) -> None:
 
 
 def visit_terms(thy: ReifiedTheory, cb: Callable[[ReifiedTheoryTerm], None]):
-    '''
+    """
     Visit the terms occuring in the theory atoms of the given theory.
 
     This function does not recurse into terms.
-    '''
+    """
     for atm in thy:
         for elem in atm.elements:
             for term in elem.terms:
@@ -137,8 +145,8 @@ def visit_terms(thy: ReifiedTheory, cb: Callable[[ReifiedTheoryTerm], None]):
 
 
 def _assume(ctl: Control):
-    ctl.add("base", [], '{a;b}.')
-    ctl.ground([('base', [])])
+    ctl.add("base", [], "{a;b}.")
+    ctl.ground([("base", [])])
 
     lit_a = cast(SymbolicAtom, ctl.symbolic_atoms[Function("a")]).literal
     lit_b = cast(SymbolicAtom, ctl.symbolic_atoms[Function("b")]).literal
@@ -147,122 +155,135 @@ def _assume(ctl: Control):
 
 
 def _incremental(ctl: Control):
-    ctl.add('step0', [], 'a :- b. b :- a. {a;b}.')
-    ctl.ground([('step0', [])])
+    ctl.add("step0", [], "a :- b. b :- a. {a;b}.")
+    ctl.ground([("step0", [])])
     ctl.solve()
-    ctl.add('step1', [], 'c :- d. d :- c. {c;d}.')
-    ctl.ground([('step1', [])])
+    ctl.add("step1", [], "c :- d. d :- c. {c;d}.")
+    ctl.ground([("step1", [])])
     ctl.solve()
 
 
 class TestReifier(TestCase):
-    '''
+    """
     Tests for the Reifier.
-    '''
+    """
 
     def test_incremental(self):
-        '''
+        """
         Test incremental reification.
-        '''
+        """
 
         # Note: we use sets here because the reification of sccs does not
         # exactly follow what clingo does. In priniciple, it would be possible
         # to implement this in the same fashion clingo does.
-        self.assertSetEqual(set(_reify(_incremental, True, True)),
-                            set(_reify_check(_incremental, True, True)))
+        self.assertSetEqual(
+            set(_reify(_incremental, True, True)),
+            set(_reify_check(_incremental, True, True)),
+        )
 
     def test_reify(self):
-        '''
+        """
         Test reification of different language elements.
-        '''
+        """
 
         prgs = [
             _assume,
-            GRAMMAR + '&tel { a <? b: x}. { x }.',
+            GRAMMAR + "&tel { a <? b: x}. { x }.",
             GRAMMAR + '&tel { a("s") <? b({2,3}) }.',
-            GRAMMAR + '&tel { a <? b([2,c(1)]) }.',
-            GRAMMAR + '&tel { a(s) <? b((2,3)) }.',
-            GRAMMAR + '&tel2 { a <? b } = c.',
-            'a :- b. b :- a. c :- d. {a; d}.',
-            '{ a(1); a(2) } 2. :- a(1..2).',
-            ':- not b. {b}.',
-            '{ a(1..4) }. :- #count{ X: a(X) } > 2.',
-            'a(1..2). #show b(X): a(X).',
-            '1{ a(1..2) }. #minimize { X@2: a(X) }.',
-            '{ a(1..2)}. #show c: a(_). #show.',
-            '#external a. [true]',
-            '#external a. [false]',
-            '#external a. [free]',
-            '#heuristic a. [1,true] {a}.',
-            '#project c: a. { a; b; c }. #project b: a.',
-            '#edge (a,b): c. {c}.'
+            GRAMMAR + "&tel { a <? b([2,c(1)]) }.",
+            GRAMMAR + "&tel { a(s) <? b((2,3)) }.",
+            GRAMMAR + "&tel2 { a <? b } = c.",
+            "a :- b. b :- a. c :- d. {a; d}.",
+            "{ a(1); a(2) } 2. :- a(1..2).",
+            ":- not b. {b}.",
+            "{ a(1..4) }. :- #count{ X: a(X) } > 2.",
+            "a(1..2). #show b(X): a(X).",
+            "1{ a(1..2) }. #minimize { X@2: a(X) }.",
+            "{ a(1..2)}. #show c: a(_). #show.",
+            "#external a. [true]",
+            "#external a. [false]",
+            "#external a. [free]",
+            "#heuristic a. [1,true] {a}.",
+            "#project c: a. { a; b; c }. #project b: a.",
+            "#edge (a,b): c. {c}.",
         ]
         for prg in prgs:
             self.assertListEqual(_reify(prg), _reify_check(prg))
-            self.assertListEqual(_reify(prg, reify_steps=True), _reify_check(prg, reify_steps=True))
-            self.assertListEqual(_reify(prg, calculate_sccs=True), _reify_check(prg, calculate_sccs=True))
+            self.assertListEqual(
+                _reify(prg, reify_steps=True), _reify_check(prg, reify_steps=True)
+            )
+            self.assertListEqual(
+                _reify(prg, calculate_sccs=True), _reify_check(prg, calculate_sccs=True)
+            )
 
     def test_theory(self):
-        '''
+        """
         Test the reified theory class.
-        '''
+        """
+
         def get_theory(prg):
             symbols = reify_program(prg)
             thy = ReifiedTheory(symbols)
             return list(thy)
 
-        atm1 = get_theory(THEORY + '&a { f(1+ -2): x } = z. { x }.')[0]
-        atm2 = get_theory(THEORY + '&a { f((1,2)): x }. { x }.')[0]
-        atm3 = get_theory(THEORY + '&a { f([1,2]): x }. { x }.')[0]
-        atm4 = get_theory(THEORY + '&a { f({1,2}): x }. { x }.')[0]
-        atm5 = get_theory(THEORY + '&a. { x }.')[0]
-        self.assertEqual(str(atm1), '&a { f((1)+(-(2))): literal_tuple(1) } = z')
-        self.assertEqual(str(atm2), '&a { f((1,2)): literal_tuple(1) }')
-        self.assertEqual(str(atm3), '&a { f([1,2]): literal_tuple(1) }')
-        self.assertEqual(str(atm4), '&a { f({1,2}): literal_tuple(1) }')
-        self.assertEqual(str(atm5), '&a')
+        atm1 = get_theory(THEORY + "&a { f(1+ -2): x } = z. { x }.")[0]
+        atm2 = get_theory(THEORY + "&a { f((1,2)): x }. { x }.")[0]
+        atm3 = get_theory(THEORY + "&a { f([1,2]): x }. { x }.")[0]
+        atm4 = get_theory(THEORY + "&a { f({1,2}): x }. { x }.")[0]
+        atm5 = get_theory(THEORY + "&a. { x }.")[0]
+        self.assertEqual(str(atm1), "&a { f((1)+(-(2))): literal_tuple(1) } = z")
+        self.assertEqual(str(atm2), "&a { f((1,2)): literal_tuple(1) }")
+        self.assertEqual(str(atm3), "&a { f([1,2]): literal_tuple(1) }")
+        self.assertEqual(str(atm4), "&a { f({1,2}): literal_tuple(1) }")
+        self.assertEqual(str(atm5), "&a")
 
-        self.assertEqual(evaluate(atm1.elements[0].terms[0]), Function('f', [Number(-1)]))
+        self.assertEqual(
+            evaluate(atm1.elements[0].terms[0]), Function("f", [Number(-1)])
+        )
         self.assertGreaterEqual(atm1.literal, 1)
 
-        dir1 = get_theory(THEORY + '&b.')[0]
+        dir1 = get_theory(THEORY + "&b.")[0]
         self.assertEqual(dir1.literal, 0)
 
-        atms = get_theory(THEORY + '&a { 1 }. &a { 2 }. &a { 3 }.')
+        atms = get_theory(THEORY + "&a { 1 }. &a { 2 }. &a { 3 }.")
         self.assertEqual(len(set(atms)), 3)
         self.assertNotEqual(atms[0], atms[1])
-        self.assertNotEqual(atms[0] < atms[1],
-                            atms[0] > atms[1])
+        self.assertNotEqual(atms[0] < atms[1], atms[0] > atms[1])
 
-        aele = get_theory(THEORY + '&a { 1; 2; 3 }.')[0]
+        aele = get_theory(THEORY + "&a { 1; 2; 3 }.")[0]
         self.assertEqual(len(set(aele.elements)), 3)
         self.assertNotEqual(aele.elements[0], aele.elements[1])
-        self.assertNotEqual(aele.elements[0] < aele.elements[1],
-                            aele.elements[0] > aele.elements[1])
+        self.assertNotEqual(
+            aele.elements[0] < aele.elements[1], aele.elements[0] > aele.elements[1]
+        )
 
-        atup = get_theory(THEORY + '&a { 1,2,3 }.')[0]
+        atup = get_theory(THEORY + "&a { 1,2,3 }.")[0]
         self.assertEqual(len(set(atup.elements[0].terms)), 3)
         self.assertNotEqual(atup.elements[0].terms[0], atup.elements[0].terms[1])
-        self.assertNotEqual(atup.elements[0].terms[0] < atup.elements[0].terms[1],
-                            atup.elements[0].terms[0] > atup.elements[0].terms[1])
+        self.assertNotEqual(
+            atup.elements[0].terms[0] < atup.elements[0].terms[1],
+            atup.elements[0].terms[0] > atup.elements[0].terms[1],
+        )
 
     def test_theory_symbols(self):
         """
         Test function to get symbols in a theory.
         """
+
         def theory_symbols(prg: str) -> Set[str]:
             ret: Dict[int, Symbol] = {}
-            visit_terms(ReifiedTheory(reify_program(prg)),
-                        lambda term: term_symbols(term, ret))
+            visit_terms(
+                ReifiedTheory(reify_program(prg)), lambda term: term_symbols(term, ret)
+            )
             return set(str(x) for x in ret.values())
 
-        prg = GRAMMAR + '&tel { a(s) <? b((2,3)) }.'
-        self.assertSetEqual(theory_symbols(prg),
-                            set(['a(s)', 'b((2,3))', 'tel']))
+        prg = GRAMMAR + "&tel { a(s) <? b((2,3)) }."
+        self.assertSetEqual(theory_symbols(prg), set(["a(s)", "b((2,3))", "tel"]))
 
         prg = GRAMMAR + '&tel2 { (a("s") <? 2+3) <? b((2,3)) } = z.'
-        self.assertSetEqual(theory_symbols(prg),
-                            set(['5', 'a("s")', 'z', 'tel2', 'b((2,3))']))
+        self.assertSetEqual(
+            theory_symbols(prg), set(["5", 'a("s")', "z", "tel2", "b((2,3))"])
+        )
 
-        prg = GRAMMAR + '&tel{ a({b,c}) <? c}.'
+        prg = GRAMMAR + "&tel{ a({b,c}) <? c}."
         self.assertRaises(RuntimeError, theory_symbols, prg)

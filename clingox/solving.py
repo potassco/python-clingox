@@ -1,7 +1,7 @@
-'''
+"""
 This module provides functions to approximate the cautious consequences of a
 program
-'''
+"""
 
 from typing import Optional, Sequence, Tuple
 
@@ -11,7 +11,7 @@ from clingo.symbol import Symbol
 
 
 def approximate(ctl: Control) -> Optional[Tuple[Sequence[Symbol], Sequence[Symbol]]]:
-    '''
+    """
     Approximate the stable models of a program.
 
     Parameters
@@ -32,7 +32,7 @@ def approximate(ctl: Control) -> Optional[Tuple[Sequence[Symbol], Sequence[Symbo
     -----
     Runs in polynomial time. An approximation might be returned even if the
     problem is unsatisfiable.
-    '''
+    """
     # solve with a limit of 0 conflicts to propagate direct consequences
     assert isinstance(ctl.configuration.solve, Configuration)
     solve_limit = ctl.configuration.solve.solve_limit
