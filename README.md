@@ -1,12 +1,30 @@
-This projects collects useful python functions that can be used along with the
-clingo libary.
+# clingox: Auxiliary functions for the clingo library
+
+This projects collects useful Python functions that can be used along with the
+clingo library.
+
+## Documentation
 
 For examples how to use the library check the unit tests. The API documentation
 is available [online][doc].
 
-# Development
+## Installation
 
-To improve code quality, we run a linters, type checkers, and unit tests. The
+We provide clingox packages for various package managers:
+
+```bash
+# pip
+pip install clingox
+# conda
+conda install -c conda-forge python-clingox
+# ubuntu
+sudo add-apt-repository ppa:potassco/stable
+sudo apt install python3-clingox
+```
+
+## Development
+
+To improve code quality, we run linters, type checkers, and unit tests. The
 tools can be run using [nox]:
 
 ```bash
@@ -34,7 +52,7 @@ nox -rs format
 nox -rs format -- --check --diff clingox
 ```
 
-The latter command can be usde to inspect changes before applying them.
+The latter command can be used to inspect changes before applying them.
 
 [doc]: https://potassco.org/clingo/python-api/current/
 [nox]: https://nox.thea.codes/en/stable/index.html
