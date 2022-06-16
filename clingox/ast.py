@@ -459,7 +459,23 @@ class TheoryTermParser(Transformer):
         return cast(AST, self(self._parser.parse(x)))
 
 
-@lru_cache()
+_clingo_term_table = {
+    ("-", Arity.Unary): (5, Associativity.NoAssociativity),
+    ("~", Arity.Unary): (5, Associativity.NoAssociativity),
+    ("**", Arity.Binary): (4, Associativity.Right),
+    ("*", Arity.Binary): (3, Associativity.Left),
+    ("/", Arity.Binary): (3, Associativity.Left),
+    ("\\", Arity.Binary): (3, Associativity.Left),
+    ("+", Arity.Binary): (2, Associativity.Left),
+    ("-", Arity.Binary): (2, Associativity.Left),
+    ("&", Arity.Binary): (1, Associativity.Left),
+    ("?", Arity.Binary): (1, Associativity.Left),
+    ("^", Arity.Binary): (1, Associativity.Left),
+    ("..", Arity.Binary): (0, Associativity.Left),
+}
+
+
+@lru_cache(maxsize=1)
 def clingo_term_parser() -> TheoryTermParser:
     """
     Return a theory term parser that parses theory terms like clingo terms.
@@ -467,21 +483,7 @@ def clingo_term_parser() -> TheoryTermParser:
     Note that for technical reasons pools and the absolute function are not
     supported.
     """
-    table = {
-        ("-", Arity.Unary): (5, Associativity.NoAssociativity),
-        ("~", Arity.Unary): (5, Associativity.NoAssociativity),
-        ("**", Arity.Binary): (4, Associativity.Right),
-        ("*", Arity.Binary): (3, Associativity.Left),
-        ("/", Arity.Binary): (3, Associativity.Left),
-        ("\\", Arity.Binary): (3, Associativity.Left),
-        ("+", Arity.Binary): (2, Associativity.Left),
-        ("-", Arity.Binary): (2, Associativity.Left),
-        ("&", Arity.Binary): (1, Associativity.Left),
-        ("?", Arity.Binary): (1, Associativity.Left),
-        ("^", Arity.Binary): (1, Associativity.Left),
-        ("..", Arity.Binary): (0, Associativity.Left),
-    }
-    return TheoryTermParser(table)
+    return TheoryTermParser(_clingo_term_table)
 
 
 class TheoryParser(Transformer):
@@ -1192,3 +1194,114 @@ def theory_term_to_term(x: AST, parse: bool = True) -> AST:
     if parse:
         x = clingo_term_parser()(x)
     return _theory_term_to_term(x)
+
+
+@lru_cache(maxsize=1)
+def _clingo_literal_parser() -> TheoryTermParser:
+    """
+    Return a theory term parser that parses theory literals similar to clingo.
+
+    Note that for technical reasons pools and the absolute function are not
+    supported.
+    """
+    clingo_literal_table = _clingo_term_table.copy()
+    clingo_literal_table.update(
+        {
+            ("-", Arity.Unary): (0, Associativity.NoAssociativity),
+            ("not", Arity.Unary): (0, Associativity.NoAssociativity),
+            ("~", Arity.Unary): (0, Associativity.NoAssociativity),
+        }
+    )
+    return TheoryTermParser(clingo_literal_table)
+
+
+def _build_atom(
+    location: ast.Location, positive: bool, name: str, arguments: List
+) -> ast.AST:
+    """
+    Helper function to create an atom.
+
+    Arguments:
+    location --  Location to use.
+    positive --  Classical sign of the atom.
+    name     --  The name of the atom.
+    arguments -- The arguments of the atom.
+    """
+    ret = ast.Function(location, name, arguments, False)
+    if not positive:
+        ret = ast.UnaryOperation(location, ast.UnaryOperator.Minus, ret)
+    return ast.SymbolicAtom(ret)
+
+
+def negate_sign(sign: ast.Sign, positive: bool = True) -> ast.Sign:
+    """
+    Return the sign of the literal.
+    """
+    if positive:
+        if sign == ast.Sign.Negation:
+            return ast.Sign.DoubleNegation
+        return ast.Sign.Negation
+    if sign != ast.Sign.Negation:
+        return ast.Sign.DoubleNegation
+    return sign
+
+
+class TheoryTermToLiteralTransformer(Transformer):
+    """
+    Turns the given theory term into an atom.
+    """
+
+    # pylint: disable=invalid-name
+
+    def visit_SymbolicTerm(self, x, positive, sign):
+        """
+        Maps functions to atoms.
+
+        Every other symbol causes a runtime error.
+
+        Arguments:
+        x        -- The theory term to translate.
+        positive -- The classical sign of the atom.
+        """
+        symbol = x.symbol
+        if x.symbol.type == clingo.SymbolType.Function and len(symbol.name) > 0:
+            atom = _build_atom(
+                x.location,
+                (positive == symbol.positive),
+                symbol.name,
+                [ast.SymbolicTerm(x.location, a) for a in symbol.arguments],
+            )
+            return ast.Literal(x.location, sign, atom)
+        raise RuntimeError(f"invalid formula: {x.location}")
+
+    def visit_TheoryFunction(self, x, positive, sign):
+        """
+        Maps theory functions to atoms.
+
+        If the function name is not a negation, an exception is thrown.
+        """
+        if x.name == "-":
+            return self.visit(x.arguments[0], not positive, sign)
+        if x.name in ("not", "~"):
+            new_sign = negate_sign(sign, positive)
+            print(positive, sign, new_sign)
+            return self.visit(x.arguments[0], True, new_sign)
+
+        atom = _build_atom(
+            x.location,
+            positive,
+            x.name,
+            [theory_term_to_term(a) for a in x.arguments],
+        )
+        return ast.Literal(x.location, sign, atom)
+
+
+def theory_term_to_literal(
+    x, parse: bool = True, positive=True, sign=ast.Sign.NoSign
+) -> AST:
+    """
+    Convert the given theory term into an literal.
+    """
+    if parse:
+        x = _clingo_literal_parser()(x)
+    return TheoryTermToLiteralTransformer()(x, positive, sign)
