@@ -118,7 +118,7 @@ from typing import (
     Union,
     cast,
 )
-from functools import singledispatch
+from functools import lru_cache, singledispatch
 from copy import copy
 from re import fullmatch
 from enum import Enum, auto
@@ -154,6 +154,7 @@ __all__ = [
     "TheoryTermParser",
     "TheoryUnparsedTermParser",
     "ast_to_dict",
+    "clingo_term_parser",
     "dict_to_ast",
     "get_body",
     "location_to_str",
@@ -456,6 +457,31 @@ class TheoryTermParser(Transformer):
         The rewritten AST.
         """
         return cast(AST, self(self._parser.parse(x)))
+
+
+@lru_cache()
+def clingo_term_parser() -> TheoryTermParser:
+    """
+    Return a theory term parser that parses theory terms like clingo terms.
+
+    Note that for technical reasons pools and the absolute function are not
+    supported.
+    """
+    table = {
+        ("-", Arity.Unary): (5, Associativity.NoAssociativity),
+        ("~", Arity.Unary): (5, Associativity.NoAssociativity),
+        ("**", Arity.Binary): (4, Associativity.Right),
+        ("*", Arity.Binary): (3, Associativity.Left),
+        ("/", Arity.Binary): (3, Associativity.Left),
+        ("\\", Arity.Binary): (3, Associativity.Left),
+        ("+", Arity.Binary): (2, Associativity.Left),
+        ("-", Arity.Binary): (2, Associativity.Left),
+        ("&", Arity.Binary): (1, Associativity.Left),
+        ("?", Arity.Binary): (1, Associativity.Left),
+        ("^", Arity.Binary): (1, Associativity.Left),
+        ("..", Arity.Binary): (0, Associativity.Left),
+    }
+    return TheoryTermParser(table)
 
 
 class TheoryParser(Transformer):
@@ -1095,13 +1121,13 @@ def get_body(
     return body
 
 
-_unary_operators_string_to_operator_mapping = {
+_unary_operator_map = {
     "-": ast.UnaryOperator.Minus,
     "~": ast.UnaryOperator.Negation,
     "|": ast.UnaryOperator.Absolute,
 }
 
-_binary_operators_string_to_operator_mapping = {
+_binary_operator_map = {
     "+": ast.BinaryOperator.Plus,
     "-": ast.BinaryOperator.Minus,
     "*": ast.BinaryOperator.Multiplication,
@@ -1114,70 +1140,55 @@ _binary_operators_string_to_operator_mapping = {
 }
 
 
-class _TheoryTermToTermTransformer(Transformer):
+def _theory_term_to_term(x: AST) -> AST:
     """
-    This class transforms a given theory term into a plain term.
+    Convert a given theory term into a plain clingo term.
     """
+    if x.ast_type in (ASTType.SymbolicTerm, ASTType.Variable):
+        return x
 
-    # pylint: disable=invalid-name
-    def visit_TheorySequence(self, x):
-        """
-        Theory term tuples are mapped to term tuples.
-        """
-        if x.sequence_type == ast.TheorySequenceType.Tuple:
-            return ast.Function(x.location, "", [self(a) for a in x.terms], False)
-        raise RuntimeError(f"invalid term: {x.location}")
+    if x.ast_type == ASTType.TheoryFunction:
+        if len(x.arguments) == 1 and x.name in _unary_operator_map:
+            arg = _theory_term_to_term(x.arguments[0])
+            uop = _unary_operator_map[x.name]
 
-    def visit_TheoryFunction(self, x):
-        """
-        Theory functions are mapped to functions.
+            return ast.UnaryOperation(x.location, uop, arg)
 
-        If the function name refers to a function in the table, an exception is thrown.
-        """
-        if (
-            len(x.arguments) == 1
-            and x.name in _unary_operators_string_to_operator_mapping
-        ):
-            rhs = self(x.arguments[0])
-            op = _unary_operators_string_to_operator_mapping[x.name]
-            return ast.UnaryOperation(x.location, op, rhs)
         if len(x.arguments) == 2:
-            lhs = self(x.arguments[0])
-            rhs = self(x.arguments[1])
-            if x.name in _binary_operators_string_to_operator_mapping:
-                op = _binary_operators_string_to_operator_mapping[x.name]
-                return ast.BinaryOperation(x.location, op, lhs, rhs)
+            lhs = _theory_term_to_term(x.arguments[0])
+            rhs = _theory_term_to_term(x.arguments[1])
+
+            if x.name in _binary_operator_map:
+                bop = _binary_operator_map[x.name]
+                return ast.BinaryOperation(x.location, bop, lhs, rhs)
+
             if x.name == "..":
                 return ast.Interval(x.location, lhs, rhs)
-        # if x.name == ";":
-        #     return ast.Pool(x.location, x.arguments)
-        return ast.Function(x.location, x.name, [self(a) for a in x.arguments], False)
+
+        if not is_operator(x.name):
+            return ast.Function(
+                x.location,
+                x.name,
+                [_theory_term_to_term(a) for a in x.arguments],
+                False,
+            )
+
+    elif x.ast_type == ASTType.TheorySequence:
+        if x.sequence_type == ast.TheorySequenceType.Tuple:
+            return ast.Function(
+                x.location, "", [theory_term_to_term(a) for a in x.terms], False
+            )
+
+    raise RuntimeError(f"{location_to_str(x.location)}: invalid term `{str(x)}`")
 
 
-_ARITHMETIC_TERM_TABLE = {
-    ("-", Arity.Unary): (5, Associativity.NoAssociativity),
-    ("~", Arity.Unary): (5, Associativity.NoAssociativity),
-    ("**", Arity.Binary): (4, Associativity.Right),
-    ("*", Arity.Binary): (3, Associativity.Left),
-    ("/", Arity.Binary): (3, Associativity.Left),
-    ("\\", Arity.Binary): (3, Associativity.Left),
-    ("+", Arity.Binary): (2, Associativity.Left),
-    ("-", Arity.Binary): (2, Associativity.Left),
-    ("&", Arity.Binary): (1, Associativity.Left),
-    ("?", Arity.Binary): (1, Associativity.Left),
-    ("^", Arity.Binary): (1, Associativity.Left),
-    ("..", Arity.Binary): (0, Associativity.Left),
-}
-
-parse_arithmetic_term = TheoryTermParser(_ARITHMETIC_TERM_TABLE)
-
-
-def theory_term_to_term(x: AST, parse_unparsed_terms: bool = True) -> AST:
+def theory_term_to_term(x: AST, parse: bool = True) -> AST:
     """
     Convert the given theory term into a term.
+
+    If argument `parse` is set to true, occurences of unparsed theory terms are
+    parse using `clingo_term_parser()`.
     """
-    # TODO: I'ld rather pass in an optional parser instead of a Boolean
-    # we can make the parse_arithmetic_term  a public member
-    if parse_unparsed_terms:
-        x = parse_arithmetic_term(x)
-    return _TheoryTermToTermTransformer()(x)
+    if parse:
+        x = clingo_term_parser()(x)
+    return _theory_term_to_term(x)
