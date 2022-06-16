@@ -1141,6 +1141,8 @@ _binary_operator_map = {
     "^": ast.BinaryOperator.XOr,
 }
 
+_operators = _unary_operator_map.keys() | _binary_operator_map.keys()
+
 
 def _theory_term_to_term(x: AST) -> AST:
     """
@@ -1246,54 +1248,37 @@ def negate_sign(sign: ast.Sign, positive: bool = True) -> ast.Sign:
     return sign
 
 
-class TheoryTermToLiteralTransformer(Transformer):
+def _theory_term_to_literal(x: AST, positive=True, sign=ast.Sign.NoSign) -> AST:
     """
-    Turns the given theory term into an atom.
+    Convert a given theory term into a plain clingo literal.
     """
-
-    # pylint: disable=invalid-name
-
-    def visit_SymbolicTerm(self, x, positive, sign):
-        """
-        Maps functions to atoms.
-
-        Every other symbol causes a runtime error.
-
-        Arguments:
-        x        -- The theory term to translate.
-        positive -- The classical sign of the atom.
-        """
-        symbol = x.symbol
-        if x.symbol.type == clingo.SymbolType.Function and len(symbol.name) > 0:
-            atom = _build_atom(
-                x.location,
-                (positive == symbol.positive),
-                symbol.name,
-                [ast.SymbolicTerm(x.location, a) for a in symbol.arguments],
-            )
-            return ast.Literal(x.location, sign, atom)
-        raise RuntimeError(f"invalid formula: {x.location}")
-
-    def visit_TheoryFunction(self, x, positive, sign):
-        """
-        Maps theory functions to atoms.
-
-        If the function name is not a negation, an exception is thrown.
-        """
+    if x.ast_type == ASTType.TheoryFunction:
         if x.name == "-":
-            return self.visit(x.arguments[0], not positive, sign)
+            return _theory_term_to_literal(x.arguments[0], not positive, sign)
         if x.name in ("not", "~"):
             new_sign = negate_sign(sign, positive)
-            print(positive, sign, new_sign)
-            return self.visit(x.arguments[0], True, new_sign)
-
+            return _theory_term_to_literal(x.arguments[0], True, new_sign)
+        if len(x.name) > 0 and x.name not in _operators:
+            atom = _build_atom(
+                x.location,
+                positive,
+                x.name,
+                [theory_term_to_term(a) for a in x.arguments],
+            )
+            return ast.Literal(x.location, sign, atom)
+    elif (
+        x.ast_type == ASTType.SymbolicTerm
+        and x.symbol.type == clingo.SymbolType.Function
+        and len(x.symbol.name) > 0
+    ):
         atom = _build_atom(
             x.location,
-            positive,
-            x.name,
-            [theory_term_to_term(a) for a in x.arguments],
+            (positive == x.symbol.positive),
+            x.symbol.name,
+            [ast.SymbolicTerm(x.location, a) for a in x.symbol.arguments],
         )
         return ast.Literal(x.location, sign, atom)
+    raise RuntimeError(f"{location_to_str(x.location)}: invalid literal `{str(x)}`")
 
 
 def theory_term_to_literal(
@@ -1304,4 +1289,4 @@ def theory_term_to_literal(
     """
     if parse:
         x = _clingo_literal_parser()(x)
-    return TheoryTermToLiteralTransformer()(x, positive, sign)
+    return _theory_term_to_literal(x, positive, sign)

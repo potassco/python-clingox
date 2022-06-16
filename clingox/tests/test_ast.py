@@ -2666,7 +2666,11 @@ class TestAST(TestCase):
 
         self._aux_theory_term_to_literal("p(not 1)", literal)
 
-        # with self.assertRaisesRegex(RuntimeError, "invalid term"):
-        #     theory_term_to_term(parse_theory_term("[3*4]"))
-        # with self.assertRaisesRegex(RuntimeError, "invalid term"):
-        #     theory_term_to_term(parse_theory_term("{3*4}"))
+        with self.assertRaisesRegex(RuntimeError, "invalid literal"):
+            theory_term_to_term(
+                theory_term_to_literal(parse_theory_term_as_literal("(a,b)"))
+            )
+        with self.assertRaisesRegex(RuntimeError, "invalid literal"):
+            theory_term_to_term(
+                theory_term_to_literal(parse_theory_term_as_literal("not 3*4"))
+            )
