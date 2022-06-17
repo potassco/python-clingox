@@ -20,7 +20,7 @@ from clingo.ast import (
 )
 from .. import ast
 from ..ast import (
-    _clingo_literal_parser,
+    clingo_literal_parser,
     ast_to_dict,
     clingo_term_parser,
     dict_to_ast,
@@ -121,7 +121,7 @@ def parse_theory_term_as_literal(s: str) -> AST:
     """
     Parse the given theory term using a simple parse table for testing.
     """
-    return _clingo_literal_parser()(theory_atom(f"&p {{{s}}}").elements[0].terms[0])
+    return clingo_literal_parser()(theory_atom(f"&p {{{s}}}").elements[0].terms[0])
 
 
 def parse_clingo_term(s: str) -> AST:
