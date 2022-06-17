@@ -102,7 +102,7 @@ def is_operator(op: str):
     -------
     Whether the string is an operator name.
     """
-    return op and op[0] in "/!<=>+-*\\?&@|:;~^."
+    return (op and op[0] in "/!<=>+-*\\?&@|:;~^.") or (op == "not")
 
 
 def _unquote(s: str) -> str:

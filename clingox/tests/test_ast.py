@@ -5,7 +5,7 @@ Simple tests for ast manipulation.
 # pylint: disable=too-many-lines
 
 from unittest import TestCase
-from typing import Callable, Container, List, Optional, Sequence, Union, cast
+from typing import Callable, Container, List, Optional, Sequence, cast
 
 import clingo
 from clingo import Function
@@ -2605,18 +2605,13 @@ class TestAST(TestCase):
         with self.assertRaisesRegex(RuntimeError, "invalid term"):
             theory_term_to_term(parse_theory_term("{3*4}"))
 
-    def _aux_theory_term_to_literal(
-        self, s: str, expected: Optional[Union[str, ast.AST]] = None
-    ) -> None:
+    def _aux_theory_term_to_literal(self, s: str, s_expected: Optional[str] = None):
         """
-        Parse the given theory term using a simple parse table for testing.
+        Test parsing the given string representing a theory literal.
         """
-        if expected is None:
-            expected = s
         parsed = parse_theory_term_as_literal(s)
         unparsed = theory_atom(f"&p {{{s}}}").elements[0].terms[0]
-        if not isinstance(expected, ast.AST):
-            expected = parse_clingo_literal(expected)
+        expected = parse_clingo_literal(s if s_expected is None else s_expected)
 
         self.assertEqual(
             theory_term_to_literal(parsed, False), expected, "without parsing"
@@ -2633,7 +2628,7 @@ class TestAST(TestCase):
         self._aux_theory_term_to_literal("p(1)")
         self._aux_theory_term_to_literal("not p(1+X,1-X,1*X,1/X,1\\X,1**X,1&X,1?X,1^X)")
         self._aux_theory_term_to_literal("not not p(1..X)")
-        self._aux_theory_term_to_term("-p(f(X))")
+        self._aux_theory_term_to_literal("-p(f(X))")
         self._aux_theory_term_to_literal("not -p(1)")
         self._aux_theory_term_to_literal("not not -p(1)")
 
@@ -2647,30 +2642,9 @@ class TestAST(TestCase):
         self._aux_theory_term_to_literal("- not not - not p(1)", "not p(1)")
         self._aux_theory_term_to_literal("- -not not p(1)", "not not p(1)")
 
-        literal = clingo.ast.Literal(
-            LOC,
-            0,
-            ast.SymbolicAtom(
-                ast.Function(
-                    LOC,
-                    "p",
-                    [
-                        ast.Function(
-                            LOC, "not", [ast.SymbolicTerm(LOC, clingo.Number(1))], 0
-                        )
-                    ],
-                    0,
-                )
-            ),
-        )
-
-        self._aux_theory_term_to_literal("p(not 1)", literal)
-
+        with self.assertRaisesRegex(RuntimeError, "cannot parse operator"):
+            theory_term_to_literal(parse_theory_term_as_literal("p(not 1)"))
         with self.assertRaisesRegex(RuntimeError, "invalid literal"):
-            theory_term_to_term(
-                theory_term_to_literal(parse_theory_term_as_literal("(a,b)"))
-            )
+            theory_term_to_literal(parse_theory_term_as_literal("(a,b)"))
         with self.assertRaisesRegex(RuntimeError, "invalid literal"):
-            theory_term_to_term(
-                theory_term_to_literal(parse_theory_term_as_literal("not 3*4"))
-            )
+            theory_term_to_literal(parse_theory_term_as_literal("not 3*4"))
