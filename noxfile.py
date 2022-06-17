@@ -45,4 +45,4 @@ def test(session, stable):
             "-r", f".github/requirements{'-stable' if stable else ''}.txt", "coverage"
         )
         session.run("coverage", "run", "-m", "unittest", "discover", "-v")
-        session.run("coverage", "report", "--fail-under=100")
+        session.run("coverage", "report", "-m", "--fail-under=100")

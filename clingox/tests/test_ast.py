@@ -20,30 +20,23 @@ from clingo.ast import (
 )
 from .. import ast
 from ..ast import (
-    Arity,
-    Associativity,
+    clingo_literal_parser,
     ast_to_dict,
+    clingo_term_parser,
     dict_to_ast,
     location_to_str,
     prefix_symbolic_atoms,
     str_to_location,
     TheoryAtomType,
     TheoryParser,
-    TheoryTermParser,
     get_body,
     parse_theory,
     reify_symbolic_atoms,
+    theory_term_to_literal,
+    theory_term_to_term,
 )
 
-TERM_TABLE = {
-    "t": {
-        ("-", Arity.Unary): (3, Associativity.NoAssociativity),
-        ("**", Arity.Binary): (2, Associativity.Right),
-        ("*", Arity.Binary): (1, Associativity.Left),
-        ("+", Arity.Binary): (0, Associativity.Left),
-        ("-", Arity.Binary): (0, Associativity.Left),
-    }
-}
+TERM_TABLE = {"t": clingo_term_parser()}
 
 ATOM_TABLE = {
     ("p", 0): (TheoryAtomType.Head, "t", None),
@@ -57,6 +50,7 @@ TEST_THEORY = """\
         -  : 3, unary;
         ** : 2, binary, right;
         *  : 1, binary, left;
+        /  : 1, binary, left;
         +  : 0, binary, left;
         -  : 0, binary, left
     };
@@ -105,28 +99,43 @@ def last_stm(s: str) -> AST:
     """
     Convert string to rule.
     """
-    v = Extractor()
     stm = None
 
     def set_stm(x):
         nonlocal stm
         stm = x
-        v(stm)
 
     parse_string(s, set_stm)
 
     return cast(AST, stm)
 
 
-def parse_term(s: str) -> str:
+def parse_theory_term(s: str) -> AST:
     """
     Parse the given theory term using a simple parse table for testing.
     """
-    return str(
-        TheoryTermParser(TERM_TABLE["t"])(
-            theory_atom(f"&p {{{s}}}").elements[0].terms[0]
-        )
-    )
+    return clingo_term_parser()(theory_atom(f"&p {{{s}}}").elements[0].terms[0])
+
+
+def parse_theory_term_as_literal(s: str) -> AST:
+    """
+    Parse the given theory term using a simple parse table for testing.
+    """
+    return clingo_literal_parser()(theory_atom(f"&p {{{s}}}").elements[0].terms[0])
+
+
+def parse_clingo_term(s: str) -> AST:
+    """
+    Parse the given theory term using a simple parse table for testing.
+    """
+    return last_stm(f"p({s}).").head.atom.symbol.arguments[0]
+
+
+def parse_clingo_literal(s: str) -> AST:
+    """
+    Parse the given theory term using a simple parse table for testing.
+    """
+    return last_stm(f"{s}.").head
 
 
 def parse_atom(s: str, parser: Optional[TheoryParser] = None) -> str:
@@ -135,7 +144,6 @@ def parse_atom(s: str, parser: Optional[TheoryParser] = None) -> str:
     """
     if parser is None:
         parser = TheoryParser(TERM_TABLE, ATOM_TABLE)
-
     return str(parser(theory_atom(s)))
 
 
@@ -145,7 +153,6 @@ def parse_stm(s: str, parser: Optional[TheoryParser] = None) -> str:
     """
     if parser is None:
         parser = TheoryParser(TERM_TABLE, ATOM_TABLE)
-
     return str(parser(last_stm(s)))
 
 
@@ -233,13 +240,13 @@ class TestAST(TestCase):
         """
         Test parsing of theory terms.
         """
-        self.assertEqual(parse_term("1+2"), "+(1,2)")
-        self.assertEqual(parse_term("1+2+3"), "+(+(1,2),3)")
-        self.assertEqual(parse_term("1+2*3"), "+(1,*(2,3))")
-        self.assertEqual(parse_term("1**2**3"), "**(1,**(2,3))")
-        self.assertEqual(parse_term("-1+2"), "+(-(1),2)")
-        self.assertEqual(parse_term("f(1+2)+3"), "+(f(+(1,2)),3)")
-        self.assertRaises(RuntimeError, parse_term, "1++2")
+        self.assertEqual(str(parse_theory_term("1+2")), "+(1,2)")
+        self.assertEqual(str(parse_theory_term("1+2+3")), "+(+(1,2),3)")
+        self.assertEqual(str(parse_theory_term("1+2*3")), "+(1,*(2,3))")
+        self.assertEqual(str(parse_theory_term("1**2**3")), "**(1,**(2,3))")
+        self.assertEqual(str(parse_theory_term("-1+2")), "+(-(1),2)")
+        self.assertEqual(str(parse_theory_term("f(1+2)+3")), "+(f(+(1,2)),3)")
+        self.assertRaises(RuntimeError, parse_theory_term, "1++2")
 
     def test_parse_atom(self):
         """
@@ -249,9 +256,6 @@ class TestAST(TestCase):
         self.assertEqual(parse_atom("&p {1+2+3}"), "&p { +(+(1,2),3) }")
         self.assertEqual(parse_atom("&q(1+2+3) { }"), "&q(((1+2)+3)) { }")
         self.assertEqual(parse_atom("&r { } < 1+2+3"), "&r { } < +(+(1,2),3)")
-        # for coverage
-        p = TheoryParser({"t": TheoryTermParser(TERM_TABLE["t"])}, ATOM_TABLE)
-        self.assertEqual(parse_atom("&p {1+2}", p), "&p { +(1,2) }")
 
     def test_parse_atom_occ(self):
         """
@@ -2574,3 +2578,73 @@ class TestAST(TestCase):
             ["b(X)", "c(Y)"],
             exclude_conditional_literals=True,
         )
+
+    def _aux_theory_term_to_term(self, s: str) -> None:
+        """
+        Parse the given theory term using a simple parse table for testing.
+        """
+        parsed = parse_theory_term(s)
+        unparsed = theory_atom(f"&p {{{s}}}").elements[0].terms[0]
+        term = parse_clingo_term(s)
+
+        self.assertEqual(theory_term_to_term(parsed, False), term, "without parsing")
+        self.assertEqual(theory_term_to_term(unparsed, True), term, "with parsing")
+
+    def test_theory_term_to_term(self):
+        """
+        Tests for converting theory terms into terms.
+        """
+        self._aux_theory_term_to_term("(1,-1,~1)")
+        self._aux_theory_term_to_term("(1+X,1-X,1*X,1/X,1\\X,1**X,1&X,1?X,1^X)")
+        self._aux_theory_term_to_term("1..X")
+        self._aux_theory_term_to_term("f(X)")
+        self._aux_theory_term_to_term("-1+ ~2-3*4/5\\6**7&8?9^10..11")
+
+        with self.assertRaisesRegex(RuntimeError, "invalid term"):
+            theory_term_to_term(parse_theory_term("[3*4]"))
+        with self.assertRaisesRegex(RuntimeError, "invalid term"):
+            theory_term_to_term(parse_theory_term("{3*4}"))
+
+    def _aux_theory_term_to_literal(self, s: str, s_expected: Optional[str] = None):
+        """
+        Test parsing the given string representing a theory literal.
+        """
+        parsed = parse_theory_term_as_literal(s)
+        unparsed = theory_atom(f"&p {{{s}}}").elements[0].terms[0]
+        expected = parse_clingo_literal(s if s_expected is None else s_expected)
+
+        self.assertEqual(
+            theory_term_to_literal(parsed, False), expected, "without parsing"
+        )
+        self.assertEqual(
+            theory_term_to_literal(unparsed, True), expected, "with parsing"
+        )
+
+    def test_theory_term_to_literal(self):
+        """
+        Tests for converting theory terms into terms.
+        """
+        self._aux_theory_term_to_literal("p")
+        self._aux_theory_term_to_literal("p(1)")
+        self._aux_theory_term_to_literal("not p(1+X,1-X,1*X,1/X,1\\X,1**X,1&X,1?X,1^X)")
+        self._aux_theory_term_to_literal("not not p(1..X)")
+        self._aux_theory_term_to_literal("-p(f(X))")
+        self._aux_theory_term_to_literal("not -p(1)")
+        self._aux_theory_term_to_literal("not not -p(1)")
+
+        self._aux_theory_term_to_literal("not not not p(1)", "not p(1)")
+        self._aux_theory_term_to_literal("not not not not p(1)", "not not p(1)")
+        self._aux_theory_term_to_literal("- -p(1)", "p(1)")
+        self._aux_theory_term_to_literal("- - -p(1)", "-p(1)")
+        self._aux_theory_term_to_literal("- not p(1)", "not not p(1)")
+        self._aux_theory_term_to_literal("- - not p(1)", "not p(1)")
+        self._aux_theory_term_to_literal("- not not p(1)", "not p(1)")
+        self._aux_theory_term_to_literal("- not not - not p(1)", "not p(1)")
+        self._aux_theory_term_to_literal("- -not not p(1)", "not not p(1)")
+
+        with self.assertRaisesRegex(RuntimeError, "cannot parse operator"):
+            theory_term_to_literal(parse_theory_term_as_literal("p(not 1)"))
+        with self.assertRaisesRegex(RuntimeError, "invalid literal"):
+            theory_term_to_literal(parse_theory_term_as_literal("(a,b)"))
+        with self.assertRaisesRegex(RuntimeError, "invalid literal"):
+            theory_term_to_literal(parse_theory_term_as_literal("not 3*4"))
