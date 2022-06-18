@@ -1093,12 +1093,19 @@ def dict_to_ast(x: dict) -> AST:
     )
 
 
+def _eval_predicate(predicate: Union[Callable[[AST], bool], bool], arg: AST) -> bool:
+    if isinstance(predicate, bool):
+        return predicate
+    return predicate(arg)
+
+
 def get_body(
     stm: AST,
-    exclude_signs: Container[Sign] = (),
-    exclude_theory_atoms: Union[bool, Callable[[AST], bool]] = False,
-    exclude_aggregates: bool = False,
-    exclude_conditional_literals: bool = False,
+    symbolic_atom_predicate: Union[Callable[[AST], bool], bool] = True,
+    theory_atoms_predicate: Union[Callable[[AST], bool], bool] = True,
+    aggregate_predicate: Union[Callable[[AST], bool], bool] = True,
+    conditional_literals_predicate: Union[Callable[[AST], bool], bool] = True,
+    signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
 ) -> List[AST]:
     """
     Returns the body of a statement applying optional filters.
@@ -1107,13 +1114,13 @@ def get_body(
     ----------
     stm
         An `AST` for a statement with a body.
-    exclude_signs
+    signs
         Literals having any of the given signs are excluded.
-    exclude_theory_atoms
+    theory_atoms_predicate
         Whether theory atoms should be excluded.
-    exclude_aggregates
+    aggregate_predicate
         Whether aggregates should be excluded.
-    exclude_conditional_literals
+    conditional_literals_predicate
         Whether conditional literals should be excluded.
 
     Returns
@@ -1125,25 +1132,23 @@ def get_body(
     body: List[AST] = []
 
     for lit in stm.body:
+        include_lit = True
         if lit.ast_type == ASTType.Literal:
             atom = lit.atom
-            if lit.sign in exclude_signs:
+            if lit.sign not in signs:
                 continue
-            if exclude_aggregates and atom.ast_type == ASTType.Aggregate:
-                continue
-            if exclude_aggregates and atom.ast_type == ASTType.BodyAggregate:
-                continue
-            if atom.ast_type == ASTType.TheoryAtom:
-                if isinstance(exclude_theory_atoms, bool):
-                    exclude_this_theory_atom = exclude_theory_atoms
-                else:
-                    exclude_this_theory_atom = exclude_theory_atoms(atom)
-                if exclude_this_theory_atom:
-                    continue
-
-        if lit.ast_type == ASTType.ConditionalLiteral:
-            if exclude_conditional_literals:
-                continue
+            if atom.ast_type == ASTType.SymbolicAtom:
+                include_lit = _eval_predicate(symbolic_atom_predicate, atom.symbol)
+            elif atom.ast_type in (ASTType.Aggregate, ASTType.BodyAggregate):
+                include_lit = _eval_predicate(aggregate_predicate, atom)
+            elif atom.ast_type == ASTType.TheoryAtom:
+                include_lit = _eval_predicate(theory_atoms_predicate, atom)
+        elif lit.ast_type == ASTType.ConditionalLiteral:
+            # if lit.literal.sign not in signs:
+            #     continue
+            include_lit = _eval_predicate(conditional_literals_predicate, lit)
+        if not include_lit:
+            continue
 
         body.append(lit)
 
