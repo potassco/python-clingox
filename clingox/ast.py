@@ -1147,10 +1147,8 @@ def get_body(
             # if lit.literal.sign not in signs:
             #     continue
             include_lit = _eval_predicate(conditional_literals_predicate, lit)
-        if not include_lit:
-            continue
-
-        body.append(lit)
+        if include_lit:
+            body.append(lit)
 
     return body
 
