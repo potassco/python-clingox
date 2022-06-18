@@ -17,6 +17,7 @@ from clingo.ast import (
     Transformer,
     Variable,
     parse_string,
+    ASTType,
 )
 from .. import ast
 from ..ast import (
@@ -2577,6 +2578,21 @@ class TestAST(TestCase):
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)"],
             exclude_conditional_literals=True,
+        )
+
+        self.helper_get_body(
+            "a(X) :- &k{ b(X) }, &k{ not c(X)}.",
+            ["&k { b(X) }"],
+            exclude_theory_atoms=lambda x: (
+                len(x.elements) > 0
+                and len(x.elements[0].terms) > 0
+                and x.elements[0].terms[0].ast_type == ASTType.TheoryUnparsedTerm
+                and len(x.elements[0].terms[0].elements) > 0
+                and x.elements[0].terms[0].elements[0].ast_type
+                == ASTType.TheoryUnparsedTermElement
+                and len(x.elements[0].terms[0].elements[0].operators) > 0
+                and x.elements[0].terms[0].elements[0].operators[0] == "not"
+            ),
         )
 
     def _aux_theory_term_to_term(self, s: str) -> None:

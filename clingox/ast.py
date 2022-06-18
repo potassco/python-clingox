@@ -1096,7 +1096,7 @@ def dict_to_ast(x: dict) -> AST:
 def get_body(
     stm: AST,
     exclude_signs: Container[Sign] = (),
-    exclude_theory_atoms: bool = False,
+    exclude_theory_atoms: Union[bool, Callable[[AST], bool]] = False,
     exclude_aggregates: bool = False,
     exclude_conditional_literals: bool = False,
 ) -> List[AST]:
@@ -1129,12 +1129,17 @@ def get_body(
             atom = lit.atom
             if lit.sign in exclude_signs:
                 continue
-            if exclude_theory_atoms and atom.ast_type == ASTType.TheoryAtom:
-                continue
             if exclude_aggregates and atom.ast_type == ASTType.Aggregate:
                 continue
             if exclude_aggregates and atom.ast_type == ASTType.BodyAggregate:
                 continue
+            if atom.ast_type == ASTType.TheoryAtom:
+                if isinstance(exclude_theory_atoms, bool):
+                    exclude_this_theory_atom = exclude_theory_atoms
+                else:
+                    exclude_this_theory_atom = exclude_theory_atoms(atom)
+                if exclude_this_theory_atom:
+                    continue
 
         if lit.ast_type == ASTType.ConditionalLiteral:
             if exclude_conditional_literals:
