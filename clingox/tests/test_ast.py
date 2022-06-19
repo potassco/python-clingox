@@ -2634,10 +2634,15 @@ class TestAST(TestCase):
                 and x.elements[0].terms[0].elements[0].operators[0] == "not"
             ),
         )
-
         self.helper_get_body(
-            "a(X) :- b(X), c(Y), d(Z): e(X,Z); not d(Z): e(X,Z).",
-            ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
+            "a(X) :- b(X), not c(Y), d(Z): e(X,Z); not d(Z): e(X,Z).",
+            ["b(X)", "d(Z): e(X,Z)", "not d(Z): e(X,Z)"],
+            signs=(Sign.NoSign,),
+        )
+        self.helper_get_body(
+            "a(X) :- b(X), not c(Y), d(Z): e(X,Z); not d(Z): e(X,Z).",
+            ["b(X)", "d(Z): e(X,Z)"],
+            signs=(Sign.NoSign,),
             conditional_literals_predicate=lambda x: x.literal.sign != Sign.Negation,
         )
 
