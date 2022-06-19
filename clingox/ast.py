@@ -109,6 +109,7 @@ from typing import (
     Any,
     Callable,
     Container,
+    Iterable,
     List,
     Mapping,
     Optional,
@@ -1093,20 +1094,23 @@ def dict_to_ast(x: dict) -> AST:
     )
 
 
-def _eval_predicate(predicate: Union[Callable[[AST], bool], bool], arg: AST) -> bool:
-    if isinstance(predicate, bool):
-        return predicate
-    return predicate(arg)
+ASTPredicate = Union[Callable[[AST], bool], bool]
+
+
+def _eval_predicate(predicate: ASTPredicate, arg: AST) -> bool:
+    if callable(predicate):
+        return predicate(arg)
+    return predicate
 
 
 def get_body(
     stm: AST,
-    symbolic_atom_predicate: Union[Callable[[AST], bool], bool] = True,
-    theory_atoms_predicate: Union[Callable[[AST], bool], bool] = True,
-    aggregate_predicate: Union[Callable[[AST], bool], bool] = True,
-    conditional_literals_predicate: Union[Callable[[AST], bool], bool] = True,
+    symbolic_atom_predicate: ASTPredicate = True,
+    theory_atoms_predicate: ASTPredicate = True,
+    aggregate_predicate: ASTPredicate = True,
+    conditional_literal_predicate: ASTPredicate = True,
     signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
-) -> List[AST]:
+) -> Iterable[AST]:
     """
     Returns the body of a statement applying optional filters.
 
@@ -1114,22 +1118,28 @@ def get_body(
     ----------
     stm
         An `AST` for a statement with a body.
+    symbolic_atom_predicate
+        Whether a symbolic atoms should be include or excluded.
+    theory_atoms_predicate
+        Whether theory atoms should be include or excluded.
+    aggregate_predicate
+        Whether aggregates should be include or excluded.
+    conditional_literal_predicate
+        Whether conditional literals should be include or excluded.
     signs
         Literals having any of the given signs are excluded.
-    theory_atoms_predicate
-        Whether theory atoms should be excluded.
-    aggregate_predicate
-        Whether aggregates should be excluded.
-    conditional_literals_predicate
-        Whether conditional literals should be excluded.
 
     Returns
     -------
     A list of body literals.
+
+    Notes
+    -----
+    An ASTPredicate is a callable that takes an `AST` and returns a boolean.
+    Booleans `True` and `False` are also accepted, meaning that the predicate
+    is always `True` or `False`, respectively.
     """
     assert hasattr(stm, "body")
-
-    body: List[AST] = []
 
     for lit in stm.body:
         if lit.ast_type == ASTType.Literal:
@@ -1150,14 +1160,11 @@ def get_body(
             ):
                 continue
         elif lit.ast_type == ASTType.ConditionalLiteral:
-            # if lit.literal.sign not in signs:
-            #     continue
-            if not _eval_predicate(conditional_literals_predicate, lit):
+            if lit.literal.sign not in signs or not _eval_predicate(
+                conditional_literal_predicate, lit
+            ):
                 continue
-
-        body.append(lit)
-
-    return body
+        yield lit
 
 
 _unary_operator_map = {

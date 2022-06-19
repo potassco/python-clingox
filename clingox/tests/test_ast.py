@@ -2361,7 +2361,7 @@ class TestAST(TestCase):
         symbolic_atom_predicate: Union[Callable[[AST], bool], bool] = True,
         theory_atoms_predicate: Union[Callable[[AST], bool], bool] = True,
         aggregate_predicate: Union[Callable[[AST], bool], bool] = True,
-        conditional_literals_predicate: Union[Callable[[AST], bool], bool] = True,
+        conditional_literal_predicate: Union[Callable[[AST], bool], bool] = True,
     ):
         """
         Helper for testing get_body.
@@ -2371,7 +2371,7 @@ class TestAST(TestCase):
             symbolic_atom_predicate,
             theory_atoms_predicate,
             aggregate_predicate,
-            conditional_literals_predicate,
+            conditional_literal_predicate,
             signs,
         )
         self.assertListEqual(sorted(body), sorted(str(s) for s in res))
@@ -2567,7 +2567,7 @@ class TestAST(TestCase):
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
-            ["d(Z): e(X,Z)"],
+            [],
             signs=(
                 Sign.Negation,
                 Sign.DoubleNegation,
@@ -2577,27 +2577,27 @@ class TestAST(TestCase):
         self.helper_get_body(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)"],
-            conditional_literals_predicate=False,
+            conditional_literal_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)", "Z = #sum { X: d(X) }"],
-            conditional_literals_predicate=False,
+            conditional_literal_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)", "&sum { X: d(X) } = Z"],
-            conditional_literals_predicate=False,
+            conditional_literal_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)", "Z = { d(X) }"],
-            conditional_literals_predicate=False,
+            conditional_literal_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)"],
-            conditional_literals_predicate=False,
+            conditional_literal_predicate=False,
         )
 
         self.helper_get_body(
@@ -2636,14 +2636,14 @@ class TestAST(TestCase):
         )
         self.helper_get_body(
             "a(X) :- b(X), not c(Y), d(Z): e(X,Z); not d(Z): e(X,Z).",
-            ["b(X)", "d(Z): e(X,Z)", "not d(Z): e(X,Z)"],
+            ["b(X)", "d(Z): e(X,Z)"],
             signs=(Sign.NoSign,),
         )
         self.helper_get_body(
             "a(X) :- b(X), not c(Y), d(Z): e(X,Z); not d(Z): e(X,Z).",
             ["b(X)", "d(Z): e(X,Z)"],
             signs=(Sign.NoSign,),
-            conditional_literals_predicate=lambda x: x.literal.sign != Sign.Negation,
+            conditional_literal_predicate=lambda x: x.literal.sign != Sign.Negation,
         )
 
     def _aux_theory_term_to_term(self, s: str) -> None:
