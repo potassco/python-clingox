@@ -1132,23 +1132,30 @@ def get_body(
     body: List[AST] = []
 
     for lit in stm.body:
-        include_lit = True
         if lit.ast_type == ASTType.Literal:
             atom = lit.atom
             if lit.sign not in signs:
                 continue
-            if atom.ast_type == ASTType.SymbolicAtom:
-                include_lit = _eval_predicate(symbolic_atom_predicate, atom.symbol)
-            elif atom.ast_type in (ASTType.Aggregate, ASTType.BodyAggregate):
-                include_lit = _eval_predicate(aggregate_predicate, atom)
-            elif atom.ast_type == ASTType.TheoryAtom:
-                include_lit = _eval_predicate(theory_atoms_predicate, atom)
+            if atom.ast_type == ASTType.SymbolicAtom and not _eval_predicate(
+                symbolic_atom_predicate, atom.symbol
+            ):
+                continue
+            if atom.ast_type in (
+                ASTType.Aggregate,
+                ASTType.BodyAggregate,
+            ) and not _eval_predicate(aggregate_predicate, atom):
+                continue
+            if atom.ast_type == ASTType.TheoryAtom and not _eval_predicate(
+                theory_atoms_predicate, atom
+            ):
+                continue
         elif lit.ast_type == ASTType.ConditionalLiteral:
             # if lit.literal.sign not in signs:
             #     continue
-            include_lit = _eval_predicate(conditional_literals_predicate, lit)
-        if include_lit:
-            body.append(lit)
+            if not _eval_predicate(conditional_literals_predicate, lit):
+                continue
+
+        body.append(lit)
 
     return body
 
