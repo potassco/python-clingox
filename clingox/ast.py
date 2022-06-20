@@ -149,6 +149,7 @@ from .theory import is_operator
 __all__ = [
     "Arity",
     "Associativity",
+    "ASTPredicate",
     "AtomTable",
     "OperatorTable",
     "TheoryParser",
@@ -167,8 +168,8 @@ __all__ = [
     "rename_symbolic_atoms",
     "str_to_location",
     "theory_parser_from_definition",
-    "theory_term_to_term",
     "theory_term_to_literal",
+    "theory_term_to_term",
 ]
 
 
@@ -1106,7 +1107,7 @@ def _eval_predicate(predicate: ASTPredicate, arg: AST) -> bool:
 def get_body(
     stm: AST,
     symbolic_atom_predicate: ASTPredicate = True,
-    theory_atoms_predicate: ASTPredicate = True,
+    theory_atom_predicate: ASTPredicate = True,
     aggregate_predicate: ASTPredicate = True,
     conditional_literal_predicate: ASTPredicate = True,
     signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
@@ -1119,15 +1120,15 @@ def get_body(
     stm
         An `AST` for a statement with a body.
     symbolic_atom_predicate
-        Whether a symbolic atoms should be include or excluded.
-    theory_atoms_predicate
-        Whether theory atoms should be include or excluded.
+        Predicate to filter symbolic atoms.
+    theory_atom_predicate
+        Predicate to filter theory atoms.
     aggregate_predicate
-        Whether aggregates should be include or excluded.
+        Predicate to filter aggregates.
     conditional_literal_predicate
-        Whether conditional literals should be include or excluded.
+        Predicate to filter conditional literals.
     signs
-        Literals having any of the given signs are excluded.
+        Only include literals with the given signs.
 
     Returns
     -------
@@ -1135,7 +1136,7 @@ def get_body(
 
     Notes
     -----
-    An ASTPredicate is a callable that takes an `AST` and returns a boolean.
+    An `ASTPredicate` is a callable that takes an `AST` and returns a Boolean.
     Booleans `True` and `False` are also accepted, meaning that the predicate
     is always `True` or `False`, respectively.
     """
@@ -1156,7 +1157,7 @@ def get_body(
             ) and not _eval_predicate(aggregate_predicate, atom):
                 continue
             if atom.ast_type == ASTType.TheoryAtom and not _eval_predicate(
-                theory_atoms_predicate, atom
+                theory_atom_predicate, atom
             ):
                 continue
         elif lit.ast_type == ASTType.ConditionalLiteral:

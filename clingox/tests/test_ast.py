@@ -2359,7 +2359,7 @@ class TestAST(TestCase):
         body: Sequence[str],
         signs: Container[Sign] = (Sign.NoSign,),
         symbolic_atom_predicate: Union[Callable[[AST], bool], bool] = True,
-        theory_atoms_predicate: Union[Callable[[AST], bool], bool] = True,
+        theory_atom_predicate: Union[Callable[[AST], bool], bool] = True,
         aggregate_predicate: Union[Callable[[AST], bool], bool] = True,
         conditional_literal_predicate: Union[Callable[[AST], bool], bool] = True,
     ):
@@ -2369,7 +2369,7 @@ class TestAST(TestCase):
         res = get_body(
             last_stm(stm),
             symbolic_atom_predicate,
-            theory_atoms_predicate,
+            theory_atom_predicate,
             aggregate_predicate,
             conditional_literal_predicate,
             signs,
@@ -2401,27 +2401,27 @@ class TestAST(TestCase):
         self.helper_get_body(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)", "Z = #sum { X: d(X) }"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)", "Z = { d(X) }"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
         )
 
         self.helper_get_body(
@@ -2453,31 +2453,31 @@ class TestAST(TestCase):
         self.helper_get_body(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
             aggregate_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
             aggregate_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
             aggregate_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
             aggregate_predicate=False,
         )
         self.helper_get_body(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
-            theory_atoms_predicate=False,
+            theory_atom_predicate=False,
             aggregate_predicate=False,
         )
 
@@ -2623,7 +2623,7 @@ class TestAST(TestCase):
         self.helper_get_body(
             "a(X) :- &k{ b(X) }, &k{ not c(X)}.",
             ["&k { b(X) }"],
-            theory_atoms_predicate=lambda x: not (
+            theory_atom_predicate=lambda x: not (
                 x.elements
                 and x.elements[0].terms
                 and x.elements[0].terms[0].ast_type == ASTType.TheoryUnparsedTerm
