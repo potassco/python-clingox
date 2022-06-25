@@ -5,7 +5,7 @@ Simple tests for ast manipulation.
 # pylint: disable=too-many-lines
 
 from unittest import TestCase
-from typing import Callable, Container, List, Optional, Sequence, Union, cast
+from typing import Callable, Container, Iterable, List, Optional, Sequence, Union, cast
 
 import clingo
 from clingo import Function
@@ -22,6 +22,7 @@ from clingo.ast import (
 )
 from .. import ast
 from ..ast import (
+    ASTPredicate,
     clingo_literal_parser,
     ast_to_dict,
     clingo_term_parser,
@@ -31,7 +32,7 @@ from ..ast import (
     str_to_location,
     TheoryAtomType,
     TheoryParser,
-    get_body,
+    filter_body_elements,
     parse_theory,
     reify_symbolic_atoms,
     theory_term_to_literal,
@@ -207,6 +208,27 @@ def test_ast_dict(tc: TestCase, s: str):
     tc.assertEqual(ret[0], preamble)
     tc.assertEqual(prg, [dict_to_ast(x) for x in ret])
     return ret[1:]
+
+
+def get_body(
+    stm: AST,
+    symbolic_atom_predicate: ASTPredicate = True,
+    theory_atom_predicate: ASTPredicate = True,
+    aggregate_predicate: ASTPredicate = True,
+    conditional_literal_predicate: ASTPredicate = True,
+    signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
+) -> Iterable[AST]:
+    """
+    Returns the body of a statement applying optional filters.
+    """
+    return filter_body_elements(
+        stm.body,
+        symbolic_atom_predicate,
+        theory_atom_predicate,
+        aggregate_predicate,
+        conditional_literal_predicate,
+        signs,
+    )
 
 
 class TestAST(TestCase):

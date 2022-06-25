@@ -159,7 +159,7 @@ __all__ = [
     "clingo_literal_parser",
     "clingo_term_parser",
     "dict_to_ast",
-    "get_body",
+    "filter_body_elements",
     "location_to_str",
     "negate_sign",
     "parse_theory",
@@ -1104,8 +1104,8 @@ def _eval_predicate(predicate: ASTPredicate, arg: AST) -> bool:
     return predicate
 
 
-def get_body(
-    stm: AST,
+def filter_body_elements(
+    body: Iterable[AST],
     symbolic_atom_predicate: ASTPredicate = True,
     theory_atom_predicate: ASTPredicate = True,
     aggregate_predicate: ASTPredicate = True,
@@ -1140,9 +1140,7 @@ def get_body(
     Booleans `True` and `False` are also accepted, meaning that the predicate
     is always `True` or `False`, respectively.
     """
-    assert hasattr(stm, "body")
-
-    for lit in stm.body:
+    for lit in body:
         if lit.ast_type == ASTType.Literal:
             atom = lit.atom
             if lit.sign not in signs:
