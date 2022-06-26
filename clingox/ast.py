@@ -105,6 +105,7 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
+from itertools import filterfalse, tee
 from typing import (
     Any,
     Callable,
@@ -1165,7 +1166,7 @@ def filter_body_elements(
     Booleans `True` and `False` are also accepted, meaning that the predicate
     is always `True` or `False`, respectively.
     """
-    f = partial(
+    pred = partial(
         _body_elements_predicate,
         symbolic_atom_predicate=symbolic_atom_predicate,
         theory_atom_predicate=theory_atom_predicate,
@@ -1173,7 +1174,59 @@ def filter_body_elements(
         conditional_literal_predicate=conditional_literal_predicate,
         signs=signs,
     )
-    return filter(f, body)
+    return filter(pred, body)
+
+
+def partition_body_elements(
+    body: Iterable[AST],
+    symbolic_atom_predicate: ASTPredicate = True,
+    theory_atom_predicate: ASTPredicate = True,
+    aggregate_predicate: ASTPredicate = True,
+    conditional_literal_predicate: ASTPredicate = True,
+    signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
+) -> Tuple[Iterable[AST], Iterable[AST]]:
+    """
+    Partitions the body elements in body according to the given predicates.
+
+    Parameters
+    ----------
+    body
+        An iterable of `AST` that represents a body.
+    symbolic_atom_predicate
+        Predicate to partition symbolic atoms.
+    theory_atom_predicate
+        Predicate to partition theory atoms.
+    aggregate_predicate
+        Predicate to partition aggregates.
+    conditional_literal_predicate
+        Predicate to partition conditional literals.
+    signs
+        Only include literals with the given signs in the first list.
+
+    Returns
+    -------
+    A pair of lists of body literals. The first list contains the literals
+    that satisfy the predicate. The second one the ones that do not.
+
+    Notes
+    -----
+    An `ASTPredicate` is a callable that takes an `AST` and returns a Boolean.
+    Booleans `True` and `False` are also accepted, meaning that the predicate
+    is always `True` or `False`, respectively.
+    """
+    pred = partial(
+        _body_elements_predicate,
+        symbolic_atom_predicate=symbolic_atom_predicate,
+        theory_atom_predicate=theory_atom_predicate,
+        aggregate_predicate=aggregate_predicate,
+        conditional_literal_predicate=conditional_literal_predicate,
+        signs=signs,
+    )
+    t1, t2 = tee(body)
+    return (
+        filter(pred, t1),
+        filterfalse(pred, t2),
+    )
 
 
 _unary_operator_map = {
