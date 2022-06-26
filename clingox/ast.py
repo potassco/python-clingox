@@ -119,7 +119,7 @@ from typing import (
     Union,
     cast,
 )
-from functools import lru_cache, singledispatch
+from functools import lru_cache, partial, singledispatch
 from copy import copy
 from re import fullmatch
 from enum import Enum, auto
@@ -1104,6 +1104,31 @@ def _eval_predicate(predicate: ASTPredicate, arg: AST) -> bool:
     return predicate
 
 
+def _body_elements_predicate(
+    lit: AST,
+    symbolic_atom_predicate: ASTPredicate = True,
+    theory_atom_predicate: ASTPredicate = True,
+    aggregate_predicate: ASTPredicate = True,
+    conditional_literal_predicate: ASTPredicate = True,
+    signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
+) -> bool:
+    if lit.ast_type == ASTType.Literal:
+        atom = lit.atom
+        if lit.sign not in signs:
+            return False
+        if atom.ast_type == ASTType.SymbolicAtom:
+            return _eval_predicate(symbolic_atom_predicate, atom.symbol)
+        if atom.ast_type in (ASTType.Aggregate, ASTType.BodyAggregate):
+            return _eval_predicate(aggregate_predicate, atom)
+        if atom.ast_type == ASTType.TheoryAtom:
+            return _eval_predicate(theory_atom_predicate, atom)
+    elif lit.ast_type == ASTType.ConditionalLiteral:
+        return lit.literal.sign in signs and _eval_predicate(
+            conditional_literal_predicate, lit
+        )
+    return True
+
+
 def filter_body_elements(
     body: Iterable[AST],
     symbolic_atom_predicate: ASTPredicate = True,
@@ -1113,12 +1138,12 @@ def filter_body_elements(
     signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
 ) -> Iterable[AST]:
     """
-    Returns the body of a statement applying optional filters.
+    Filters the body elements in body according to the given predicates.
 
     Parameters
     ----------
-    stm
-        An `AST` for a statement with a body.
+    body
+        An iterable of `AST` that represents a body.
     symbolic_atom_predicate
         Predicate to filter symbolic atoms.
     theory_atom_predicate
@@ -1140,30 +1165,15 @@ def filter_body_elements(
     Booleans `True` and `False` are also accepted, meaning that the predicate
     is always `True` or `False`, respectively.
     """
-    for lit in body:
-        if lit.ast_type == ASTType.Literal:
-            atom = lit.atom
-            if lit.sign not in signs:
-                continue
-            if atom.ast_type == ASTType.SymbolicAtom and not _eval_predicate(
-                symbolic_atom_predicate, atom.symbol
-            ):
-                continue
-            if atom.ast_type in (
-                ASTType.Aggregate,
-                ASTType.BodyAggregate,
-            ) and not _eval_predicate(aggregate_predicate, atom):
-                continue
-            if atom.ast_type == ASTType.TheoryAtom and not _eval_predicate(
-                theory_atom_predicate, atom
-            ):
-                continue
-        elif lit.ast_type == ASTType.ConditionalLiteral:
-            if lit.literal.sign not in signs or not _eval_predicate(
-                conditional_literal_predicate, lit
-            ):
-                continue
-        yield lit
+    f = partial(
+        _body_elements_predicate,
+        symbolic_atom_predicate=symbolic_atom_predicate,
+        theory_atom_predicate=theory_atom_predicate,
+        aggregate_predicate=aggregate_predicate,
+        conditional_literal_predicate=conditional_literal_predicate,
+        signs=signs,
+    )
+    return filter(f, body)
 
 
 _unary_operator_map = {

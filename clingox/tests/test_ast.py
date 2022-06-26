@@ -2667,6 +2667,8 @@ class TestAST(TestCase):
             signs=(Sign.NoSign,),
             conditional_literal_predicate=lambda x: x.literal.sign != Sign.Negation,
         )
+        stm = last_stm("#show a.")
+        self.assertListEqual(list(filter_body_elements([stm])), [stm])
 
     def _aux_theory_term_to_term(self, s: str) -> None:
         """
