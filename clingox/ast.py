@@ -105,7 +105,7 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
-from itertools import filterfalse, tee
+from itertools import tee
 from typing import (
     Any,
     Callable,
@@ -1222,11 +1222,10 @@ def partition_body_elements(
         conditional_literal_predicate=conditional_literal_predicate,
         signs=signs,
     )
-    t1, t2 = tee(body)
-    return (
-        filter(pred, t1),
-        filterfalse(pred, t2),
-    )
+    t1, t2 = tee((e, pred(e)) for e in body)
+    t3 = (e for e, p in t1 if p)
+    t4 = (e for e, p in t2 if not p)
+    return (t3, t4)
 
 
 _unary_operator_map = {
