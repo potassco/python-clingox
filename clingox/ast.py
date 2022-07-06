@@ -164,6 +164,7 @@ __all__ = [
     "location_to_str",
     "negate_sign",
     "parse_theory",
+    "partition_body_literals",
     "prefix_symbolic_atoms",
     "reify_symbolic_atoms",
     "rename_symbolic_atoms",
