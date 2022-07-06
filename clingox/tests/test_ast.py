@@ -38,12 +38,12 @@ from ..ast import (
     clingo_term_parser,
     dict_to_ast,
     location_to_str,
-    partition_body_elements,
+    partition_body_literals,
     prefix_symbolic_atoms,
     str_to_location,
     TheoryAtomType,
     TheoryParser,
-    filter_body_elements,
+    filter_body_literals,
     parse_theory,
     reify_symbolic_atoms,
     theory_term_to_literal,
@@ -233,7 +233,7 @@ def get_body(
     Returns the body of a statement applying optional filters.
     """
     return list(
-        filter_body_elements(
+        filter_body_literals(
             stm.body,
             symbolic_atom_predicate,
             theory_atom_predicate,
@@ -255,7 +255,7 @@ def partition_body(
     """
     Returns the body of a statement applying optional filters.
     """
-    t1, t2 = partition_body_elements(
+    t1, t2 = partition_body_literals(
         stm.body,
         symbolic_atom_predicate,
         theory_atom_predicate,
@@ -2723,7 +2723,7 @@ class TestAST(TestCase):
             conditional_literal_predicate=lambda x: x.literal.sign != Sign.Negation,
         )
         stm = last_stm("#show a.")
-        self.assertListEqual(list(filter_body_elements([stm])), [stm])
+        self.assertListEqual(list(filter_body_literals([stm])), [stm])
 
     def _aux_theory_term_to_term(self, s: str) -> None:
         """

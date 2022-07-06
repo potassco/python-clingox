@@ -160,7 +160,7 @@ __all__ = [
     "clingo_literal_parser",
     "clingo_term_parser",
     "dict_to_ast",
-    "filter_body_elements",
+    "filter_body_literals",
     "location_to_str",
     "negate_sign",
     "parse_theory",
@@ -1105,7 +1105,7 @@ def _eval_predicate(predicate: ASTPredicate, arg: AST) -> bool:
     return predicate
 
 
-def _body_elements_predicate(
+def _body_literal_predicate(
     lit: AST,
     symbolic_atom_predicate: ASTPredicate = True,
     theory_atom_predicate: ASTPredicate = True,
@@ -1130,7 +1130,7 @@ def _body_elements_predicate(
     return True
 
 
-def filter_body_elements(
+def filter_body_literals(
     body: Iterable[AST],
     symbolic_atom_predicate: ASTPredicate = True,
     theory_atom_predicate: ASTPredicate = True,
@@ -1139,12 +1139,12 @@ def filter_body_elements(
     signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
 ) -> Iterable[AST]:
     """
-    Filters the body elements in body according to the given predicates.
+    Filters the given body literals according to the given predicates.
 
     Parameters
     ----------
     body
-        An iterable of `AST` that represents a body.
+        An iterable of `AST`s for body literals.
     symbolic_atom_predicate
         Predicate to filter symbolic atoms.
     theory_atom_predicate
@@ -1158,7 +1158,7 @@ def filter_body_elements(
 
     Returns
     -------
-    A list of body literals.
+    An iterarable of body literals.
 
     Notes
     -----
@@ -1167,7 +1167,7 @@ def filter_body_elements(
     is always `True` or `False`, respectively.
     """
     pred = partial(
-        _body_elements_predicate,
+        _body_literal_predicate,
         symbolic_atom_predicate=symbolic_atom_predicate,
         theory_atom_predicate=theory_atom_predicate,
         aggregate_predicate=aggregate_predicate,
@@ -1177,7 +1177,7 @@ def filter_body_elements(
     return filter(pred, body)
 
 
-def partition_body_elements(
+def partition_body_literals(
     body: Iterable[AST],
     symbolic_atom_predicate: ASTPredicate = True,
     theory_atom_predicate: ASTPredicate = True,
@@ -1186,7 +1186,7 @@ def partition_body_elements(
     signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
 ) -> Tuple[Iterable[AST], Iterable[AST]]:
     """
-    Partitions the body elements in body according to the given predicates.
+    Partition the given body literals according to the given predicates.
 
     Parameters
     ----------
@@ -1205,8 +1205,9 @@ def partition_body_elements(
 
     Returns
     -------
-    A pair of lists of body literals. The first list contains the literals
-    that satisfy the predicate. The second one the ones that do not.
+    A pair of lists of body literals. The first iterable yields the literals
+    that satisfy the predicate while the second one yields the ones that do
+    not.
 
     Notes
     -----
@@ -1215,7 +1216,7 @@ def partition_body_elements(
     is always `True` or `False`, respectively.
     """
     pred = partial(
-        _body_elements_predicate,
+        _body_literal_predicate,
         symbolic_atom_predicate=symbolic_atom_predicate,
         theory_atom_predicate=theory_atom_predicate,
         aggregate_predicate=aggregate_predicate,
