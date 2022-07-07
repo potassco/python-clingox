@@ -105,7 +105,6 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
-from itertools import tee
 from typing import (
     Any,
     Callable,
@@ -1185,7 +1184,7 @@ def partition_body_literals(
     aggregate_predicate: ASTPredicate = True,
     conditional_literal_predicate: ASTPredicate = True,
     signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
-) -> Tuple[Iterable[AST], Iterable[AST]]:
+) -> Tuple[List[AST], List[AST]]:
     """
     Partition the given body literals according to the given predicates.
 
@@ -1224,10 +1223,14 @@ def partition_body_literals(
         conditional_literal_predicate=conditional_literal_predicate,
         signs=signs,
     )
-    t1, t2 = tee((e, pred(e)) for e in body)
-    t3 = (e for e, p in t1 if p)
-    t4 = (e for e, p in t2 if not p)
-    return (t3, t4)
+    part_a: List[AST] = []
+    part_b: List[AST] = []
+    for lit in body:
+        if pred(lit):
+            part_a.append(lit)
+        else:
+            part_b.append(lit)
+    return part_a, part_b
 
 
 _unary_operator_map = {

@@ -8,12 +8,9 @@ from unittest import TestCase
 from typing import (
     Callable,
     Container,
-    Iterable,
     List,
     Optional,
     Sequence,
-    Tuple,
-    Union,
     cast,
 )
 
@@ -219,51 +216,6 @@ def test_ast_dict(tc: TestCase, s: str):
     tc.assertEqual(ret[0], preamble)
     tc.assertEqual(prg, [dict_to_ast(x) for x in ret])
     return ret[1:]
-
-
-def get_body(
-    stm: AST,
-    symbolic_atom_predicate: ASTPredicate = True,
-    theory_atom_predicate: ASTPredicate = True,
-    aggregate_predicate: ASTPredicate = True,
-    conditional_literal_predicate: ASTPredicate = True,
-    signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
-) -> Iterable[AST]:
-    """
-    Returns the body of a statement applying optional filters.
-    """
-    return list(
-        filter_body_literals(
-            stm.body,
-            symbolic_atom_predicate,
-            theory_atom_predicate,
-            aggregate_predicate,
-            conditional_literal_predicate,
-            signs,
-        )
-    )
-
-
-def partition_body(
-    stm: AST,
-    symbolic_atom_predicate: ASTPredicate = True,
-    theory_atom_predicate: ASTPredicate = True,
-    aggregate_predicate: ASTPredicate = True,
-    conditional_literal_predicate: ASTPredicate = True,
-    signs: Container[Sign] = (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
-) -> Tuple[List[AST], List[AST]]:
-    """
-    Returns the body of a statement applying optional filters.
-    """
-    t1, t2 = partition_body_literals(
-        stm.body,
-        symbolic_atom_predicate,
-        theory_atom_predicate,
-        aggregate_predicate,
-        conditional_literal_predicate,
-        signs,
-    )
-    return list(t1), list(t2)
 
 
 class TestAST(TestCase):
@@ -2415,17 +2367,17 @@ class TestAST(TestCase):
         stm: str,
         body: Sequence[str],
         signs: Container[Sign] = (Sign.NoSign,),
-        symbolic_atom_predicate: Union[Callable[[AST], bool], bool] = True,
-        theory_atom_predicate: Union[Callable[[AST], bool], bool] = True,
-        aggregate_predicate: Union[Callable[[AST], bool], bool] = True,
-        conditional_literal_predicate: Union[Callable[[AST], bool], bool] = True,
+        symbolic_atom_predicate: ASTPredicate = True,
+        theory_atom_predicate: ASTPredicate = True,
+        aggregate_predicate: ASTPredicate = True,
+        conditional_literal_predicate: ASTPredicate = True,
     ):
         """
-        Helper for testing get_body.
+        Helper for testing filter_body_literals.
         """
-        parsed_stm = last_stm(stm)
-        res = get_body(
-            parsed_stm,
+        parsed_body = last_stm(stm).body
+        res = filter_body_literals(
+            parsed_body,
             symbolic_atom_predicate,
             theory_atom_predicate,
             aggregate_predicate,
@@ -2433,8 +2385,8 @@ class TestAST(TestCase):
             signs,
         )
         self.assertListEqual(sorted(body), sorted(str(s) for s in res))
-        res_true, res_false = partition_body(
-            parsed_stm,
+        res_true, res_false = partition_body_literals(
+            parsed_body,
             symbolic_atom_predicate,
             theory_atom_predicate,
             aggregate_predicate,
@@ -2442,8 +2394,8 @@ class TestAST(TestCase):
             signs,
         )
         self.assertListEqual(sorted(body), sorted(str(s) for s in res_true))
-        full_body = get_body(
-            parsed_stm,
+        full_body = filter_body_literals(
+            parsed_body,
             True,
             True,
             True,
@@ -2455,7 +2407,7 @@ class TestAST(TestCase):
 
     def test_get_positive_body(self):
         """
-        Test for get_body.
+        Test for filter_body_literals.
         """
         self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).", ["b(X)", "c(Y)"]
