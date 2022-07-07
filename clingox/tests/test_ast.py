@@ -5,7 +5,14 @@ Simple tests for ast manipulation.
 # pylint: disable=too-many-lines
 
 from unittest import TestCase
-from typing import Callable, Container, List, Optional, Sequence, Union, cast
+from typing import (
+    Callable,
+    Container,
+    List,
+    Optional,
+    Sequence,
+    cast,
+)
 
 import clingo
 from clingo import Function
@@ -22,16 +29,18 @@ from clingo.ast import (
 )
 from .. import ast
 from ..ast import (
+    ASTPredicate,
     clingo_literal_parser,
     ast_to_dict,
     clingo_term_parser,
     dict_to_ast,
     location_to_str,
+    partition_body_literals,
     prefix_symbolic_atoms,
     str_to_location,
     TheoryAtomType,
     TheoryParser,
-    get_body,
+    filter_body_literals,
     parse_theory,
     reify_symbolic_atoms,
     theory_term_to_literal,
@@ -2353,21 +2362,22 @@ class TestAST(TestCase):
             RuntimeError, dict_to_ast, {"ast_type": "Rule", "body": set()}
         )
 
-    def helper_get_body(
+    def helper_body_elements(
         self,
         stm: str,
         body: Sequence[str],
         signs: Container[Sign] = (Sign.NoSign,),
-        symbolic_atom_predicate: Union[Callable[[AST], bool], bool] = True,
-        theory_atom_predicate: Union[Callable[[AST], bool], bool] = True,
-        aggregate_predicate: Union[Callable[[AST], bool], bool] = True,
-        conditional_literal_predicate: Union[Callable[[AST], bool], bool] = True,
+        symbolic_atom_predicate: ASTPredicate = True,
+        theory_atom_predicate: ASTPredicate = True,
+        aggregate_predicate: ASTPredicate = True,
+        conditional_literal_predicate: ASTPredicate = True,
     ):
         """
-        Helper for testing get_body.
+        Helper for testing filter_body_literals.
         """
-        res = get_body(
-            last_stm(stm),
+        parsed_body = last_stm(stm).body
+        res = filter_body_literals(
+            parsed_body,
             symbolic_atom_predicate,
             theory_atom_predicate,
             aggregate_predicate,
@@ -2375,165 +2385,184 @@ class TestAST(TestCase):
             signs,
         )
         self.assertListEqual(sorted(body), sorted(str(s) for s in res))
+        res_true, res_false = partition_body_literals(
+            parsed_body,
+            symbolic_atom_predicate,
+            theory_atom_predicate,
+            aggregate_predicate,
+            conditional_literal_predicate,
+            signs,
+        )
+        self.assertListEqual(sorted(body), sorted(str(s) for s in res_true))
+        full_body = filter_body_literals(
+            parsed_body,
+            True,
+            True,
+            True,
+            True,
+            (Sign.NoSign, Sign.Negation, Sign.DoubleNegation),
+        )
+        body_false = [str(e) for e in full_body if str(e) not in body]
+        self.assertListEqual(sorted(body_false), sorted(str(s) for s in res_false))
 
     def test_get_positive_body(self):
         """
-        Test for get_body.
+        Test for filter_body_literals.
         """
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).", ["b(X)", "c(Y)"]
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)", "Z = #sum { X: d(X) }"],
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)", "&sum { X: d(X) } = Z"],
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.", ["b(X)", "c(Y)", "Z = { d(X) }"]
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).", ["b(X)", "c(Y)", "d(Z): e(X,Z)"]
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)"],
             theory_atom_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)", "Z = #sum { X: d(X) }"],
             theory_atom_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)"],
             theory_atom_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)", "Z = { d(X) }"],
             theory_atom_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
             theory_atom_predicate=False,
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)"],
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)"],
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)", "&sum { X: d(X) } = Z"],
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)"],
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
             aggregate_predicate=False,
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)"],
             theory_atom_predicate=False,
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)"],
             theory_atom_predicate=False,
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)"],
             theory_atom_predicate=False,
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)"],
             theory_atom_predicate=False,
             aggregate_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
             theory_atom_predicate=False,
             aggregate_predicate=False,
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)", "not d(X)"],
             signs=(Sign.NoSign, Sign.Negation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)", "Z = #sum { X: d(X) }"],
             signs=(Sign.NoSign, Sign.Negation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)", "&sum { X: d(X) } = Z"],
             signs=(Sign.NoSign, Sign.Negation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)", "Z = { d(X) }"],
             signs=(Sign.NoSign, Sign.Negation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
             signs=(Sign.NoSign, Sign.Negation),
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)", "not not e(X,Y)"],
             signs=(Sign.NoSign, Sign.DoubleNegation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)", "Z = #sum { X: d(X) }"],
             signs=(Sign.NoSign, Sign.DoubleNegation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)", "&sum { X: d(X) } = Z"],
             signs=(Sign.NoSign, Sign.DoubleNegation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)", "Z = { d(X) }"],
             signs=(Sign.NoSign, Sign.DoubleNegation),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)", "d(Z): e(X,Z)"],
             signs=(Sign.NoSign, Sign.DoubleNegation),
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["not d(X)", "not not e(X,Y)"],
             signs=(
@@ -2541,7 +2570,7 @@ class TestAST(TestCase):
                 Sign.DoubleNegation,
             ),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             [],
             signs=(
@@ -2549,7 +2578,7 @@ class TestAST(TestCase):
                 Sign.DoubleNegation,
             ),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             [],
             signs=(
@@ -2557,7 +2586,7 @@ class TestAST(TestCase):
                 Sign.DoubleNegation,
             ),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             [],
             signs=(
@@ -2565,7 +2594,7 @@ class TestAST(TestCase):
                 Sign.DoubleNegation,
             ),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             [],
             signs=(
@@ -2574,53 +2603,53 @@ class TestAST(TestCase):
             ),
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), not d(X), not not e(X,Y).",
             ["b(X)", "c(Y)"],
             conditional_literal_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }.",
             ["b(X)", "c(Y)", "Z = #sum { X: d(X) }"],
             conditional_literal_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), &sum { X: d(X) } = Z.",
             ["b(X)", "c(Y)", "&sum { X: d(X) } = Z"],
             conditional_literal_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = { d(X) }.",
             ["b(X)", "c(Y)", "Z = { d(X) }"],
             conditional_literal_predicate=False,
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), d(Z): e(X,Z).",
             ["b(X)", "c(Y)"],
             conditional_literal_predicate=False,
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }, Z = #count { X: d(X) }.",
             ["Z = #count { X: d(X) }", "Z = #sum { X: d(X) }"],
             symbolic_atom_predicate=False,
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }, Z = #count { X: d(X) }.",
             ["Z = #count { X: d(X) }", "Z = #sum { X: d(X) }", "b(X)"],
             symbolic_atom_predicate=lambda x: x.ast_type == ASTType.Function
             and x.name == "b",
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), c(Y), Z = #sum { X: d(X) }, Z = #count { X: d(X) }.",
             ["Z = #count { X: d(X) }", "b(X)", "c(Y)"],
             aggregate_predicate=lambda x: x.ast_type == ASTType.BodyAggregate
             and x.function == AggregateFunction.Count,
         )
 
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- &k{ b(X) }, &k{ not c(X)}.",
             ["&k { b(X) }"],
             theory_atom_predicate=lambda x: not (
@@ -2634,17 +2663,19 @@ class TestAST(TestCase):
                 and x.elements[0].terms[0].elements[0].operators[0] == "not"
             ),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), not c(Y), d(Z): e(X,Z); not d(Z): e(X,Z).",
             ["b(X)", "d(Z): e(X,Z)"],
             signs=(Sign.NoSign,),
         )
-        self.helper_get_body(
+        self.helper_body_elements(
             "a(X) :- b(X), not c(Y), d(Z): e(X,Z); not d(Z): e(X,Z).",
             ["b(X)", "d(Z): e(X,Z)"],
             signs=(Sign.NoSign,),
             conditional_literal_predicate=lambda x: x.literal.sign != Sign.Negation,
         )
+        stm = last_stm("#show a.")
+        self.assertListEqual(list(filter_body_literals([stm])), [stm])
 
     def _aux_theory_term_to_term(self, s: str) -> None:
         """
