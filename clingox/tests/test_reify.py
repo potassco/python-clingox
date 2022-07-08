@@ -3,19 +3,18 @@ Test cases for the reify module.
 """
 
 import os
-from tempfile import NamedTemporaryFile
 from multiprocessing import Process
+from tempfile import NamedTemporaryFile
+from typing import Any, Callable, Dict, Set, Union, cast
 from unittest import TestCase
 
-from typing import Any, Callable, Dict, Set, Union, cast
-
-from clingo.control import Control
-from clingo.symbolic_atoms import SymbolicAtom
-from clingo.symbol import Function, Number, Symbol
 from clingo.application import Application, clingo_main
+from clingo.control import Control
+from clingo.symbol import Function, Number, Symbol
+from clingo.symbolic_atoms import SymbolicAtom
 from clingo.theory_atoms import TheoryTermType
 
-from ..reify import Reifier, ReifiedTheory, ReifiedTheoryTerm, reify_program
+from ..reify import ReifiedTheory, ReifiedTheoryTerm, Reifier, reify_program
 from ..theory import evaluate, is_clingo_operator, is_operator
 
 GRAMMAR = """

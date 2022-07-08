@@ -105,6 +105,10 @@ Another interesting feature is to convert ASTs to YAML:
 ```
 '''
 
+from copy import copy
+from enum import Enum, auto
+from functools import lru_cache, partial, singledispatch
+from re import fullmatch
 from typing import (
     Any,
     Callable,
@@ -119,10 +123,6 @@ from typing import (
     Union,
     cast,
 )
-from functools import lru_cache, partial, singledispatch
-from copy import copy
-from re import fullmatch
-from enum import Enum, auto
 
 import clingo
 from clingo import ast
@@ -144,6 +144,7 @@ from clingo.ast import (
     UnaryOperation,
     parse_string,
 )
+
 from .theory import is_operator
 
 __all__ = [

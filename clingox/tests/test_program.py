@@ -1,9 +1,8 @@
 """
 Test cases for the ground program and observer.
 """
-from unittest import TestCase
-
 from typing import cast
+from unittest import TestCase
 
 from clingo import Control, Function, HeuristicType, TruthValue
 
