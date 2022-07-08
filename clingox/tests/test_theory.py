@@ -4,8 +4,9 @@ Simple tests for term evaluation.
 
 from unittest import TestCase
 
-from clingo.symbol import String, Symbol
 from clingo.control import Control
+from clingo.symbol import String, Symbol
+
 from ..theory import evaluate
 
 

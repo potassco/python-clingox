@@ -45,9 +45,10 @@ Python's `with` statement:
     SAT
 """
 
-from typing import Iterable, Sequence, Tuple
 from itertools import chain
-from clingo import HeuristicType, Symbol, Backend, TruthValue
+from typing import Iterable, Sequence, Tuple
+
+from clingo import Backend, HeuristicType, Symbol, TruthValue
 
 __all__ = ["SymbolicBackend"]
 

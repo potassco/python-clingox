@@ -5,8 +5,8 @@ program
 
 from typing import Optional, Sequence, Tuple
 
-from clingo.control import Control
 from clingo.configuration import Configuration
+from clingo.control import Control
 from clingo.symbol import Symbol
 
 

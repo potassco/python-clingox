@@ -1,5 +1,6 @@
-import nox
 import os
+
+import nox
 
 nox.options.sessions = "lint_flake8", "lint_pylint", "typecheck", "test"
 
@@ -15,7 +16,7 @@ def format(session):
 
 @nox.session
 def lint_flake8(session):
-    session.install("flake8", "flake8-black")
+    session.install("flake8", "flake8-black", "flake8-isort")
     session.run("flake8", "clingox")
 
 

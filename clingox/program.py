@@ -40,6 +40,10 @@ b c a
 ```
 """
 
+from copy import copy
+from dataclasses import dataclass, field
+from functools import singledispatch
+from itertools import chain
 from typing import (
     Callable,
     Iterable,
@@ -53,10 +57,6 @@ from typing import (
     Tuple,
     TypeVar,
 )
-from dataclasses import dataclass, field
-from functools import singledispatch
-from itertools import chain
-from copy import copy
 
 from clingo import Backend, HeuristicType, Observer, Symbol, TruthValue
 

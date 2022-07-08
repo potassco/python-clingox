@@ -37,6 +37,7 @@ Function('p', [], True)
 ```
 """
 
+from dataclasses import dataclass, field
 from typing import (
     Callable,
     Dict,
@@ -49,10 +50,9 @@ from typing import (
     Tuple,
     TypeVar,
 )
-from dataclasses import dataclass, field
 
-from clingo.control import Control
 from clingo.backend import HeuristicType, Observer, TruthValue
+from clingo.control import Control
 from clingo.symbol import Function, Number, String, Symbol
 from clingo.theory_atoms import TheoryTermType
 

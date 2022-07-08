@@ -35,7 +35,7 @@ Example
 
 from typing import Any
 
-from clingo import Symbol, Function, String, Tuple_, Number, SymbolType, TheoryTermType
+from clingo import Function, Number, String, Symbol, SymbolType, TheoryTermType, Tuple_
 
 __all__ = [
     "evaluate",

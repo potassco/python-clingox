@@ -4,45 +4,39 @@ Simple tests for ast manipulation.
 
 # pylint: disable=too-many-lines
 
+from typing import Callable, Container, List, Optional, Sequence, cast
 from unittest import TestCase
-from typing import (
-    Callable,
-    Container,
-    List,
-    Optional,
-    Sequence,
-    cast,
-)
 
 import clingo
 from clingo import Function
 from clingo.ast import (
     AST,
+    AggregateFunction,
+    ASTType,
     Location,
     Position,
     Sign,
     Transformer,
     Variable,
     parse_string,
-    ASTType,
-    AggregateFunction,
 )
+
 from .. import ast
 from ..ast import (
     ASTPredicate,
-    clingo_literal_parser,
-    ast_to_dict,
-    clingo_term_parser,
-    dict_to_ast,
-    location_to_str,
-    partition_body_literals,
-    prefix_symbolic_atoms,
-    str_to_location,
     TheoryAtomType,
     TheoryParser,
+    ast_to_dict,
+    clingo_literal_parser,
+    clingo_term_parser,
+    dict_to_ast,
     filter_body_literals,
+    location_to_str,
     parse_theory,
+    partition_body_literals,
+    prefix_symbolic_atoms,
     reify_symbolic_atoms,
+    str_to_location,
     theory_term_to_literal,
     theory_term_to_term,
 )

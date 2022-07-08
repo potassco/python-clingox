@@ -1,4 +1,5 @@
 from textwrap import dedent
+
 from setuptools import setup
 
 setup(
