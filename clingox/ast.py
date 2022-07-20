@@ -104,7 +104,6 @@ Another interesting feature is to convert ASTs to YAML:
 ]
 ```
 '''
-
 from copy import copy
 from enum import Enum, auto
 from functools import lru_cache, partial, singledispatch

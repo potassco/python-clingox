@@ -3,3 +3,4 @@
 exclude_lines =
     assert
     nocoverage
+    PrettyPrinter\(\)\._safe_repr

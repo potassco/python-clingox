@@ -110,11 +110,11 @@ def _reify_check(
 
 def term_symbols(term: ReifiedTheoryTerm, ret: Dict[int, Symbol]) -> None:
     """
-    Represent arguments to theory operators using clingo's `clingo.Symbol`
-    class.
+    Represent arguments to theory operators using clingo's
+    `clingo.symbol.Symbol` class.
 
-    Theory terms are evaluated using `clingox.theory.evaluate_unary` and added
-    to the given dictionary using the index of the theory term as key.
+    Theory terms are evaluated using `clingox.theory.evaluate` and added to the
+    given dictionary using the index of the theory term as key.
     """
     if (
         term.type == TheoryTermType.Function
@@ -129,7 +129,7 @@ def term_symbols(term: ReifiedTheoryTerm, ret: Dict[int, Symbol]) -> None:
 
 def visit_terms(thy: ReifiedTheory, cb: Callable[[ReifiedTheoryTerm], None]):
     """
-    Visit the terms occuring in the theory atoms of the given theory.
+    Visit the terms occurring in the theory atoms of the given theory.
 
     This function does not recurse into terms.
     """

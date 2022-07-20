@@ -10,3 +10,4 @@ dist
 .eggs
 test.sh
 build
+dev

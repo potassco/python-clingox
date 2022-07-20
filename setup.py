@@ -20,7 +20,7 @@ setup(
         "clingo>=5.5",
         'dataclasses ; python_version<"3.7"',
     ],
-    packages=["clingox"],
+    packages=["clingox", "clingox.testing"],
     package_data={"clingox": ["py.typed"]},
     zip_safe=False,
     python_requires=">=3.6",
