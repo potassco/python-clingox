@@ -49,7 +49,7 @@ There is also a format session for nox. It can be run as follows:
 
 ```bash
 nox -rs format
-nox -rs format -- --check --diff clingox
+nox -rs format -- check
 ```
 
 The latter command can be used to inspect changes before applying them.
