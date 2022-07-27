@@ -1,11 +1,11 @@
 # clingox: Auxiliary functions for the clingo library
 
-This projects collects useful Python functions that can be used along with the
+This project collects useful Python functions that can be used along with the
 clingo library.
 
 ## Documentation
 
-For examples how to use the library check the unit tests. The API documentation
+For examples how to use the library, check the unit tests. The API documentation
 is available [online][doc].
 
 ## Installation
