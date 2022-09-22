@@ -23,7 +23,7 @@ def parse_statement(stm: str) -> AST:
     Parse a statement.
     """
     stms: List[AST] = []
-    parse_string(stm, stms.append, lambda code, msg: None, 1)
+    parse_string(stm, stms.append, logger=lambda code, msg: None, message_limit=1)
     if len(stms) != 2:
         raise RuntimeError(
             f"syntax error: stm must contain exactly one statement, {len(stms)} given"
