@@ -3,7 +3,7 @@ from textwrap import dedent
 from setuptools import setup
 
 setup(
-    version="1.2.0",
+    version="1.2.1",
     name="clingox",
     description="Support library for clingo.",
     long_description=dedent(
