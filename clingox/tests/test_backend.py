@@ -129,7 +129,7 @@ class TestSymbolicBackend(TestCase):
         c = Function("c", [Function("c3")])
         with SymbolicBackend(self.ctl.backend()) as symbolic_backend:
             symbolic_backend.add_weight_rule([a], 3, [(b, 5)], [(c, 7)])
-        self.assertEqual(str(self.prg), "a(c1) :- 3{5,0: b(c2), 7,1: not c(c3)}.")
+        self.assertEqual(str(self.prg), "a(c1) :- 3 #sum {5,0: b(c2); 7,1: not c(c3)}.")
 
     def test_add_weight_choice_rule(self):
         """
@@ -140,4 +140,6 @@ class TestSymbolicBackend(TestCase):
         c = Function("c", [Function("c3")])
         with SymbolicBackend(self.ctl.backend()) as symbolic_backend:
             symbolic_backend.add_weight_rule([a], 3, [(b, 5)], [(c, 7)], choice=True)
-        self.assertEqual(str(self.prg), "{a(c1)} :- 3{5,0: b(c2), 7,1: not c(c3)}.")
+        self.assertEqual(
+            str(self.prg), "{a(c1)} :- 3 #sum {5,0: b(c2); 7,1: not c(c3)}."
+        )

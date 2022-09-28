@@ -372,12 +372,12 @@ def _pretty_str_weight_rule(stm: WeightRule, output_atoms: OutputTable) -> str:
     Pretty print a rule or weight rule.
     """
     head = _pretty_str_rule_head(stm.choice, bool(stm.body), stm.head, output_atoms)
-    body = ", ".join(
+    body = "; ".join(
         f"{weight},{i}: {_pretty_str_lit(literal, output_atoms)}"
         for i, (literal, weight) in enumerate(stm.body)
     )
 
-    return f"{head}{stm.lower_bound}{{{body}}}."
+    return f"{head}{stm.lower_bound} #sum {{{body}}}."
 
 
 @remap.register(WeightRule)

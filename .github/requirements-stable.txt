@@ -1,6 +1,5 @@
-clingo==5.5.*
-clingo-dl==1.3.*
-clingcon==5.0.*
+clingo
+clingo-dl
+clingcon
 dataclasses; python_version < '3.7'
 types-dataclasses; python_version < '3.7'
---extra-index-url https://test.pypi.org/simple/
