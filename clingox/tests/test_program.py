@@ -222,7 +222,7 @@ class TestProgram(TestCase):
                     )
                 ],
             ),
-            "{a} :- 10{7,0: b, 5,1: not c}.",
+            "{a} :- 10 #sum {7,0: b; 5,1: not c}.",
         )
 
     def test_add_weight_choice_rule(self):
@@ -248,7 +248,7 @@ class TestProgram(TestCase):
                     )
                 ],
             ),
-            "{a} :- 10{7,0: b, 5,1: not c}.",
+            "{a} :- 10 #sum {7,0: b; 5,1: not c}.",
         )
 
     def test_add_project(self):
