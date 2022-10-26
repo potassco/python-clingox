@@ -2775,7 +2775,7 @@ class TestAST(TestCase):
             "ast.SymbolicAtom(ast.Function(Location(begin=Position(filename='<string>', line=1, column=9), "
             "end=Position(filename='<string>', line=1, column=13)), 'u', "
             "[ast.Function(Location(begin=Position(filename='<string>', line=1, column=11), "
-            "end=Position(filename='<string>', line=1, column=12)), 'b', [], 0)], 0)))])]"
+            "end=Position(filename='<string>', line=1, column=12)), 'b', [], 0)], 0)))])]",
         )
         self.assertEqual(
             test_parse_function_transformer("#program base(n). u(a(1..n))."),
@@ -2798,5 +2798,5 @@ class TestAST(TestCase):
             "ast.SymbolicTerm(Location(begin=Position(filename='<string>', line=1, column=23), "
             "end=Position(filename='<string>', line=1, column=24)), Number(1)), "
             "ast.Function(Location(begin=Position(filename='<string>', line=1, column=26), "
-            "end=Position(filename='<string>', line=1, column=27)), 'n', [], 0))], 0)], 0))), [])]"
+            "end=Position(filename='<string>', line=1, column=27)), 'n', [], 0))], 0)], 0))), [])]",
         )

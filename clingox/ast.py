@@ -1404,6 +1404,7 @@ def rule_to_symbolic_term_adapter(x: AST):
 
 class _SymbolicTermToFunctionTransformer(Transformer):
     """Transforms a SymbolicTerm AST into a Function AST"""
+
     def visit_SymbolicTerm(self, term: AST):  # pylint: disable=invalid-name
         """
         Transform the given symbolic term.
