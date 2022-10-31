@@ -2761,9 +2761,6 @@ class TestAST(TestCase):
             normalized_atom, ast.Function(LOC, "u", [ast.Function(LOC, "a", [], 0)], 0)
         )
         atom = parse_term("u(1)")
-        print("=" * 80)
-        print(repr(atom))
-        print("=" * 80)
         self.assertEqual(
             atom, ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Number(1))], 0)
         )
