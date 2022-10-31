@@ -2749,9 +2749,6 @@ class TestAST(TestCase):
         Tests for converting clingo.Function to ast.Function
         """
         atom = parse_term("u(a)")
-        print("=" * 80)
-        print(repr(atom))
-        print("=" * 80)
         self.assertEqual(
             atom,
             ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Function("a", [], True))], 0),
