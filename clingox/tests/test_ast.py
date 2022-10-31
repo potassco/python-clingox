@@ -8,7 +8,7 @@ from typing import Callable, Container, List, Optional, Sequence, cast
 from unittest import TestCase
 
 import clingo
-from clingo import Function
+from clingo import Function, Number
 from clingo.ast import (
     AST,
     AggregateFunction,
@@ -21,6 +21,8 @@ from clingo.ast import (
     parse_string,
 )
 
+from clingox.testing.ast import parse_term
+
 from .. import ast
 from ..ast import (
     ASTPredicate,
@@ -32,11 +34,11 @@ from ..ast import (
     dict_to_ast,
     filter_body_literals,
     location_to_str,
+    normalize_symbolic_terms,
     parse_theory,
     partition_body_literals,
     prefix_symbolic_atoms,
     reify_symbolic_atoms,
-    rule_to_symbolic_term_adapter,
     str_to_location,
     theory_term_to_literal,
     theory_term_to_term,
@@ -177,17 +179,6 @@ def parse_with(s: str, f: Callable[[AST], AST] = lambda x: x) -> Sequence[str]:
 
     parse_string(s, append)
     return prg
-
-
-def test_parse_function_transformer(stm: str) -> str:
-    """
-    Parse the given program and apply Function transformer to return a list of strings.
-    """
-    ret: List[AST]
-    ret = []
-    parse_string(stm, ret.append)
-    expected_program = [rule_to_symbolic_term_adapter(stm) for stm in ret]
-    return str(expected_program)
 
 
 def test_rename(s: str) -> Sequence[str]:
@@ -2757,46 +2748,27 @@ class TestAST(TestCase):
         """
         Tests for converting clingo.Function to ast.Function
         """
-
+        atom = parse_term("u(a)")
+        print("=" * 80)
+        print(repr(atom))
+        print("=" * 80)
         self.assertEqual(
-            test_parse_function_transformer("u(a) :- u(b)."),
-            "[ast.Program(Location(begin=Position(filename='<string>', line=1, column=1), "
-            "end=Position(filename='<string>', line=1, column=1)), 'base', []), "
-            "ast.Rule(Location(begin=Position(filename='<string>', line=1, column=1), "
-            "end=Position(filename='<string>', line=1, column=14)), "
-            "ast.Literal(Location(begin=Position(filename='<string>', line=1, column=1), "
-            "end=Position(filename='<string>', line=1, column=5)), 0, "
-            "ast.SymbolicAtom(ast.Function(Location(begin=Position(filename='<string>', line=1, column=1), "
-            "end=Position(filename='<string>', line=1, column=5)), 'u', "
-            "[ast.Function(Location(begin=Position(filename='<string>', line=1, column=3), "
-            "end=Position(filename='<string>', line=1, column=4)), 'a', [], 0)], 0))), "
-            "[ast.Literal(Location(begin=Position(filename='<string>', line=1, column=9), "
-            "end=Position(filename='<string>', line=1, column=13)), 0, "
-            "ast.SymbolicAtom(ast.Function(Location(begin=Position(filename='<string>', line=1, column=9), "
-            "end=Position(filename='<string>', line=1, column=13)), 'u', "
-            "[ast.Function(Location(begin=Position(filename='<string>', line=1, column=11), "
-            "end=Position(filename='<string>', line=1, column=12)), 'b', [], 0)], 0)))])]",
+            atom,
+            ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Function("a", [], True))], 0),
         )
+        normalized_atom = normalize_symbolic_terms(atom)
         self.assertEqual(
-            test_parse_function_transformer("#program base(n). u(a(1..n))."),
-            "[ast.Program(Location(begin=Position(filename='<string>', line=1, column=1), "
-            "end=Position(filename='<string>', line=1, column=1)), 'base', []), "
-            "ast.Program(Location(begin=Position(filename='<string>', line=1, column=1), "
-            "end=Position(filename='<string>', line=1, column=18)), 'base', "
-            "[ast.Id(Location(begin=Position(filename='<string>', line=1, column=15), "
-            "end=Position(filename='<string>', line=1, column=16)), 'n')]), "
-            "ast.Rule(Location(begin=Position(filename='<string>', line=1, column=19), "
-            "end=Position(filename='<string>', line=1, column=30)), "
-            "ast.Literal(Location(begin=Position(filename='<string>', line=1, column=19), "
-            "end=Position(filename='<string>', line=1, column=29)), 0, "
-            "ast.SymbolicAtom(ast.Function(Location(begin=Position(filename='<string>', line=1, column=19), "
-            "end=Position(filename='<string>', line=1, column=29)), 'u', "
-            "[ast.Function(Location(begin=Position(filename='<string>', line=1, column=21), "
-            "end=Position(filename='<string>', line=1, column=28)), 'a', "
-            "[ast.Interval(Location(begin=Position(filename='<string>', line=1, column=23), "
-            "end=Position(filename='<string>', line=1, column=27)), "
-            "ast.SymbolicTerm(Location(begin=Position(filename='<string>', line=1, column=23), "
-            "end=Position(filename='<string>', line=1, column=24)), Number(1)), "
-            "ast.Function(Location(begin=Position(filename='<string>', line=1, column=26), "
-            "end=Position(filename='<string>', line=1, column=27)), 'n', [], 0))], 0)], 0))), [])]",
+            normalized_atom, ast.Function(LOC, "u", [ast.Function(LOC, "a", [], 0)], 0)
+        )
+        atom = parse_term("u(1)")
+        print("=" * 80)
+        print(repr(atom))
+        print("=" * 80)
+        self.assertEqual(
+            atom, ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Number(1))], 0)
+        )
+        normalized_atom = normalize_symbolic_terms(atom)
+        self.assertEqual(
+            normalized_atom,
+            ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Number(1))], 0),
         )
