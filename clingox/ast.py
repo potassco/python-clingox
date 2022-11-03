@@ -1457,8 +1457,4 @@ class _NormalizeSymbolicTermTransformer(Transformer):
         if symbol.type != clingo.SymbolType.Function:
             return term
 
-        location = term.location
-        name = symbol.name
-        arguments = [symbol_to_ast(arg, location) for arg in symbol.arguments]
-
-        return ast.Function(location, name, arguments, external=False)
+        return symbol_to_ast(symbol, term.location)
