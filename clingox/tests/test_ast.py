@@ -2766,3 +2766,14 @@ class TestAST(TestCase):
             normalized_atom,
             ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Number(1))], 0),
         )
+        atom = ast.SymbolicTerm(LOC, Function("u", [Function("a", [], True)], True))
+        normalized_atom = normalize_symbolic_terms(atom)
+        self.assertEqual(
+            normalized_atom, ast.Function(LOC, "u", [ast.Function(LOC, "a", [], 0)], 0)
+        )
+        atom = ast.SymbolicTerm(LOC, Function("u", [Number(1)], True))
+        normalized_atom = normalize_symbolic_terms(atom)
+        self.assertEqual(
+            normalized_atom,
+            ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Number(1))], 0),
+        )

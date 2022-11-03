@@ -1410,6 +1410,31 @@ def normalize_symbolic_terms(x: AST):
     return _NormalizeSymbolicTermTransformer().visit(x)
 
 
+def symbol_to_ast(x: clingo.Symbol, location: ast.Location) -> AST:
+    """
+    Convert the given symbol into an AST.
+
+    Parameters
+    ----------
+    x
+        The symbol to convert.
+    location
+        The location to use.
+
+    Returns
+    -------
+    The converted AST.
+    """
+    if x.type != clingo.SymbolType.Function:
+        return SymbolicTerm(location, x)
+    return ast.Function(
+        location,
+        x.name,
+        [symbol_to_ast(a, location) for a in x.arguments],
+        external=False,
+    )
+
+
 class _NormalizeSymbolicTermTransformer(Transformer):
     """Transforms a SymbolicTerm AST of type Function into an AST of type ast.Function."""
 
@@ -1434,6 +1459,6 @@ class _NormalizeSymbolicTermTransformer(Transformer):
 
         location = term.location
         name = symbol.name
-        arguments = symbol.arguments
+        arguments = [symbol_to_ast(arg, location) for arg in symbol.arguments]
 
-        return ast.Function(location, name, arguments, False)
+        return ast.Function(location, name, arguments, external=False)
