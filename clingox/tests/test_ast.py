@@ -8,7 +8,7 @@ from typing import Callable, Container, List, Optional, Sequence, cast
 from unittest import TestCase
 
 import clingo
-from clingo import Function
+from clingo import Function, Number
 from clingo.ast import (
     AST,
     AggregateFunction,
@@ -21,6 +21,8 @@ from clingo.ast import (
     parse_string,
 )
 
+from clingox.testing.ast import parse_term
+
 from .. import ast
 from ..ast import (
     ASTPredicate,
@@ -32,6 +34,7 @@ from ..ast import (
     dict_to_ast,
     filter_body_literals,
     location_to_str,
+    normalize_symbolic_terms,
     parse_theory,
     partition_body_literals,
     prefix_symbolic_atoms,
@@ -2740,3 +2743,26 @@ class TestAST(TestCase):
             theory_term_to_literal(parse_theory_term_as_literal("(a,b)"))
         with self.assertRaisesRegex(RuntimeError, "invalid literal"):
             theory_term_to_literal(parse_theory_term_as_literal("not 3*4"))
+
+    def test_function_transformer(self):
+        """
+        Tests for converting clingo.Function to ast.Function
+        """
+        atom = parse_term("u(a)")
+        self.assertEqual(
+            atom,
+            ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Function("a", [], True))], 0),
+        )
+        normalized_atom = normalize_symbolic_terms(atom)
+        self.assertEqual(
+            normalized_atom, ast.Function(LOC, "u", [ast.Function(LOC, "a", [], 0)], 0)
+        )
+        atom = parse_term("u(1)")
+        self.assertEqual(
+            atom, ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Number(1))], 0)
+        )
+        normalized_atom = normalize_symbolic_terms(atom)
+        self.assertEqual(
+            normalized_atom,
+            ast.Function(LOC, "u", [ast.SymbolicTerm(LOC, Number(1))], 0),
+        )
