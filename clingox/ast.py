@@ -162,6 +162,7 @@ __all__ = [
     "filter_body_literals",
     "location_to_str",
     "negate_sign",
+    "normalize_symbolic_terms",
     "parse_theory",
     "partition_body_literals",
     "prefix_symbolic_atoms",
@@ -171,7 +172,6 @@ __all__ = [
     "theory_parser_from_definition",
     "theory_term_to_literal",
     "theory_term_to_term",
-    "normalize_symbolic_terms",
 ]
 
 
