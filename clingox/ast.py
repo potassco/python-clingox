@@ -162,6 +162,7 @@ __all__ = [
     "filter_body_literals",
     "location_to_str",
     "negate_sign",
+    "normalize_symbolic_terms",
     "parse_theory",
     "partition_body_literals",
     "prefix_symbolic_atoms",
@@ -1391,3 +1392,70 @@ def theory_term_to_literal(x: AST, parse: bool = True) -> AST:
     if parse:
         x = clingo_literal_parser()(x)
     return _theory_term_to_literal(x, True, ast.Sign.NoSign)
+
+
+def normalize_symbolic_terms(x: AST):
+    """
+    Replaces all occurrences of objects of the class clingo.Function in an AST
+    by the corresponding object of the class ast.Function.
+
+    Parameters
+    ----------
+    x
+        The AST to rewrite.
+
+    Returns
+    -------
+    The rewritten AST.
+    """
+    return _NormalizeSymbolicTermTransformer().visit(x)
+
+
+def _symbol_to_ast(x: clingo.Symbol, location: ast.Location) -> AST:
+    """
+    Convert the given symbol into an AST.
+
+    Parameters
+    ----------
+    x
+        The symbol to convert.
+    location
+        The location to use.
+
+    Returns
+    -------
+    The converted AST.
+    """
+    if x.type != clingo.SymbolType.Function:
+        return SymbolicTerm(location, x)
+    return ast.Function(
+        location,
+        x.name,
+        [_symbol_to_ast(a, location) for a in x.arguments],
+        external=False,
+    )
+
+
+class _NormalizeSymbolicTermTransformer(Transformer):
+    """Transforms a SymbolicTerm AST of type Function into an AST of type ast.Function."""
+
+    def visit_SymbolicTerm(self, x: AST):  # pylint: disable=invalid-name
+        """
+        Transform the given symbolic term.
+
+        Parameters
+        ----------
+        x
+            The AST to rewrite.
+
+        Returns
+        -------
+        The rewritten AST.
+        """
+
+        symbol = x.symbol
+
+        if symbol.type != clingo.SymbolType.Function:
+            return x
+
+        return _symbol_to_ast(symbol, x.location)
