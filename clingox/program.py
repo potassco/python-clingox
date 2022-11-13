@@ -830,7 +830,7 @@ class Remapping:
     _map: MutableMapping[Atom, Atom]
 
     def __init__(
-        self, backend: Backend, output_atoms: OutputTable, facts: Iterable[Fact] = None
+        self, backend: Backend, output_atoms: OutputTable, facts: Iterable[Fact] = ()
     ):
         self._backend = backend
         self._map = {}
