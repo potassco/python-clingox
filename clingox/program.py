@@ -837,9 +837,8 @@ class Remapping:
         for atom, sym in output_atoms.items():
             assert atom not in self._map
             self._map[atom] = self._backend.add_atom(sym)
-        if facts is not None:
-            for fact in facts:
-                backend.add_rule([backend.add_atom(fact.symbol)])
+        for fact in facts:
+            backend.add_rule([backend.add_atom(fact.symbol)])
 
     def __call__(self, atom: Atom) -> Atom:
         """
