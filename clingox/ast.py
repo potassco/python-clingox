@@ -921,7 +921,7 @@ def prefix_symbolic_atoms(x: AST, prefix: str) -> AST:
 def reify_symbolic_atoms(
     x: AST,
     name: str,
-    argument_extender: Callable[[AST], Sequence[AST]] = None,
+    argument_extender: Optional[Callable[[AST], Sequence[AST]]] = None,
     reify_strong_negation: bool = False,
 ) -> AST:
     """
