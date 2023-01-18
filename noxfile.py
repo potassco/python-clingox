@@ -6,8 +6,11 @@ import nox
 nox.options.sessions = "lint_flake8", "lint_pylint", "typecheck", "test"
 
 PYTHON_VERSIONS = None
-if not sys.platform.startswith("linux") and "GITHUB_ACTIONS" in os.environ:
-    PYTHON_VERSIONS = ["3.6", "3.11"]
+if "GITHUB_ACTIONS" in os.environ:
+    PYTHON_VERSIONS = ["3.7", "3.11"]
+    # Note: there is no Python 3.6 anymore on Ubuntu 22.04
+    if not sys.platform.startswith("linux"):
+        PYTHON_VERSIONS.insert(0, "3.6")
 
 
 @nox.session
