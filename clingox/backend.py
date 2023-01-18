@@ -13,7 +13,7 @@ The following example shows how to add the rules
 to a program using the `SymbolicBackend`:
 
     >>> import clingo
-    >>> from clingox.backends import SymbolicBackend
+    >>> from clingox.backend import SymbolicBackend
     >>> ctl = clingo.Control()
     >>> a = clingo.Function("a")
     >>> b = clingo.Function("b")
@@ -30,7 +30,7 @@ that it wraps. In this case, it is the `Backend` that must be used with
 Python's `with` statement:
 
     >>> import clingo
-    >>> from clingox.backends import SymbolicBackend
+    >>> from clingox.backend import SymbolicBackend
     >>> ctl = clingo.Control()
     >>> a = clingo.Function("a")
     >>> b = clingo.Function("b")
