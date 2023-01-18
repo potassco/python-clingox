@@ -1,10 +1,13 @@
 import os
+import sys
 
 import nox
 
 nox.options.sessions = "lint_flake8", "lint_pylint", "typecheck", "test"
 
-PYTHON_VERSIONS = ["3.6", "3.9"] if "GITHUB_ACTIONS" in os.environ else None
+PYTHON_VERSIONS = None
+if not sys.platform.startswith("linux") and "GITHUB_ACTIONS" in os.environ:
+    PYTHON_VERSIONS = ["3.6", "3.11"]
 
 
 @nox.session
