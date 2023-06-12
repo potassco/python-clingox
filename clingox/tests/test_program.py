@@ -420,4 +420,3 @@ class TestProgram(TestCase):
                 projects=[Project(atom=lb), Project(atom=la)],
             ).sort(),
         )
-        print(self.prg)
