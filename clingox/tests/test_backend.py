@@ -49,7 +49,7 @@ class TestSymbolicBackend(TestCase):
         a = Function("a", [Function("c1")])
         with SymbolicBackend(self.ctl.backend()) as symbolic_backend:
             symbolic_backend.add_external(a, TruthValue.True_)
-        self.assertEqual(str(self.prg), "#external a(c1). [True]")
+        self.assertEqual(str(self.prg), "#external a(c1). [true]")
 
     def test_add_heuristic(self):
         """
