@@ -197,10 +197,10 @@ def _pretty_str_truth_value(stm: TruthValue):
     Pretty print a truth value.
     """
     if stm == TruthValue.False_:
-        return "False"
+        return "false"
     if stm == TruthValue.True_:
-        return "True"
-    return "Free"
+        return "true"
+    return "free"
 
 
 def _remap_lit(literal: Literal, mapping: AtomMap) -> Atom:

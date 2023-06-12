@@ -300,7 +300,7 @@ class TestProgram(TestCase):
                     External(atom=13, value=TruthValue.False_),
                 ],
             ),
-            "#external a. [True]\n" "#external b. [Free]\n" "#external c. [False]",
+            "#external a. [true]\n" "#external b. [free]\n" "#external c. [false]",
         )
 
     def test_add_minimize(self):
@@ -399,7 +399,6 @@ class TestProgram(TestCase):
             """,
         )
         ctl.ground([("base", [])])
-
         a, b, c = (Function(s) for s in ("a", "b", "c"))
         la, lb, lc = (ctl.symbolic_atoms[sym].literal for sym in (a, b, c))
 
