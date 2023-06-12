@@ -1,5 +1,4 @@
 import os
-import sys
 
 import nox
 
@@ -8,7 +7,6 @@ nox.options.sessions = "lint_flake8", "lint_pylint", "typecheck", "test"
 PYTHON_VERSIONS = None
 if "GITHUB_ACTIONS" in os.environ:
     PYTHON_VERSIONS = ["3.7", "3.11"]
-
 
 
 @nox.session
