@@ -1,5 +1,10 @@
 # Changes
 
+## clingox 1.2.1
+* fix printing of weight rules (#39)
+* fix printing of external directives (#45)
+* add function to remove function symbols from AST (#41)
+
 ## clingox 1.2.0
 * make compatible with clingo 5.6
 * add module to ease unit testing
