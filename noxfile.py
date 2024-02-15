@@ -2,7 +2,7 @@ import os
 
 import nox
 
-nox.options.sessions = "lint_flake8", "lint_pylint", "typecheck", "test"
+nox.options.sessions = "lint_pylint", "typecheck", "test"
 
 PYTHON_VERSIONS = None
 if "GITHUB_ACTIONS" in os.environ:
@@ -37,12 +37,6 @@ def format(session):
         black_args.insert(0, "--check")
         black_args.insert(1, "--diff")
     session.run("black", *black_args)
-
-
-@nox.session
-def lint_flake8(session):
-    session.install("flake8", "flake8-black", "flake8-isort")
-    session.run("flake8", "clingox")
 
 
 @nox.session
